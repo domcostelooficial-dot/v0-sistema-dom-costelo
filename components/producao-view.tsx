@@ -15,6 +15,7 @@ import {
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
@@ -145,6 +146,11 @@ export function ProducaoView({
                 <DialogTitle>
                   {editingReceita ? "Editar Receita" : "Nova Receita"}
                 </DialogTitle>
+                <DialogDescription>
+                  {editingReceita
+                    ? "Altere os dados da receita de producao"
+                    : "Crie uma nova receita definindo os itens de entrada e saida"}
+                </DialogDescription>
               </DialogHeader>
               <FieldGroup className="gap-4">
                 <Field>
