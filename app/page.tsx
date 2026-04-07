@@ -53,7 +53,16 @@ export default function Home() {
 
   const handleUpdateItem = (nome: string, novoAtual: number) => {
     const updated = itens.map((item) =>
-      item.nome === nome ? { ...item, atual: novoAtual } : item
+      item.nome === nome
+        ? {
+            ...item,
+            atual: novoAtual,
+            ultimaAlteracao: {
+              usuario: user || "Desconhecido",
+              data: new Date().toLocaleDateString("pt-BR"),
+            },
+          }
+        : item
     )
     setItens(updated)
     saveEstoque(updated)
@@ -62,7 +71,16 @@ export default function Home() {
   const handleEntrada = (nome: string, qtd: number, custo: number) => {
     // Update estoque
     const updated = itens.map((item) =>
-      item.nome === nome ? { ...item, atual: item.atual + qtd } : item
+      item.nome === nome
+        ? {
+            ...item,
+            atual: item.atual + qtd,
+            ultimaAlteracao: {
+              usuario: user || "Desconhecido",
+              data: new Date().toLocaleDateString("pt-BR"),
+            },
+          }
+        : item
     )
     setItens(updated)
     saveEstoque(updated)
@@ -80,12 +98,16 @@ export default function Home() {
   }
 
   const handleProduzir = () => {
+    const alteracao = {
+      usuario: user || "Desconhecido",
+      data: new Date().toLocaleDateString("pt-BR"),
+    }
     const updated = itens.map((item) => {
       if (item.nome === "Costela") {
-        return { ...item, atual: item.atual - 1 }
+        return { ...item, atual: item.atual - 1, ultimaAlteracao: alteracao }
       }
       if (item.nome === "Costela Desfiada") {
-        return { ...item, atual: item.atual + 1 }
+        return { ...item, atual: item.atual + 1, ultimaAlteracao: alteracao }
       }
       return item
     })

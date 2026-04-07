@@ -4,6 +4,10 @@ export interface Item {
   atual: number
   categoria: string
   preco?: number
+  ultimaAlteracao?: {
+    usuario: string
+    data: string
+  }
 }
 
 export interface HistoricoEntry {

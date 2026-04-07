@@ -32,13 +32,14 @@ export function ExportPDFButton({ itensEmFalta }: ExportPDFButtonProps) {
     
     // Table header
     let yPos = 55
-    doc.setFontSize(11)
+    doc.setFontSize(10)
     doc.setFont("helvetica", "bold")
     doc.text("Item", 20, yPos)
-    doc.text("Categoria", 90, yPos)
-    doc.text("Atual", 140, yPos)
-    doc.text("Min.", 160, yPos)
-    doc.text("Comprar", 175, yPos)
+    doc.text("Categoria", 70, yPos)
+    doc.text("Atual", 105, yPos)
+    doc.text("Min.", 120, yPos)
+    doc.text("Comprar", 137, yPos)
+    doc.text("Alterado por", 160, yPos)
     
     doc.setLineWidth(0.3)
     doc.line(20, yPos + 3, 190, yPos + 3)
@@ -80,16 +81,18 @@ export function ExportPDFButton({ itensEmFalta }: ExportPDFButtonProps) {
         
         const quantidadeComprar = Math.max(0, item.min - item.atual + Math.ceil(item.min * 0.2))
         const isCritical = item.atual < item.min
+        const alteradoPor = item.ultimaAlteracao?.usuario || "-"
         
         if (isCritical) {
           doc.setTextColor(180, 0, 0)
         }
         
-        doc.text(item.nome, 22, yPos)
-        doc.text(item.categoria, 90, yPos)
-        doc.text(String(item.atual), 143, yPos)
-        doc.text(String(item.min), 163, yPos)
-        doc.text(String(quantidadeComprar), 180, yPos)
+        doc.text(item.nome.substring(0, 25), 22, yPos)
+        doc.text(item.categoria, 70, yPos)
+        doc.text(String(item.atual), 108, yPos)
+        doc.text(String(item.min), 123, yPos)
+        doc.text(String(quantidadeComprar), 142, yPos)
+        doc.text(alteradoPor.substring(0, 12), 160, yPos)
         
         doc.setTextColor(0, 0, 0)
         yPos += 7

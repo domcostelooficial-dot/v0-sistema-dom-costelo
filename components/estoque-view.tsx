@@ -192,6 +192,7 @@ export function EstoqueView({ itens, onUpdateItem }: EstoqueViewProps) {
                   <TableHead className="text-muted-foreground text-center">Mínimo</TableHead>
                   <TableHead className="text-muted-foreground text-center">Atual</TableHead>
                   <TableHead className="text-muted-foreground text-center">Status</TableHead>
+                  <TableHead className="text-muted-foreground hidden md:table-cell">Alterado por</TableHead>
                   <TableHead className="text-muted-foreground text-center">Ações</TableHead>
                 </TableRow>
               </TableHeader>
@@ -212,6 +213,19 @@ export function EstoqueView({ itens, onUpdateItem }: EstoqueViewProps) {
                     </TableCell>
                     <TableCell className="text-center">
                       {getStatusBadge(item)}
+                    </TableCell>
+                    <TableCell className="text-muted-foreground hidden md:table-cell">
+                      {item.ultimaAlteracao ? (
+                        <div className="text-sm">
+                          <span className="font-medium text-foreground capitalize">
+                            {item.ultimaAlteracao.usuario}
+                          </span>
+                          <br />
+                          <span className="text-xs">{item.ultimaAlteracao.data}</span>
+                        </div>
+                      ) : (
+                        <span className="text-xs">-</span>
+                      )}
                     </TableCell>
                     <TableCell className="text-center">
                       <div className="flex items-center justify-center gap-1">
