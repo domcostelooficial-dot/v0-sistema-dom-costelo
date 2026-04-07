@@ -29,7 +29,6 @@ import {
   Plus,
   FileDown,
 } from "lucide-react"
-import jsPDF from "jspdf"
 
 interface EstoqueViewProps {
   itens: Item[]
@@ -64,7 +63,8 @@ export function EstoqueView({ itens, onUpdateItem }: EstoqueViewProps) {
     return itens.filter((item) => item.atual <= item.min * 1.2)
   }, [itens])
 
-  const exportarListaComprasPDF = () => {
+  const exportarListaComprasPDF = async () => {
+    const jsPDF = (await import("jspdf")).default
     const doc = new jsPDF()
     const dataAtual = new Date().toLocaleDateString("pt-BR")
     
