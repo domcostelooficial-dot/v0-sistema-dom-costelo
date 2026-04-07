@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Item, HistoricoEntry } from "@/lib/types"
+import { Item, HistoricoEntry, Receita } from "@/lib/types"
 import {
   getEstoque,
   saveEstoque,
@@ -10,6 +10,8 @@ import {
   getUser,
   saveUser,
   clearUser,
+  getReceitas,
+  saveReceitas,
 } from "@/lib/store"
 import { LoginForm } from "@/components/login-form"
 import { AppSidebar } from "@/components/app-sidebar"
@@ -28,16 +30,19 @@ export default function Home() {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [itens, setItens] = useState<Item[]>([])
   const [historico, setHistorico] = useState<HistoricoEntry[]>([])
+  const [receitas, setReceitas] = useState<Receita[]>([])
 
   // Load data on mount
   useEffect(() => {
     const storedUser = getUser()
     const storedItens = getEstoque()
     const storedHistorico = getHistorico()
+    const storedReceitas = getReceitas()
 
     setUser(storedUser)
     setItens(storedItens)
     setHistorico(storedHistorico)
+    setReceitas(storedReceitas)
     setIsLoading(false)
   }, [])
 
@@ -97,22 +102,40 @@ export default function Home() {
     saveHistorico(newHistorico)
   }
 
-  const handleProduzir = () => {
+  const handleProduzir = (receita: Receita) => {
     const alteracao = {
       usuario: user || "Desconhecido",
       data: new Date().toLocaleDateString("pt-BR"),
     }
     const updated = itens.map((item) => {
-      if (item.nome === "Costela") {
-        return { ...item, atual: item.atual - 1, ultimaAlteracao: alteracao }
+      if (item.nome === receita.inputItem) {
+        return { ...item, atual: item.atual - receita.inputQtd, ultimaAlteracao: alteracao }
       }
-      if (item.nome === "Costela Desfiada") {
-        return { ...item, atual: item.atual + 1, ultimaAlteracao: alteracao }
+      if (item.nome === receita.outputItem) {
+        return { ...item, atual: item.atual + receita.outputQtd, ultimaAlteracao: alteracao }
       }
       return item
     })
     setItens(updated)
     saveEstoque(updated)
+  }
+
+  const handleAddReceita = (receita: Receita) => {
+    const newReceitas = [...receitas, receita]
+    setReceitas(newReceitas)
+    saveReceitas(newReceitas)
+  }
+
+  const handleUpdateReceita = (receita: Receita) => {
+    const updated = receitas.map((r) => (r.id === receita.id ? receita : r))
+    setReceitas(updated)
+    saveReceitas(updated)
+  }
+
+  const handleDeleteReceita = (id: string) => {
+    const filtered = receitas.filter((r) => r.id !== id)
+    setReceitas(filtered)
+    saveReceitas(filtered)
   }
 
   if (isLoading) {
@@ -171,7 +194,14 @@ export default function Home() {
             <EntradaView itens={itens} onEntrada={handleEntrada} />
           )}
           {activeTab === "producao" && (
-            <ProducaoView itens={itens} onProduzir={handleProduzir} />
+            <ProducaoView
+              itens={itens}
+              receitas={receitas}
+              onProduzir={handleProduzir}
+              onAddReceita={handleAddReceita}
+              onUpdateReceita={handleUpdateReceita}
+              onDeleteReceita={handleDeleteReceita}
+            />
           )}
           {activeTab === "financeiro" && (
             <FinanceiroView historico={historico} />

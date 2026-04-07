@@ -22,6 +22,26 @@ export interface Usuario {
   pass: string
 }
 
+export interface Receita {
+  id: string
+  nome: string
+  inputItem: string
+  inputQtd: number
+  outputItem: string
+  outputQtd: number
+}
+
+export const defaultReceitas: Receita[] = [
+  {
+    id: "1",
+    nome: "Costela Pronta",
+    inputItem: "Costela Crua",
+    inputQtd: 1,
+    outputItem: "Costela Pronta",
+    outputQtd: 1,
+  },
+]
+
 export const categorias = [
   "Carnes",
   "Padaria",
@@ -36,10 +56,10 @@ export const categorias = [
 export type Categoria = (typeof categorias)[number]
 
 export const defaultItens: Item[] = [
-  { nome: "Costela", min: 12, atual: 12, categoria: "Carnes" },
+  { nome: "Costela Crua", min: 12, atual: 12, categoria: "Carnes" },
   { nome: "Contra filé", min: 6, atual: 6, categoria: "Carnes" },
   { nome: "Carne de hambúrguer", min: 12, atual: 12, categoria: "Carnes" },
-  { nome: "Costela Desfiada", min: 2, atual: 2, categoria: "Carnes" },
+  { nome: "Costela Pronta", min: 2, atual: 2, categoria: "Carnes" },
   { nome: "Bacon em cubos", min: 2, atual: 2, categoria: "Carnes" },
 
   { nome: "Pão de Australiano Aussie", min: 12, atual: 12, categoria: "Padaria" },

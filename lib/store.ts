@@ -1,10 +1,11 @@
 "use client"
 
-import { Item, HistoricoEntry, defaultItens } from "./types"
+import { Item, HistoricoEntry, Receita, defaultItens, defaultReceitas } from "./types"
 
 const ESTOQUE_KEY = "dom-costelo-estoque"
 const HISTORICO_KEY = "dom-costelo-historico"
 const USER_KEY = "dom-costelo-user"
+const RECEITAS_KEY = "dom-costelo-receitas"
 
 export function getEstoque(): Item[] {
   if (typeof window === "undefined") return defaultItens
@@ -41,4 +42,15 @@ export function saveUser(user: string) {
 export function clearUser() {
   if (typeof window === "undefined") return
   localStorage.removeItem(USER_KEY)
+}
+
+export function getReceitas(): Receita[] {
+  if (typeof window === "undefined") return defaultReceitas
+  const stored = localStorage.getItem(RECEITAS_KEY)
+  return stored ? JSON.parse(stored) : defaultReceitas
+}
+
+export function saveReceitas(receitas: Receita[]) {
+  if (typeof window === "undefined") return
+  localStorage.setItem(RECEITAS_KEY, JSON.stringify(receitas))
 }
