@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import Image from "next/image"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -37,8 +38,15 @@ export function LoginForm({ onLogin }: LoginFormProps) {
     <div className="min-h-screen flex items-center justify-center bg-background p-4">
       <Card className="w-full max-w-md border-border">
         <CardHeader className="text-center">
-          <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-primary/10">
-            <span className="text-3xl">🍔</span>
+          <div className="mx-auto mb-4">
+            <Image
+              src="/logo.jpg"
+              alt="Dom Costelo Logo"
+              width={120}
+              height={120}
+              className="rounded-full"
+              priority
+            />
           </div>
           <CardTitle className="text-2xl font-bold text-foreground">
             Dom Costelo PRO

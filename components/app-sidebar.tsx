@@ -1,5 +1,6 @@
 "use client"
 
+import Image from "next/image"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import {
@@ -71,9 +72,13 @@ export function AppSidebar({
           {/* Header */}
           <div className="border-b border-sidebar-border p-6">
             <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
-                <span className="text-xl">🍔</span>
-              </div>
+              <Image
+                src="/logo.jpg"
+                alt="Dom Costelo Logo"
+                width={48}
+                height={48}
+                className="rounded-full"
+              />
               <div>
                 <h1 className="font-bold text-sidebar-foreground">
                   Dom Costelo
