@@ -11,6 +11,7 @@ import { Lock, User } from "lucide-react"
 const usuarios = [
   { user: "thiago", pass: "123" },
   { user: "joseane", pass: "123" },
+  { user: "deborah", pass: "123" },
 ]
 
 interface LoginFormProps {
