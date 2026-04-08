@@ -12,20 +12,26 @@ const defaultUsuarios: UsuarioSistema[] = [
   {
     login: "thiago",
     senha: "123",
+    email: "thiago@domcostelo.com",
     role: "admin",
     permissoes: ["estoque", "entrada", "producao", "financeiro", "dashboard", "lista-compras", "admin"],
+    status: "aprovado",
   },
   {
     login: "debora",
     senha: "456",
+    email: "debora@domcostelo.com",
     role: "operador",
     permissoes: ["estoque", "entrada", "producao", "dashboard", "lista-compras"],
+    status: "aprovado",
   },
   {
     login: "marcos",
     senha: "789",
+    email: "marcos@domcostelo.com",
     role: "operador",
     permissoes: ["estoque", "entrada", "producao", "dashboard", "lista-compras"],
+    status: "aprovado",
   },
 ]
 

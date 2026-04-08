@@ -8,6 +8,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { FieldGroup, Field, FieldLabel } from "@/components/ui/field"
 import { Lock, User } from "lucide-react"
 import { signInWithEmail, signUpWithEmail } from "@/lib/firebase-auth"
+import { getUsuarios, saveUsuarios } from "@/lib/store"
+import type { UsuarioSistema } from "@/lib/types"
 
 interface FirebaseLoginFormProps {
   onLogin: (user: string, role: string, permissoes: string[]) => void
@@ -18,23 +20,25 @@ export function FirebaseLoginForm({ onLogin }: FirebaseLoginFormProps) {
   const [password, setPassword] = useState("")
   const [confirmPassword, setConfirmPassword] = useState("")
   const [error, setError] = useState("")
+  const [success, setSuccess] = useState("")
   const [loading, setLoading] = useState(false)
   const [isSignUp, setIsSignUp] = useState(false)
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError("")
+    setSuccess("")
     setLoading(true)
 
-    // Validação para cadastro
+    // Validacao para cadastro
     if (isSignUp) {
       if (password.length < 6) {
-        setError("A senha deve ter no mínimo 6 caracteres")
+        setError("A senha deve ter no minimo 6 caracteres")
         setLoading(false)
         return
       }
       if (password !== confirmPassword) {
-        setError("As senhas não coincidem")
+        setError("As senhas nao coincidem")
         setLoading(false)
         return
       }
@@ -45,10 +49,44 @@ export function FirebaseLoginForm({ onLogin }: FirebaseLoginFormProps) {
       let authError
 
       if (isSignUp) {
-        // Criar nova conta
+        // Criar nova conta no Firebase
         const result = await signUpWithEmail(email, password)
         user = result.user
         authError = result.error
+
+        if (authError || !user) {
+          setError("Erro ao criar conta. Verifique os dados.")
+          setLoading(false)
+          return
+        }
+
+        // Criar usuario pendente no sistema local
+        const usuarios = getUsuarios()
+        const displayName = user.email?.split("@")[0] || user.uid
+        
+        // Verificar se ja existe
+        if (!usuarios.some(u => u.email === user.email)) {
+          const novoUsuario: UsuarioSistema = {
+            login: displayName,
+            senha: "", // Senha gerenciada pelo Firebase
+            email: user.email || "",
+            role: "operador",
+            permissoes: [],
+            status: "pendente",
+            dataCriacao: new Date().toLocaleString("pt-BR"),
+          }
+          usuarios.push(novoUsuario)
+          saveUsuarios(usuarios)
+        }
+
+        // Mostrar mensagem de sucesso e aguardar aprovacao
+        setSuccess("Conta criada com sucesso! Aguarde a aprovacao do administrador para acessar o sistema.")
+        setLoading(false)
+        setEmail("")
+        setPassword("")
+        setConfirmPassword("")
+        return
+
       } else {
         // Fazer login
         const result = await signInWithEmail(email, password)
@@ -57,16 +95,49 @@ export function FirebaseLoginForm({ onLogin }: FirebaseLoginFormProps) {
       }
       
       if (authError || !user) {
-        setError(isSignUp ? "Erro ao criar conta. Verifique os dados." : "Email ou senha inválidos")
+        setError("Email ou senha invalidos")
         setLoading(false)
         return
       }
 
-      // Login/Cadastro bem-sucedido - usar permissões padrão de admin
-      const role = "admin"
-      const permissoes = ["estoque", "entrada", "producao", "financeiro", "dashboard", "lista-compras", "admin"]
+      // Verificar se usuario esta aprovado
+      const usuarios = getUsuarios()
+      const usuarioSistema = usuarios.find(u => u.email === user.email)
+      
+      if (!usuarioSistema) {
+        // Usuario nao existe no sistema - criar como pendente
+        const displayName = user.email?.split("@")[0] || user.uid
+        const novoUsuario: UsuarioSistema = {
+          login: displayName,
+          senha: "",
+          email: user.email || "",
+          role: "operador",
+          permissoes: [],
+          status: "pendente",
+          dataCriacao: new Date().toLocaleString("pt-BR"),
+        }
+        usuarios.push(novoUsuario)
+        saveUsuarios(usuarios)
+        setError("Sua conta esta pendente de aprovacao. Entre em contato com o administrador.")
+        setLoading(false)
+        return
+      }
+
+      if (usuarioSistema.status === "pendente") {
+        setError("Sua conta esta aguardando aprovacao do administrador.")
+        setLoading(false)
+        return
+      }
+
+      if (usuarioSistema.status === "rejeitado") {
+        setError("Seu acesso foi negado pelo administrador.")
+        setLoading(false)
+        return
+      }
+
+      // Usuario aprovado - fazer login
       const displayName = user.email?.split("@")[0] || user.uid
-      onLogin(displayName, role, permissoes)
+      onLogin(displayName, usuarioSistema.role, usuarioSistema.permissoes)
     } catch (err) {
       setError(isSignUp ? "Erro ao criar conta. Tente novamente." : "Erro ao fazer login. Tente novamente.")
       setLoading(false)
@@ -162,6 +233,12 @@ export function FirebaseLoginForm({ onLogin }: FirebaseLoginFormProps) {
               </div>
             )}
 
+            {success && (
+              <div className="text-sm text-success text-center p-3 bg-success/10 rounded-md border border-success/30">
+                {success}
+              </div>
+            )}
+
             <Button
               type="submit"
               className="w-full"
@@ -180,6 +257,7 @@ export function FirebaseLoginForm({ onLogin }: FirebaseLoginFormProps) {
                 onClick={() => {
                   setIsSignUp(!isSignUp)
                   setError("")
+                  setSuccess("")
                   setConfirmPassword("")
                 }}
                 disabled={loading}

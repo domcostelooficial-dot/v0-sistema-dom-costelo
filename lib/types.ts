@@ -26,11 +26,16 @@ export type UserRole = "admin" | "operador"
 
 export type TabPermissao = "estoque" | "entrada" | "producao" | "financeiro" | "dashboard" | "lista-compras" | "admin"
 
+export type UserStatus = "pendente" | "aprovado" | "rejeitado"
+
 export interface UsuarioSistema {
   login: string
   senha: string
+  email?: string
   role: UserRole
   permissoes: TabPermissao[]
+  status: UserStatus
+  dataCriacao?: string
 }
 
 export interface Receita {
