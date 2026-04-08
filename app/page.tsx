@@ -20,8 +20,9 @@ import { EntradaView } from "@/components/entrada-view"
 import { ProducaoView } from "@/components/producao-view"
 import { FinanceiroView } from "@/components/financeiro-view"
 import { DashboardView } from "@/components/dashboard-view"
+import { ListaComprasView } from "@/components/lista-compras-view"
 
-type Tab = "estoque" | "entrada" | "producao" | "financeiro" | "dashboard"
+type Tab = "estoque" | "entrada" | "producao" | "financeiro" | "dashboard" | "lista-compras"
 
 export default function Home() {
   const [user, setUser] = useState<string | null>(null)
@@ -171,6 +172,7 @@ export default function Home() {
               {activeTab === "producao" && "Produção"}
               {activeTab === "financeiro" && "Financeiro"}
               {activeTab === "dashboard" && "Dashboard"}
+              {activeTab === "lista-compras" && "Lista de Compras"}
             </h1>
             <p className="text-muted-foreground">
               {activeTab === "estoque" &&
@@ -183,6 +185,8 @@ export default function Home() {
                 "Acompanhe seus gastos e histórico"}
               {activeTab === "dashboard" &&
                 "Visualize as métricas do seu negócio"}
+              {activeTab === "lista-compras" &&
+                "Itens com estoque baixo, quantidades e valor total da compra"}
             </p>
           </div>
 
@@ -208,6 +212,9 @@ export default function Home() {
           )}
           {activeTab === "dashboard" && (
             <DashboardView itens={itens} historico={historico} />
+          )}
+          {activeTab === "lista-compras" && (
+            <ListaComprasView itens={itens} />
           )}
         </div>
       </main>

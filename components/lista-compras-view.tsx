@@ -27,8 +27,9 @@ import {
   Search,
   AlertTriangle,
   Check,
-  FileDown,
   Trash2,
+  Calculator,
+  TrendingDown,
 } from "lucide-react"
 import dynamic from "next/dynamic"
 
@@ -80,9 +81,8 @@ export function ListaComprasView({ itens }: ListaComprasViewProps) {
   useMemo(() => {
     if (initialized) {
       const itensEmFalta = itens.filter((item) => item.atual <= item.min * 1.2)
-      
+
       setListaCompras((prev) => {
-        // Manter preços e status de comprado já preenchidos
         const updatedList = itensEmFalta.map((item) => {
           const existing = prev.find((p) => p.nome === item.nome)
           return {
@@ -111,17 +111,13 @@ export function ListaComprasView({ itens }: ListaComprasViewProps) {
 
   const handlePrecoChange = (nome: string, preco: number) => {
     setListaCompras((prev) =>
-      prev.map((item) =>
-        item.nome === nome ? { ...item, preco } : item
-      )
+      prev.map((item) => (item.nome === nome ? { ...item, preco } : item))
     )
   }
 
   const handleCompradoChange = (nome: string, comprado: boolean) => {
     setListaCompras((prev) =>
-      prev.map((item) =>
-        item.nome === nome ? { ...item, comprado } : item
-      )
+      prev.map((item) => (item.nome === nome ? { ...item, comprado } : item))
     )
   }
 
@@ -159,6 +155,7 @@ export function ListaComprasView({ itens }: ListaComprasViewProps) {
 
   const itensComprados = listaCompras.filter((item) => item.comprado).length
   const itensPendentes = listaCompras.filter((item) => !item.comprado).length
+  const itensSemPreco = listaCompras.filter((item) => !item.comprado && item.preco === 0).length
 
   const formatCurrency = (value: number) => {
     return value.toLocaleString("pt-BR", {
@@ -167,8 +164,96 @@ export function ListaComprasView({ itens }: ListaComprasViewProps) {
     })
   }
 
+  const progressoPercent =
+    listaCompras.length > 0
+      ? Math.round((itensComprados / listaCompras.length) * 100)
+      : 0
+
   return (
     <div className="space-y-6">
+      {/* Calculadora - Cards de totais em destaque */}
+      <Card className="border-primary/30 bg-primary/5">
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center gap-2 text-base text-foreground">
+            <Calculator className="h-5 w-5 text-primary" />
+            Calculadora de Compras
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid gap-4 sm:grid-cols-3">
+            <div className="rounded-lg border border-border bg-card p-4">
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-warning/10">
+                  <AlertTriangle className="h-5 w-5 text-warning" />
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Total Pendente</p>
+                  <p className="text-xl font-bold text-warning">
+                    {formatCurrency(totalPendentes)}
+                  </p>
+                  <p className="text-xs text-muted-foreground">{itensPendentes} itens</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="rounded-lg border border-border bg-card p-4">
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-success/10">
+                  <Check className="h-5 w-5 text-success" />
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Total Comprado</p>
+                  <p className="text-xl font-bold text-success">
+                    {formatCurrency(totalComprados)}
+                  </p>
+                  <p className="text-xs text-muted-foreground">{itensComprados} itens</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="rounded-lg border border-primary/40 bg-primary/5 p-4">
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/20">
+                  <span className="text-sm font-bold text-primary">R$</span>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Total Geral</p>
+                  <p className="text-2xl font-bold text-primary">
+                    {formatCurrency(totalGeral)}
+                  </p>
+                  <p className="text-xs text-muted-foreground">{listaCompras.length} itens</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Barra de progresso */}
+          {listaCompras.length > 0 && (
+            <div className="mt-4 space-y-1">
+              <div className="flex items-center justify-between text-xs text-muted-foreground">
+                <span>Progresso da compra</span>
+                <span>{progressoPercent}% concluido ({itensComprados}/{listaCompras.length})</span>
+              </div>
+              <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
+                <div
+                  className="h-full rounded-full bg-success transition-all duration-300"
+                  style={{ width: `${progressoPercent}%` }}
+                />
+              </div>
+            </div>
+          )}
+
+          {itensSemPreco > 0 && (
+            <div className="mt-3 flex items-center gap-2 rounded-md bg-warning/10 px-3 py-2 text-xs text-warning">
+              <TrendingDown className="h-3.5 w-3.5 shrink-0" />
+              <span>
+                {itensSemPreco} {itensSemPreco === 1 ? "item pendente ainda nao tem" : "itens pendentes ainda nao tem"} valor unitario preenchido. Preencha para calcular o total correto.
+              </span>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
       {/* Summary Cards */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <Card className="border-border bg-card">
@@ -291,7 +376,11 @@ export function ListaComprasView({ itens }: ListaComprasViewProps) {
                   <TableHead className="text-muted-foreground">Item</TableHead>
                   <TableHead className="text-muted-foreground">Categoria</TableHead>
                   <TableHead className="text-muted-foreground text-center">Qtd</TableHead>
-                  <TableHead className="text-muted-foreground text-center">Preco Unit.</TableHead>
+                  <TableHead className="text-muted-foreground text-center">
+                    <span className="flex items-center justify-center gap-1">
+                      Valor Unit. (R$)
+                    </span>
+                  </TableHead>
                   <TableHead className="text-muted-foreground text-center">Subtotal</TableHead>
                   <TableHead className="text-muted-foreground text-center w-12"></TableHead>
                 </TableRow>
@@ -348,20 +437,37 @@ export function ListaComprasView({ itens }: ListaComprasViewProps) {
                         />
                       </TableCell>
                       <TableCell className="text-center">
-                        <Input
-                          type="number"
-                          value={item.preco || ""}
-                          onChange={(e) =>
-                            handlePrecoChange(item.nome, parseFloat(e.target.value) || 0)
-                          }
-                          placeholder="0,00"
-                          className="w-24 mx-auto text-center bg-input border-border"
-                          min={0}
-                          step={0.01}
-                        />
+                        <div className="relative mx-auto w-28">
+                          <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">
+                            R$
+                          </span>
+                          <Input
+                            type="number"
+                            value={item.preco || ""}
+                            onChange={(e) =>
+                              handlePrecoChange(item.nome, parseFloat(e.target.value) || 0)
+                            }
+                            placeholder="0,00"
+                            className={`pl-8 text-right bg-input border-border ${
+                              !item.comprado && item.preco === 0
+                                ? "border-warning/50 focus-visible:ring-warning/30"
+                                : ""
+                            }`}
+                            min={0}
+                            step={0.01}
+                          />
+                        </div>
                       </TableCell>
-                      <TableCell className="text-center font-medium text-foreground">
-                        {formatCurrency(item.preco * item.comprar)}
+                      <TableCell className="text-center">
+                        <span
+                          className={`font-semibold ${
+                            item.preco > 0 ? "text-foreground" : "text-muted-foreground"
+                          }`}
+                        >
+                          {item.preco > 0
+                            ? formatCurrency(item.preco * item.comprar)
+                            : "-"}
+                        </span>
                       </TableCell>
                       <TableCell className="text-center">
                         <Button
@@ -379,32 +485,6 @@ export function ListaComprasView({ itens }: ListaComprasViewProps) {
               </TableBody>
             </Table>
           </div>
-
-          {/* Totais */}
-          {listaCompras.length > 0 && (
-            <div className="mt-6 rounded-lg border border-border bg-muted/30 p-4">
-              <div className="grid gap-4 sm:grid-cols-3">
-                <div className="flex justify-between sm:flex-col sm:items-center">
-                  <span className="text-sm text-muted-foreground">Total Pendente</span>
-                  <span className="text-lg font-bold text-warning">
-                    {formatCurrency(totalPendentes)}
-                  </span>
-                </div>
-                <div className="flex justify-between sm:flex-col sm:items-center">
-                  <span className="text-sm text-muted-foreground">Total Comprado</span>
-                  <span className="text-lg font-bold text-success">
-                    {formatCurrency(totalComprados)}
-                  </span>
-                </div>
-                <div className="flex justify-between sm:flex-col sm:items-center border-t pt-4 sm:border-t-0 sm:pt-0 sm:border-l sm:pl-4">
-                  <span className="text-sm text-muted-foreground">Total Geral</span>
-                  <span className="text-2xl font-bold text-primary">
-                    {formatCurrency(totalGeral)}
-                  </span>
-                </div>
-              </div>
-            </div>
-          )}
         </CardContent>
       </Card>
     </div>

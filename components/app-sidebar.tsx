@@ -12,9 +12,10 @@ import {
   LogOut,
   Menu,
   X,
+  ShoppingCart,
 } from "lucide-react"
 
-type Tab = "estoque" | "entrada" | "producao" | "financeiro" | "dashboard"
+type Tab = "estoque" | "entrada" | "producao" | "financeiro" | "dashboard" | "lista-compras"
 
 interface AppSidebarProps {
   activeTab: Tab
@@ -31,6 +32,7 @@ const menuItems = [
   { id: "producao" as Tab, label: "Produção", icon: ChefHat },
   { id: "financeiro" as Tab, label: "Financeiro", icon: DollarSign },
   { id: "dashboard" as Tab, label: "Dashboard", icon: BarChart3 },
+  { id: "lista-compras" as Tab, label: "Lista de Compras", icon: ShoppingCart },
 ]
 
 export function AppSidebar({
