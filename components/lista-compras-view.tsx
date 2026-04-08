@@ -46,6 +46,7 @@ interface ItemCompra {
   comprar: number
   preco: number
   comprado: boolean
+  fornecedor: string
 }
 
 interface ListaComprasViewProps {
@@ -71,6 +72,7 @@ export function ListaComprasView({ itens }: ListaComprasViewProps) {
           comprar: Math.max(0, item.min - item.atual + Math.ceil(item.min * 0.2)),
           preco: 0,
           comprado: false,
+          fornecedor: "",
         }))
       setListaCompras(itensEmFalta)
       setInitialized(true)
@@ -93,6 +95,7 @@ export function ListaComprasView({ itens }: ListaComprasViewProps) {
             comprar: Math.max(0, item.min - item.atual + Math.ceil(item.min * 0.2)),
             preco: existing?.preco || 0,
             comprado: existing?.comprado || false,
+            fornecedor: existing?.fornecedor || "",
           }
         })
         return updatedList
@@ -112,6 +115,12 @@ export function ListaComprasView({ itens }: ListaComprasViewProps) {
   const handlePrecoChange = (nome: string, preco: number) => {
     setListaCompras((prev) =>
       prev.map((item) => (item.nome === nome ? { ...item, preco } : item))
+    )
+  }
+
+  const handleFornecedorChange = (nome: string, fornecedor: string) => {
+    setListaCompras((prev) =>
+      prev.map((item) => (item.nome === nome ? { ...item, fornecedor } : item))
     )
   }
 
@@ -375,6 +384,7 @@ export function ListaComprasView({ itens }: ListaComprasViewProps) {
                   <TableHead className="text-muted-foreground w-12"></TableHead>
                   <TableHead className="text-muted-foreground">Item</TableHead>
                   <TableHead className="text-muted-foreground">Categoria</TableHead>
+                  <TableHead className="text-muted-foreground">Fornecedor</TableHead>
                   <TableHead className="text-muted-foreground text-center">Qtd</TableHead>
                   <TableHead className="text-muted-foreground text-center">
                     <span className="flex items-center justify-center gap-1">
@@ -388,7 +398,7 @@ export function ListaComprasView({ itens }: ListaComprasViewProps) {
               <TableBody>
                 {filteredLista.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={7} className="text-center py-8">
+                    <TableCell colSpan={8} className="text-center py-8">
                       <div className="flex flex-col items-center gap-2 text-muted-foreground">
                         <ShoppingCart className="h-8 w-8" />
                         <p>Nenhum item na lista de compras</p>
@@ -434,6 +444,17 @@ export function ListaComprasView({ itens }: ListaComprasViewProps) {
                       </TableCell>
                       <TableCell className="text-muted-foreground">
                         {item.categoria}
+                      </TableCell>
+                      <TableCell>
+                        <Input
+                          type="text"
+                          value={item.fornecedor}
+                          onChange={(e) =>
+                            handleFornecedorChange(item.nome, e.target.value)
+                          }
+                          placeholder="Nome do fornecedor..."
+                          className="w-full min-w-[180px] bg-input border-border"
+                        />
                       </TableCell>
                       <TableCell className="text-center">
                         <Input
