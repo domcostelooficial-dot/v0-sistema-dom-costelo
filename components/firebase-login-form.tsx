@@ -110,7 +110,27 @@ export function FirebaseLoginForm({ onLogin }: FirebaseLoginFormProps) {
         usuarioSistema = usuarios.find(u => u.login.toLowerCase() === displayName.toLowerCase())
       }
       
+      // Verificar se existe algum admin aprovado no sistema
+      const existeAdminAprovado = usuarios.some(u => u.role === "admin" && u.status === "aprovado")
+      
       if (!usuarioSistema) {
+        // Se nao existe nenhum admin aprovado, o primeiro usuario vira admin automaticamente
+        if (!existeAdminAprovado) {
+          const novoAdmin: UsuarioSistema = {
+            login: displayName,
+            senha: "",
+            email: user.email || "",
+            role: "admin",
+            permissoes: ["estoque", "entrada", "producao", "financeiro", "dashboard", "lista-compras", "admin"],
+            status: "aprovado",
+            dataCriacao: new Date().toLocaleString("pt-BR"),
+          }
+          usuarios.push(novoAdmin)
+          saveUsuarios(usuarios)
+          onLogin(displayName, novoAdmin.role, novoAdmin.permissoes)
+          return
+        }
+        
         // Usuario nao existe no sistema - criar como pendente
         const novoUsuario: UsuarioSistema = {
           login: displayName,
