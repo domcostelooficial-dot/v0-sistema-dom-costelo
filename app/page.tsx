@@ -58,6 +58,8 @@ export default function Home() {
   }
 
   const handleUpdateItem = (nome: string, novoAtual: number) => {
+    const now = new Date()
+    const dataHora = `${now.toLocaleDateString("pt-BR")} às ${now.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}`
     const updated = itens.map((item) =>
       item.nome === nome
         ? {
@@ -65,7 +67,7 @@ export default function Home() {
             atual: novoAtual,
             ultimaAlteracao: {
               usuario: user || "Desconhecido",
-              data: new Date().toLocaleDateString("pt-BR"),
+              data: dataHora,
             },
           }
         : item
@@ -75,6 +77,9 @@ export default function Home() {
   }
 
   const handleEntrada = (nome: string, qtd: number, custo: number) => {
+    const now = new Date()
+    const dataHora = `${now.toLocaleDateString("pt-BR")} às ${now.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}`
+    
     // Update estoque
     const updated = itens.map((item) =>
       item.nome === nome
@@ -83,7 +88,7 @@ export default function Home() {
             atual: item.atual + qtd,
             ultimaAlteracao: {
               usuario: user || "Desconhecido",
-              data: new Date().toLocaleDateString("pt-BR"),
+              data: dataHora,
             },
           }
         : item
@@ -104,9 +109,12 @@ export default function Home() {
   }
 
   const handleProduzir = (receita: Receita) => {
+    const now = new Date()
+    const dataHora = `${now.toLocaleDateString("pt-BR")} às ${now.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}`
+    
     const alteracao = {
       usuario: user || "Desconhecido",
-      data: new Date().toLocaleDateString("pt-BR"),
+      data: dataHora,
     }
     const updated = itens.map((item) => {
       if (item.nome === receita.inputItem) {
