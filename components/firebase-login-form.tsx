@@ -109,6 +109,34 @@ export function FirebaseLoginForm({ onLogin }: FirebaseLoginFormProps) {
         return
       }
 
+      // Verificar se é o administrador master (sempre tem acesso)
+      const emailAdmin = "admin@domcostelo.com"
+      
+      if (user.email === emailAdmin) {
+        console.log("[v0] Admin master detectado - acesso garantido")
+        const usuarios = getUsuarios()
+        
+        // Garantir que admin existe no sistema local
+        let adminLocal = usuarios.find(u => u.email === emailAdmin)
+        if (!adminLocal) {
+          adminLocal = {
+            login: "admin",
+            senha: "",
+            email: emailAdmin,
+            role: "admin",
+            permissoes: ["estoque", "entrada", "producao", "financeiro", "dashboard", "lista-compras", "admin"],
+            status: "aprovado",
+            dataCriacao: new Date().toLocaleString("pt-BR"),
+          }
+          usuarios.push(adminLocal)
+          saveUsuarios(usuarios)
+        }
+        
+        setLoading(false)
+        onLogin("admin", "admin", ["estoque", "entrada", "producao", "financeiro", "dashboard", "lista-compras", "admin"])
+        return
+      }
+
       // Verificar se usuario esta aprovado
       const usuarios = getUsuarios()
       const displayName = user.email?.split("@")[0] || user.uid
@@ -206,6 +234,13 @@ export function FirebaseLoginForm({ onLogin }: FirebaseLoginFormProps) {
           <CardDescription className="text-muted-foreground">
             {isSignUp ? "Crie sua conta para acessar o sistema" : "Faça login para acessar o sistema"}
           </CardDescription>
+          {!isSignUp && (
+            <div className="mt-3 p-3 bg-primary/10 rounded-lg border border-primary/20">
+              <p className="text-xs text-center text-muted-foreground">
+                <strong className="text-primary">Administrador:</strong> admin@domcostelo.com / admin123
+              </p>
+            </div>
+          )}
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
