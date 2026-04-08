@@ -13,15 +13,18 @@ import {
   Menu,
   X,
   ShoppingCart,
+  Settings,
 } from "lucide-react"
 
-type Tab = "estoque" | "entrada" | "producao" | "financeiro" | "dashboard" | "lista-compras"
+type Tab = "estoque" | "entrada" | "producao" | "financeiro" | "dashboard" | "lista-compras" | "admin"
 
 interface AppSidebarProps {
   activeTab: Tab
   onTabChange: (tab: Tab) => void
   onLogout: () => void
   user: string
+  userRole: string
+  userPermissoes: string[]
   isOpen: boolean
   onToggle: () => void
 }
@@ -33,6 +36,7 @@ const menuItems = [
   { id: "financeiro" as Tab, label: "Financeiro", icon: DollarSign },
   { id: "dashboard" as Tab, label: "Dashboard", icon: BarChart3 },
   { id: "lista-compras" as Tab, label: "Lista de Compras", icon: ShoppingCart },
+  { id: "admin" as Tab, label: "Administração", icon: Settings },
 ]
 
 export function AppSidebar({
@@ -40,9 +44,18 @@ export function AppSidebar({
   onTabChange,
   onLogout,
   user,
+  userRole,
+  userPermissoes,
   isOpen,
   onToggle,
 }: AppSidebarProps) {
+  // Filter menu items based on permissions
+  const filteredMenuItems = menuItems.filter((item) => {
+    if (item.id === "admin") {
+      return userRole === "admin"
+    }
+    return userPermissoes.includes(item.id)
+  })
   return (
     <>
       {/* Mobile Menu Button */}
@@ -93,7 +106,7 @@ export function AppSidebar({
           {/* Navigation */}
           <nav className="flex-1 p-4">
             <ul className="space-y-1">
-              {menuItems.map((item) => (
+              {filteredMenuItems.map((item) => (
                 <li key={item.id}>
                   <button
                     onClick={() => {

@@ -21,11 +21,14 @@ import { ProducaoView } from "@/components/producao-view"
 import { FinanceiroView } from "@/components/financeiro-view"
 import { DashboardView } from "@/components/dashboard-view"
 import { ListaComprasView } from "@/components/lista-compras-view"
+import { AdminView } from "@/components/admin-view"
 
-type Tab = "estoque" | "entrada" | "producao" | "financeiro" | "dashboard" | "lista-compras"
+type Tab = "estoque" | "entrada" | "producao" | "financeiro" | "dashboard" | "lista-compras" | "admin"
 
 export default function Home() {
   const [user, setUser] = useState<string | null>(null)
+  const [userRole, setUserRole] = useState<string>("")
+  const [userPermissoes, setUserPermissoes] = useState<string[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [activeTab, setActiveTab] = useState<Tab>("estoque")
   const [sidebarOpen, setSidebarOpen] = useState(false)
@@ -47,14 +50,27 @@ export default function Home() {
     setIsLoading(false)
   }, [])
 
-  const handleLogin = (username: string) => {
+  const handleLogin = (username: string, role: string, permissoes: string[]) => {
     saveUser(username)
     setUser(username)
+    setUserRole(role)
+    setUserPermissoes(permissoes)
+    
+    // Set first allowed tab as active
+    const firstAllowedTab = permissoes[0] as Tab
+    setActiveTab(firstAllowedTab || "estoque")
   }
 
   const handleLogout = () => {
     clearUser()
     setUser(null)
+    setUserRole("")
+    setUserPermissoes([])
+  }
+
+  const handlePasswordChange = () => {
+    // Force re-login after password change
+    handleLogout()
   }
 
   const handleUpdateItem = (nome: string, novoAtual: number) => {
@@ -205,6 +221,8 @@ export default function Home() {
         onTabChange={setActiveTab}
         onLogout={handleLogout}
         user={user}
+        userRole={userRole}
+        userPermissoes={userPermissoes}
         isOpen={sidebarOpen}
         onToggle={() => setSidebarOpen(!sidebarOpen)}
       />
@@ -220,6 +238,7 @@ export default function Home() {
               {activeTab === "financeiro" && "Financeiro"}
               {activeTab === "dashboard" && "Dashboard"}
               {activeTab === "lista-compras" && "Lista de Compras"}
+              {activeTab === "admin" && "Administração"}
             </h1>
             <p className="text-muted-foreground">
               {activeTab === "estoque" &&
@@ -234,6 +253,8 @@ export default function Home() {
                 "Visualize as métricas do seu negócio"}
               {activeTab === "lista-compras" &&
                 "Itens com estoque baixo, quantidades e valor total da compra"}
+              {activeTab === "admin" &&
+                "Gerenciamento de usuários, permissões e configurações"}
             </p>
           </div>
 
@@ -268,6 +289,9 @@ export default function Home() {
           )}
           {activeTab === "lista-compras" && (
             <ListaComprasView itens={itens} />
+          )}
+          {activeTab === "admin" && userRole === "admin" && (
+            <AdminView currentUser={user} onPasswordChange={handlePasswordChange} />
           )}
         </div>
       </main>

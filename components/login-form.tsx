@@ -7,15 +7,11 @@ import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { FieldGroup, Field, FieldLabel } from "@/components/ui/field"
 import { Lock, User } from "lucide-react"
-
-const usuarios = [
-  { user: "thiago", pass: "123" },
-  { user: "joseane", pass: "123" },
-  { user: "deborah", pass: "123" },
-]
+import { getUsuarios } from "@/lib/store"
+import type { UsuarioSistema } from "@/lib/types"
 
 interface LoginFormProps {
-  onLogin: (user: string) => void
+  onLogin: (user: string, role: string, permissoes: string[]) => void
 }
 
 export function LoginForm({ onLogin }: LoginFormProps) {
@@ -25,11 +21,12 @@ export function LoginForm({ onLogin }: LoginFormProps) {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
+    const usuarios = getUsuarios()
     const found = usuarios.find(
-      (u) => u.user === username && u.pass === password
+      (u: UsuarioSistema) => u.login === username && u.senha === password
     )
     if (found) {
-      onLogin(found.user)
+      onLogin(found.login, found.role, found.permissoes)
     } else {
       setError("Usuário ou senha inválidos")
     }

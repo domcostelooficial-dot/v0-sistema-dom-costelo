@@ -1,11 +1,33 @@
 "use client"
 
-import { Item, HistoricoEntry, Receita, defaultItens, defaultReceitas } from "./types"
+import { Item, HistoricoEntry, Receita, UsuarioSistema, defaultItens, defaultReceitas } from "./types"
 
 const ESTOQUE_KEY = "dom-costelo-estoque"
 const HISTORICO_KEY = "dom-costelo-historico"
 const USER_KEY = "dom-costelo-user"
 const RECEITAS_KEY = "dom-costelo-receitas"
+const USUARIOS_KEY = "dom-costelo-usuarios"
+
+const defaultUsuarios: UsuarioSistema[] = [
+  {
+    login: "thiago",
+    senha: "123",
+    role: "admin",
+    permissoes: ["estoque", "entrada", "producao", "financeiro", "dashboard", "lista-compras", "admin"],
+  },
+  {
+    login: "debora",
+    senha: "456",
+    role: "operador",
+    permissoes: ["estoque", "entrada", "producao", "dashboard", "lista-compras"],
+  },
+  {
+    login: "marcos",
+    senha: "789",
+    role: "operador",
+    permissoes: ["estoque", "entrada", "producao", "dashboard", "lista-compras"],
+  },
+]
 
 export function getEstoque(): Item[] {
   if (typeof window === "undefined") return defaultItens
@@ -53,4 +75,15 @@ export function getReceitas(): Receita[] {
 export function saveReceitas(receitas: Receita[]) {
   if (typeof window === "undefined") return
   localStorage.setItem(RECEITAS_KEY, JSON.stringify(receitas))
+}
+
+export function getUsuarios(): UsuarioSistema[] {
+  if (typeof window === "undefined") return defaultUsuarios
+  const stored = localStorage.getItem(USUARIOS_KEY)
+  return stored ? JSON.parse(stored) : defaultUsuarios
+}
+
+export function saveUsuarios(usuarios: UsuarioSistema[]) {
+  if (typeof window === "undefined") return
+  localStorage.setItem(USUARIOS_KEY, JSON.stringify(usuarios))
 }

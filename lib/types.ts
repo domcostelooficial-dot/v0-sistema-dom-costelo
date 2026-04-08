@@ -22,6 +22,17 @@ export interface Usuario {
   pass: string
 }
 
+export type UserRole = "admin" | "operador"
+
+export type TabPermissao = "estoque" | "entrada" | "producao" | "financeiro" | "dashboard" | "lista-compras" | "admin"
+
+export interface UsuarioSistema {
+  login: string
+  senha: string
+  role: UserRole
+  permissoes: TabPermissao[]
+}
+
 export interface Receita {
   id: string
   nome: string
