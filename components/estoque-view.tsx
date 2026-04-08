@@ -23,13 +23,37 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
+import { Label } from "@/components/ui/label"
+import {
   AlertTriangle,
   Package,
   Search,
   Minus,
   Plus,
+  PlusCircle,
+  Edit,
+  Trash2,
 } from "lucide-react"
 import dynamic from "next/dynamic"
+import { toast } from "sonner"
 
 const ExportPDFButton = dynamic(
   () => import("./export-pdf-button").then((mod) => mod.ExportPDFButton),
@@ -39,11 +63,24 @@ const ExportPDFButton = dynamic(
 interface EstoqueViewProps {
   itens: Item[]
   onUpdateItem: (nome: string, novoAtual: number) => void
+  onAddItem: (item: Item) => void
+  onEditItem: (oldNome: string, item: Item) => void
+  onDeleteItem: (nome: string) => void
 }
 
-export function EstoqueView({ itens, onUpdateItem }: EstoqueViewProps) {
+export function EstoqueView({ itens, onUpdateItem, onAddItem, onEditItem, onDeleteItem }: EstoqueViewProps) {
   const [search, setSearch] = useState("")
   const [categoriaFilter, setCategoriaFilter] = useState<string>("todas")
+  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
+  const [selectedItem, setSelectedItem] = useState<Item | null>(null)
+  const [formData, setFormData] = useState({
+    nome: "",
+    categoria: "Carnes",
+    min: 1,
+    atual: 0,
+  })
 
   const filteredItens = useMemo(() => {
     return itens.filter((item) => {
@@ -90,6 +127,78 @@ export function EstoqueView({ itens, onUpdateItem }: EstoqueViewProps) {
         OK
       </Badge>
     )
+  }
+
+  const handleAddItem = () => {
+    if (!formData.nome.trim()) {
+      toast.error("Digite um nome para o item")
+      return
+    }
+    
+    if (itens.some((item) => item.nome.toLowerCase() === formData.nome.trim().toLowerCase())) {
+      toast.error("Já existe um item com este nome")
+      return
+    }
+
+    const newItem: Item = {
+      nome: formData.nome.trim(),
+      categoria: formData.categoria,
+      min: formData.min,
+      atual: formData.atual,
+      ultimaAlteracao: undefined,
+    }
+
+    onAddItem(newItem)
+    setIsAddDialogOpen(false)
+    setFormData({ nome: "", categoria: "Carnes", min: 1, atual: 0 })
+    toast.success(`Item "${newItem.nome}" adicionado com sucesso!`)
+  }
+
+  const handleEditItem = () => {
+    if (!selectedItem) return
+    
+    if (!formData.nome.trim()) {
+      toast.error("Digite um nome para o item")
+      return
+    }
+
+    const updatedItem: Item = {
+      ...selectedItem,
+      nome: formData.nome.trim(),
+      categoria: formData.categoria,
+      min: formData.min,
+      atual: formData.atual,
+    }
+
+    onEditItem(selectedItem.nome, updatedItem)
+    setIsEditDialogOpen(false)
+    setSelectedItem(null)
+    toast.success(`Item "${updatedItem.nome}" atualizado com sucesso!`)
+  }
+
+  const handleDeleteItem = () => {
+    if (!selectedItem) return
+    
+    onDeleteItem(selectedItem.nome)
+    setIsDeleteDialogOpen(false)
+    setSelectedItem(null)
+    toast.success(`Item "${selectedItem.nome}" removido com sucesso!`)
+  }
+
+  const openEditDialog = (item: Item) => {
+    setSelectedItem(item)
+    setFormData({
+      nome: item.nome,
+      categoria: item.categoria,
+      min: item.min,
+      atual: item.atual,
+    })
+    setIsEditDialogOpen(true)
+  }
+
+  const openDeleteDialog = (item: Item) => {
+    setSelectedItem(item)
+    setIsDeleteDialogOpen(true)
   }
 
   return (
@@ -154,7 +263,96 @@ export function EstoqueView({ itens, onUpdateItem }: EstoqueViewProps) {
       <Card className="border-border">
         <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle className="text-lg text-foreground">Controle de Estoque</CardTitle>
-          <ExportPDFButton itensEmFalta={itensEmFalta} />
+          <div className="flex items-center gap-2">
+            <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+              <DialogTrigger asChild>
+                <Button className="gap-2">
+                  <PlusCircle className="h-4 w-4" />
+                  Adicionar Item
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Adicionar Novo Item</DialogTitle>
+                  <DialogDescription>
+                    Preencha as informações do novo item do estoque.
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="space-y-4 py-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="add-nome">Nome do Item</Label>
+                    <Input
+                      id="add-nome"
+                      value={formData.nome}
+                      onChange={(e) =>
+                        setFormData({ ...formData, nome: e.target.value })
+                      }
+                      placeholder="Ex: Contra filé"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="add-categoria">Categoria</Label>
+                    <Select
+                      value={formData.categoria}
+                      onValueChange={(value) =>
+                        setFormData({ ...formData, categoria: value })
+                      }
+                    >
+                      <SelectTrigger id="add-categoria">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {categorias.map((cat) => (
+                          <SelectItem key={cat} value={cat}>
+                            {cat}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="add-min">Estoque Mínimo</Label>
+                      <Input
+                        id="add-min"
+                        type="number"
+                        min="0"
+                        value={formData.min}
+                        onChange={(e) =>
+                          setFormData({ ...formData, min: Number(e.target.value) })
+                        }
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="add-atual">Estoque Atual</Label>
+                      <Input
+                        id="add-atual"
+                        type="number"
+                        min="0"
+                        value={formData.atual}
+                        onChange={(e) =>
+                          setFormData({ ...formData, atual: Number(e.target.value) })
+                        }
+                      />
+                    </div>
+                  </div>
+                </div>
+                <DialogFooter>
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setIsAddDialogOpen(false)
+                      setFormData({ nome: "", categoria: "Carnes", min: 1, atual: 0 })
+                    }}
+                  >
+                    Cancelar
+                  </Button>
+                  <Button onClick={handleAddItem}>Adicionar Item</Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+            <ExportPDFButton itensEmFalta={itensEmFalta} />
+          </div>
         </CardHeader>
         <CardContent>
           <div className="flex flex-col gap-4 md:flex-row">
@@ -247,6 +445,22 @@ export function EstoqueView({ itens, onUpdateItem }: EstoqueViewProps) {
                         >
                           <Plus className="h-3 w-3" />
                         </Button>
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          className="h-8 w-8"
+                          onClick={() => openEditDialog(item)}
+                        >
+                          <Edit className="h-3 w-3" />
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          className="h-8 w-8 text-destructive hover:text-destructive"
+                          onClick={() => openDeleteDialog(item)}
+                        >
+                          <Trash2 className="h-3 w-3" />
+                        </Button>
                       </div>
                     </TableCell>
                   </TableRow>
@@ -256,6 +470,119 @@ export function EstoqueView({ itens, onUpdateItem }: EstoqueViewProps) {
           </div>
         </CardContent>
       </Card>
+
+      {/* Edit Dialog */}
+      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Editar Item</DialogTitle>
+            <DialogDescription>
+              Atualize as informações do item do estoque.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="edit-nome">Nome do Item</Label>
+              <Input
+                id="edit-nome"
+                value={formData.nome}
+                onChange={(e) =>
+                  setFormData({ ...formData, nome: e.target.value })
+                }
+                placeholder="Ex: Contra filé"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-categoria">Categoria</Label>
+              <Select
+                value={formData.categoria}
+                onValueChange={(value) =>
+                  setFormData({ ...formData, categoria: value })
+                }
+              >
+                <SelectTrigger id="edit-categoria">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {categorias.map((cat) => (
+                    <SelectItem key={cat} value={cat}>
+                      {cat}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="edit-min">Estoque Mínimo</Label>
+                <Input
+                  id="edit-min"
+                  type="number"
+                  min="0"
+                  value={formData.min}
+                  onChange={(e) =>
+                    setFormData({ ...formData, min: Number(e.target.value) })
+                  }
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-atual">Estoque Atual</Label>
+                <Input
+                  id="edit-atual"
+                  type="number"
+                  min="0"
+                  value={formData.atual}
+                  onChange={(e) =>
+                    setFormData({ ...formData, atual: Number(e.target.value) })
+                  }
+                />
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setIsEditDialogOpen(false)
+                setSelectedItem(null)
+              }}
+            >
+              Cancelar
+            </Button>
+            <Button onClick={handleEditItem}>Salvar Alterações</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Confirmar Exclusão</AlertDialogTitle>
+            <AlertDialogDescription>
+              Tem certeza que deseja remover o item{" "}
+              <strong>{selectedItem?.nome}</strong> do estoque? Esta ação não
+              pode ser desfeita.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel
+              onClick={() => {
+                setIsDeleteDialogOpen(false)
+                setSelectedItem(null)
+              }}
+            >
+              Cancelar
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteItem}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Remover Item
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

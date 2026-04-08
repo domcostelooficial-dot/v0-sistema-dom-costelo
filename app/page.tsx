@@ -76,6 +76,45 @@ export default function Home() {
     saveEstoque(updated)
   }
 
+  const handleAddItem = (newItem: Item) => {
+    const now = new Date()
+    const dataHora = `${now.toLocaleDateString("pt-BR")} às ${now.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}`
+    const itemWithTimestamp = {
+      ...newItem,
+      ultimaAlteracao: {
+        usuario: user || "Desconhecido",
+        data: dataHora,
+      },
+    }
+    const updated = [...itens, itemWithTimestamp]
+    setItens(updated)
+    saveEstoque(updated)
+  }
+
+  const handleEditItem = (oldNome: string, updatedItem: Item) => {
+    const now = new Date()
+    const dataHora = `${now.toLocaleDateString("pt-BR")} às ${now.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}`
+    const updated = itens.map((item) =>
+      item.nome === oldNome
+        ? {
+            ...updatedItem,
+            ultimaAlteracao: {
+              usuario: user || "Desconhecido",
+              data: dataHora,
+            },
+          }
+        : item
+    )
+    setItens(updated)
+    saveEstoque(updated)
+  }
+
+  const handleDeleteItem = (nome: string) => {
+    const updated = itens.filter((item) => item.nome !== nome)
+    setItens(updated)
+    saveEstoque(updated)
+  }
+
   const handleEntrada = (nome: string, qtd: number, custo: number) => {
     const now = new Date()
     const dataHora = `${now.toLocaleDateString("pt-BR")} às ${now.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}`
@@ -200,7 +239,13 @@ export default function Home() {
 
           {/* Content */}
           {activeTab === "estoque" && (
-            <EstoqueView itens={itens} onUpdateItem={handleUpdateItem} />
+            <EstoqueView
+              itens={itens}
+              onUpdateItem={handleUpdateItem}
+              onAddItem={handleAddItem}
+              onEditItem={handleEditItem}
+              onDeleteItem={handleDeleteItem}
+            />
           )}
           {activeTab === "entrada" && (
             <EntradaView itens={itens} onEntrada={handleEntrada} />
