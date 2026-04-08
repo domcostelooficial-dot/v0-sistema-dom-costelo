@@ -20,11 +20,15 @@ import { EntradaView } from "@/components/entrada-view"
 import { ProducaoView } from "@/components/producao-view"
 import { FinanceiroView } from "@/components/financeiro-view"
 import { DashboardView } from "@/components/dashboard-view"
+import { ListaComprasView } from "@/components/lista-compras-view"
+import { AdminView } from "@/components/admin-view"
 
-type Tab = "estoque" | "entrada" | "producao" | "financeiro" | "dashboard"
+type Tab = "estoque" | "entrada" | "producao" | "financeiro" | "dashboard" | "lista-compras" | "admin"
 
 export default function Home() {
   const [user, setUser] = useState<string | null>(null)
+  const [userRole, setUserRole] = useState<string>("")
+  const [userPermissoes, setUserPermissoes] = useState<string[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [activeTab, setActiveTab] = useState<Tab>("estoque")
   const [sidebarOpen, setSidebarOpen] = useState(false)
@@ -46,17 +50,32 @@ export default function Home() {
     setIsLoading(false)
   }, [])
 
-  const handleLogin = (username: string) => {
+  const handleLogin = (username: string, role: string, permissoes: string[]) => {
     saveUser(username)
     setUser(username)
+    setUserRole(role)
+    setUserPermissoes(permissoes)
+    
+    // Set first allowed tab as active
+    const firstAllowedTab = permissoes[0] as Tab
+    setActiveTab(firstAllowedTab || "estoque")
   }
 
   const handleLogout = () => {
     clearUser()
     setUser(null)
+    setUserRole("")
+    setUserPermissoes([])
+  }
+
+  const handlePasswordChange = () => {
+    // Force re-login after password change
+    handleLogout()
   }
 
   const handleUpdateItem = (nome: string, novoAtual: number) => {
+    const now = new Date()
+    const dataHora = `${now.toLocaleDateString("pt-BR")} às ${now.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}`
     const updated = itens.map((item) =>
       item.nome === nome
         ? {
@@ -64,7 +83,7 @@ export default function Home() {
             atual: novoAtual,
             ultimaAlteracao: {
               usuario: user || "Desconhecido",
-              data: new Date().toLocaleDateString("pt-BR"),
+              data: dataHora,
             },
           }
         : item
@@ -73,7 +92,49 @@ export default function Home() {
     saveEstoque(updated)
   }
 
+  const handleAddItem = (newItem: Item) => {
+    const now = new Date()
+    const dataHora = `${now.toLocaleDateString("pt-BR")} às ${now.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}`
+    const itemWithTimestamp = {
+      ...newItem,
+      ultimaAlteracao: {
+        usuario: user || "Desconhecido",
+        data: dataHora,
+      },
+    }
+    const updated = [...itens, itemWithTimestamp]
+    setItens(updated)
+    saveEstoque(updated)
+  }
+
+  const handleEditItem = (oldNome: string, updatedItem: Item) => {
+    const now = new Date()
+    const dataHora = `${now.toLocaleDateString("pt-BR")} às ${now.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}`
+    const updated = itens.map((item) =>
+      item.nome === oldNome
+        ? {
+            ...updatedItem,
+            ultimaAlteracao: {
+              usuario: user || "Desconhecido",
+              data: dataHora,
+            },
+          }
+        : item
+    )
+    setItens(updated)
+    saveEstoque(updated)
+  }
+
+  const handleDeleteItem = (nome: string) => {
+    const updated = itens.filter((item) => item.nome !== nome)
+    setItens(updated)
+    saveEstoque(updated)
+  }
+
   const handleEntrada = (nome: string, qtd: number, custo: number) => {
+    const now = new Date()
+    const dataHora = `${now.toLocaleDateString("pt-BR")} às ${now.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}`
+    
     // Update estoque
     const updated = itens.map((item) =>
       item.nome === nome
@@ -82,7 +143,7 @@ export default function Home() {
             atual: item.atual + qtd,
             ultimaAlteracao: {
               usuario: user || "Desconhecido",
-              data: new Date().toLocaleDateString("pt-BR"),
+              data: dataHora,
             },
           }
         : item
@@ -103,9 +164,12 @@ export default function Home() {
   }
 
   const handleProduzir = (receita: Receita) => {
+    const now = new Date()
+    const dataHora = `${now.toLocaleDateString("pt-BR")} às ${now.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}`
+    
     const alteracao = {
       usuario: user || "Desconhecido",
-      data: new Date().toLocaleDateString("pt-BR"),
+      data: dataHora,
     }
     const updated = itens.map((item) => {
       if (item.nome === receita.inputItem) {
@@ -157,6 +221,8 @@ export default function Home() {
         onTabChange={setActiveTab}
         onLogout={handleLogout}
         user={user}
+        userRole={userRole}
+        userPermissoes={userPermissoes}
         isOpen={sidebarOpen}
         onToggle={() => setSidebarOpen(!sidebarOpen)}
       />
@@ -171,6 +237,8 @@ export default function Home() {
               {activeTab === "producao" && "Produção"}
               {activeTab === "financeiro" && "Financeiro"}
               {activeTab === "dashboard" && "Dashboard"}
+              {activeTab === "lista-compras" && "Lista de Compras"}
+              {activeTab === "admin" && "Administração"}
             </h1>
             <p className="text-muted-foreground">
               {activeTab === "estoque" &&
@@ -183,12 +251,22 @@ export default function Home() {
                 "Acompanhe seus gastos e histórico"}
               {activeTab === "dashboard" &&
                 "Visualize as métricas do seu negócio"}
+              {activeTab === "lista-compras" &&
+                "Itens com estoque baixo, quantidades e valor total da compra"}
+              {activeTab === "admin" &&
+                "Gerenciamento de usuários, permissões e configurações"}
             </p>
           </div>
 
           {/* Content */}
           {activeTab === "estoque" && (
-            <EstoqueView itens={itens} onUpdateItem={handleUpdateItem} />
+            <EstoqueView
+              itens={itens}
+              onUpdateItem={handleUpdateItem}
+              onAddItem={handleAddItem}
+              onEditItem={handleEditItem}
+              onDeleteItem={handleDeleteItem}
+            />
           )}
           {activeTab === "entrada" && (
             <EntradaView itens={itens} onEntrada={handleEntrada} />
@@ -208,6 +286,12 @@ export default function Home() {
           )}
           {activeTab === "dashboard" && (
             <DashboardView itens={itens} historico={historico} />
+          )}
+          {activeTab === "lista-compras" && (
+            <ListaComprasView itens={itens} />
+          )}
+          {activeTab === "admin" && userRole === "admin" && (
+            <AdminView currentUser={user} onPasswordChange={handlePasswordChange} />
           )}
         </div>
       </main>

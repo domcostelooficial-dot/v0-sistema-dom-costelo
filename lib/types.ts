@@ -22,6 +22,17 @@ export interface Usuario {
   pass: string
 }
 
+export type UserRole = "admin" | "operador"
+
+export type TabPermissao = "estoque" | "entrada" | "producao" | "financeiro" | "dashboard" | "lista-compras" | "admin"
+
+export interface UsuarioSistema {
+  login: string
+  senha: string
+  role: UserRole
+  permissoes: TabPermissao[]
+}
+
 export interface Receita {
   id: string
   nome: string
@@ -60,11 +71,13 @@ export const defaultItens: Item[] = [
   { nome: "Contra filé", min: 6, atual: 6, categoria: "Carnes" },
   { nome: "Carne de hambúrguer", min: 12, atual: 12, categoria: "Carnes" },
   { nome: "Costela Pronta", min: 2, atual: 2, categoria: "Carnes" },
+  { nome: "Costela Desfiada", min: 2, atual: 2, categoria: "Carnes" },
   { nome: "Bacon em cubos", min: 2, atual: 2, categoria: "Carnes" },
 
   { nome: "Pão de Australiano Aussie", min: 12, atual: 12, categoria: "Padaria" },
   { nome: "Pão brioche 4CT", min: 12, atual: 12, categoria: "Padaria" },
 
+  { nome: "Batata", min: 7, atual: 7, categoria: "Insumos" },
   { nome: "Anel de cebola", min: 2, atual: 2, categoria: "Insumos" },
   { nome: "Mussarela", min: 1, atual: 1, categoria: "Insumos" },
   { nome: "Cream cheese", min: 1, atual: 1, categoria: "Insumos" },
