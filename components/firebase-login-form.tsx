@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import Image from "next/image"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -23,6 +23,15 @@ export function FirebaseLoginForm({ onLogin }: FirebaseLoginFormProps) {
   const [success, setSuccess] = useState("")
   const [loading, setLoading] = useState(false)
   const [isSignUp, setIsSignUp] = useState(false)
+
+  // Inicializar usuarios no localStorage quando o componente monta
+  useEffect(() => {
+    try {
+      getUsuarios() // Isso faz a migracao de usuarios antigos se necessario
+    } catch (err) {
+      console.error("[v0] Erro ao inicializar usuarios:", err)
+    }
+  }, [])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -116,6 +125,7 @@ export function FirebaseLoginForm({ onLogin }: FirebaseLoginFormProps) {
       if (!usuarioSistema) {
         // Se nao existe nenhum admin aprovado, o primeiro usuario vira admin automaticamente
         if (!existeAdminAprovado) {
+          console.log("[v0] Primeiro usuario - tornando admin")
           const novoAdmin: UsuarioSistema = {
             login: displayName,
             senha: "",
@@ -127,11 +137,13 @@ export function FirebaseLoginForm({ onLogin }: FirebaseLoginFormProps) {
           }
           usuarios.push(novoAdmin)
           saveUsuarios(usuarios)
+          setLoading(false)
           onLogin(displayName, novoAdmin.role, novoAdmin.permissoes)
           return
         }
         
         // Usuario nao existe no sistema - criar como pendente
+        console.log("[v0] Novo usuario - criando como pendente")
         const novoUsuario: UsuarioSistema = {
           login: displayName,
           senha: "",
@@ -148,7 +160,9 @@ export function FirebaseLoginForm({ onLogin }: FirebaseLoginFormProps) {
         return
       }
 
-      // Usuarios antigos sem status sao considerados aprovados
+      // Verificar status do usuario
+      console.log("[v0] Usuario encontrado:", usuarioSistema.login, "Status:", usuarioSistema.status)
+      
       if (usuarioSistema.status === "pendente") {
         setError("Sua conta esta aguardando aprovacao do administrador.")
         setLoading(false)
@@ -162,6 +176,8 @@ export function FirebaseLoginForm({ onLogin }: FirebaseLoginFormProps) {
       }
 
       // Usuario aprovado ou sem status (antigos) - fazer login
+      console.log("[v0] Login bem-sucedido para:", usuarioSistema.login)
+      setLoading(false)
       onLogin(displayName, usuarioSistema.role, usuarioSistema.permissoes)
     } catch (err) {
       setError(isSignUp ? "Erro ao criar conta. Tente novamente." : "Erro ao fazer login. Tente novamente.")
