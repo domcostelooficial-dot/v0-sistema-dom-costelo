@@ -54,43 +54,6 @@ export function FirebaseLoginForm({ onLogin }: FirebaseLoginFormProps) {
     }
 
     try {
-      // Credenciais de administrador padrao para primeiro acesso
-      const ADMIN_EMAIL = "admin@domcostelo.com"
-      const ADMIN_PASSWORD = "admin123"
-      
-      // Obter usuarios uma unica vez
-      let usuarios = getUsuarios()
-      let existeAdminAprovado = usuarios.some(u => u.role === "admin" && u.status === "aprovado")
-      
-      if (!isSignUp && email === ADMIN_EMAIL && password === ADMIN_PASSWORD && !existeAdminAprovado) {
-        console.log("[v0] Primeiro acesso com credenciais padrao - criando admin")
-        
-        // Criar conta no Firebase se nao existir
-        try {
-          await signUpWithEmail(ADMIN_EMAIL, ADMIN_PASSWORD)
-        } catch (signUpError) {
-          // Ja existe, tudo bem, continuar com login
-          console.log("[v0] Usuario admin ja existe no Firebase")
-        }
-        
-        // Criar usuario admin no sistema local
-        const adminUser: UsuarioSistema = {
-          login: "admin",
-          senha: "",
-          email: ADMIN_EMAIL,
-          role: "admin",
-          permissoes: ["estoque", "entrada", "producao", "financeiro", "dashboard", "lista-compras", "admin"],
-          status: "aprovado",
-          dataCriacao: new Date().toLocaleString("pt-BR"),
-        }
-        usuarios.push(adminUser)
-        saveUsuarios(usuarios)
-        
-        setLoading(false)
-        onLogin("admin", "admin", ["estoque", "entrada", "producao", "financeiro", "dashboard", "lista-compras", "admin"])
-        return
-      }
-
       let user
       let authError
 
@@ -107,7 +70,7 @@ export function FirebaseLoginForm({ onLogin }: FirebaseLoginFormProps) {
         }
 
         // Criar usuario pendente no sistema local
-        usuarios = getUsuarios()
+        const usuarios = getUsuarios()
         const displayName = user.email?.split("@")[0] || user.uid
         
         // Verificar se ja existe
@@ -147,7 +110,7 @@ export function FirebaseLoginForm({ onLogin }: FirebaseLoginFormProps) {
       }
 
       // Verificar se usuario esta aprovado
-      usuarios = getUsuarios()
+      const usuarios = getUsuarios()
       const displayName = user.email?.split("@")[0] || user.uid
       
       // Buscar por email ou por login (para usuarios antigos)
@@ -156,8 +119,8 @@ export function FirebaseLoginForm({ onLogin }: FirebaseLoginFormProps) {
         usuarioSistema = usuarios.find(u => u.login.toLowerCase() === displayName.toLowerCase())
       }
       
-      // Atualizar verificacao de admin aprovado
-      existeAdminAprovado = usuarios.some(u => u.role === "admin" && u.status === "aprovado")
+      // Verificar se existe algum admin aprovado no sistema
+      const existeAdminAprovado = usuarios.some(u => u.role === "admin" && u.status === "aprovado")
       
       if (!usuarioSistema) {
         // Se nao existe nenhum admin aprovado, o primeiro usuario vira admin automaticamente
@@ -245,17 +208,6 @@ export function FirebaseLoginForm({ onLogin }: FirebaseLoginFormProps) {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          {!isSignUp && (
-            <div className="mb-4 p-3 bg-primary/10 border border-primary/30 rounded-md text-sm text-center">
-              <p className="font-medium text-primary">Primeiro Acesso?</p>
-              <p className="text-muted-foreground mt-1">
-                Email: <span className="font-mono font-semibold">admin@domcostelo.com</span>
-              </p>
-              <p className="text-muted-foreground">
-                Senha: <span className="font-mono font-semibold">admin123</span>
-              </p>
-            </div>
-          )}
           <form onSubmit={handleSubmit} className="space-y-4">
             <FieldGroup>
               <Field>
