@@ -8,8 +8,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { FieldGroup, Field, FieldLabel } from "@/components/ui/field"
 import { Lock, User } from "lucide-react"
 import { signInWithEmail } from "@/lib/firebase-auth"
-import { getUsuarioProfile } from "@/lib/firebase-db"
-import type { UsuarioSistema } from "@/lib/types"
 
 interface FirebaseLoginFormProps {
   onLogin: (user: string, role: string, permissoes: string[]) => void
@@ -36,22 +34,10 @@ export function FirebaseLoginForm({ onLogin }: FirebaseLoginFormProps) {
         return
       }
 
-      // Try to get user profile from Firestore, fallback to defaults
-      let role = "admin"
-      let permissoes = ["estoque", "entrada", "producao", "financeiro", "dashboard", "lista-compras", "admin"]
-      
-      try {
-        const { data: profile } = await getUsuarioProfile(user.uid)
-        if (profile) {
-          role = profile.role
-          permissoes = profile.permissoes
-        }
-      } catch {
-        // Firestore not configured, use default admin permissions
-        console.log("[v0] Firestore not available, using default permissions")
-      }
-
-      // Login successful
+      // Login successful - use default admin permissions
+      // Firestore profiles can be implemented later when database is configured
+      const role = "admin"
+      const permissoes = ["estoque", "entrada", "producao", "financeiro", "dashboard", "lista-compras", "admin"]
       const displayName = user.email?.split("@")[0] || user.uid
       onLogin(displayName, role, permissoes)
     } catch (err) {
@@ -67,7 +53,7 @@ export function FirebaseLoginForm({ onLogin }: FirebaseLoginFormProps) {
           <div className="flex justify-center mb-4">
             <div className="relative w-24 h-24">
               <Image
-                src="/logo.png"
+                src="/logo.jpg"
                 alt="Dom Costelo Logo"
                 fill
                 className="object-contain"
