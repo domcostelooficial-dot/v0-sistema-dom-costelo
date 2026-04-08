@@ -56,6 +56,7 @@ interface ListaComprasViewProps {
 export function ListaComprasView({ itens }: ListaComprasViewProps) {
   const [search, setSearch] = useState("")
   const [categoriaFilter, setCategoriaFilter] = useState<string>("todas")
+  const [fornecedorFilter, setFornecedorFilter] = useState<string>("todos")
   const [listaCompras, setListaCompras] = useState<ItemCompra[]>([])
   const [initialized, setInitialized] = useState(false)
 
@@ -108,9 +109,13 @@ export function ListaComprasView({ itens }: ListaComprasViewProps) {
       const matchesSearch = item.nome.toLowerCase().includes(search.toLowerCase())
       const matchesCategory =
         categoriaFilter === "todas" || item.categoria === categoriaFilter
-      return matchesSearch && matchesCategory
+      const matchesFornecedor =
+        fornecedorFilter === "todos" ||
+        (fornecedorFilter === "sem-fornecedor" && item.fornecedor === "") ||
+        item.fornecedor.toLowerCase().includes(fornecedorFilter.toLowerCase())
+      return matchesSearch && matchesCategory && matchesFornecedor
     })
-  }, [listaCompras, search, categoriaFilter])
+  }, [listaCompras, search, categoriaFilter, fornecedorFilter])
 
   const handlePrecoChange = (nome: string, preco: number) => {
     setListaCompras((prev) =>
@@ -172,6 +177,14 @@ export function ListaComprasView({ itens }: ListaComprasViewProps) {
       currency: "BRL",
     })
   }
+
+  // Get unique fornecedores for filter
+  const fornecedoresUnicos = useMemo(() => {
+    const fornecedores = listaCompras
+      .map((item) => item.fornecedor)
+      .filter((f) => f !== "")
+    return Array.from(new Set(fornecedores)).sort()
+  }, [listaCompras])
 
   const progressoPercent =
     listaCompras.length > 0
@@ -370,6 +383,20 @@ export function ListaComprasView({ itens }: ListaComprasViewProps) {
                 {categorias.map((cat) => (
                   <SelectItem key={cat} value={cat}>
                     {cat}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select value={fornecedorFilter} onValueChange={setFornecedorFilter}>
+              <SelectTrigger className="w-full sm:w-48 bg-input border-border">
+                <SelectValue placeholder="Fornecedor" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="todos">Todos Fornecedores</SelectItem>
+                <SelectItem value="sem-fornecedor">Sem Fornecedor</SelectItem>
+                {fornecedoresUnicos.map((fornecedor) => (
+                  <SelectItem key={fornecedor} value={fornecedor}>
+                    {fornecedor}
                   </SelectItem>
                 ))}
               </SelectContent>
