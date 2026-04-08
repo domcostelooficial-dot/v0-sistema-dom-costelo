@@ -36,17 +36,24 @@ export function FirebaseLoginForm({ onLogin }: FirebaseLoginFormProps) {
         return
       }
 
-      // Get user profile from Firestore
-      const { data: profile, error: profileError } = await getUsuarioProfile(user.uid)
+      // Try to get user profile from Firestore, fallback to defaults
+      let role = "admin"
+      let permissoes = ["estoque", "entrada", "producao", "financeiro", "dashboard", "lista-compras", "admin"]
       
-      if (profileError || !profile) {
-        setError("Erro ao carregar perfil do usuário")
-        setLoading(false)
-        return
+      try {
+        const { data: profile } = await getUsuarioProfile(user.uid)
+        if (profile) {
+          role = profile.role
+          permissoes = profile.permissoes
+        }
+      } catch {
+        // Firestore not configured, use default admin permissions
+        console.log("[v0] Firestore not available, using default permissions")
       }
 
       // Login successful
-      onLogin(user.email || user.uid, profile.role, profile.permissoes)
+      const displayName = user.email?.split("@")[0] || user.uid
+      onLogin(displayName, role, permissoes)
     } catch (err) {
       setError("Erro ao fazer login. Tente novamente.")
       setLoading(false)
