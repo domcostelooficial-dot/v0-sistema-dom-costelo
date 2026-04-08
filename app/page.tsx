@@ -1,18 +1,26 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { Item, HistoricoEntry, Receita } from "@/lib/types"
 import {
-  getEstoque,
-  saveEstoque,
-  getHistorico,
-  saveHistorico,
+  getEstoque as getEstoqueLocal,
+  saveEstoque as saveEstoqueLocal,
+  getHistorico as getHistoricoLocal,
+  saveHistorico as saveHistoricoLocal,
   getUser,
   saveUser,
   clearUser,
-  getReceitas,
-  saveReceitas,
+  getReceitas as getReceitasLocal,
+  saveReceitas as saveReceitasLocal,
 } from "@/lib/store"
+import {
+  saveEstoque as saveEstoqueFirebase,
+  getEstoque as getEstoqueFirebase,
+  saveHistorico as saveHistoricoFirebase,
+  getHistorico as getHistoricoFirebase,
+  saveReceitas as saveReceitasFirebase,
+  getReceitas as getReceitasFirebase,
+} from "@/lib/firebase-db"
 import { FirebaseLoginForm } from "@/components/firebase-login-form"
 import { AppSidebar } from "@/components/app-sidebar"
 import { EstoqueView } from "@/components/estoque-view"
