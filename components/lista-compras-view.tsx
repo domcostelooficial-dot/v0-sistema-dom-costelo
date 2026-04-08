@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Checkbox } from "@/components/ui/checkbox"
+
 import {
   Table,
   TableBody,
@@ -400,15 +400,25 @@ export function ListaComprasView({ itens }: ListaComprasViewProps) {
                   filteredLista.map((item) => (
                     <TableRow
                       key={item.nome}
-                      className={`border-border ${item.comprado ? "opacity-50" : ""}`}
+                      className={`border-border transition-colors ${
+                        item.comprado 
+                          ? "bg-success/10 border-success/30" 
+                          : ""
+                      }`}
                     >
                       <TableCell>
-                        <Checkbox
-                          checked={item.comprado}
-                          onCheckedChange={(checked) =>
-                            handleCompradoChange(item.nome, checked as boolean)
+                        <Button
+                          variant={item.comprado ? "default" : "outline"}
+                          size="icon"
+                          onClick={() => handleCompradoChange(item.nome, !item.comprado)}
+                          className={
+                            item.comprado
+                              ? "bg-success hover:bg-success/90 text-white border-success"
+                              : "hover:bg-success/10 hover:border-success/50"
                           }
-                        />
+                        >
+                          <Check className={`h-4 w-4 ${item.comprado ? "" : "opacity-40"}`} />
+                        </Button>
                       </TableCell>
                       <TableCell
                         className={`font-medium text-foreground ${
