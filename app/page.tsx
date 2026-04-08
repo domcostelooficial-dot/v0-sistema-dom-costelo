@@ -13,7 +13,7 @@ import {
   getReceitas,
   saveReceitas,
 } from "@/lib/store"
-import { LoginForm } from "@/components/login-form"
+import { FirebaseLoginForm } from "@/components/firebase-login-form"
 import { AppSidebar } from "@/components/app-sidebar"
 import { EstoqueView } from "@/components/estoque-view"
 import { EntradaView } from "@/components/entrada-view"
@@ -211,7 +211,7 @@ export default function Home() {
   }
 
   if (!user) {
-    return <LoginForm onLogin={handleLogin} />
+    return <FirebaseLoginForm onLogin={handleLogin} />
   }
 
   return (
