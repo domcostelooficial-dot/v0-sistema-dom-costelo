@@ -234,13 +234,6 @@ export function FirebaseLoginForm({ onLogin }: FirebaseLoginFormProps) {
           <CardDescription className="text-muted-foreground">
             {isSignUp ? "Crie sua conta para acessar o sistema" : "Faça login para acessar o sistema"}
           </CardDescription>
-          {!isSignUp && (
-            <div className="mt-3 p-3 bg-primary/10 rounded-lg border border-primary/20">
-              <p className="text-xs text-center text-muted-foreground">
-                <strong className="text-primary">Administrador:</strong> admin@domcostelo.com / admin123
-              </p>
-            </div>
-          )}
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
