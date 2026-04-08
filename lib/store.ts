@@ -86,7 +86,26 @@ export function saveReceitas(receitas: Receita[]) {
 export function getUsuarios(): UsuarioSistema[] {
   if (typeof window === "undefined") return defaultUsuarios
   const stored = localStorage.getItem(USUARIOS_KEY)
-  return stored ? JSON.parse(stored) : defaultUsuarios
+  if (!stored) return defaultUsuarios
+  
+  // Migrar usuarios antigos que nao tem status
+  const usuarios = JSON.parse(stored) as UsuarioSistema[]
+  let needsUpdate = false
+  
+  const migratedUsuarios = usuarios.map(u => {
+    if (!u.status) {
+      needsUpdate = true
+      return { ...u, status: "aprovado" as const }
+    }
+    return u
+  })
+  
+  // Salvar se houve migracao
+  if (needsUpdate) {
+    localStorage.setItem(USUARIOS_KEY, JSON.stringify(migratedUsuarios))
+  }
+  
+  return migratedUsuarios
 }
 
 export function saveUsuarios(usuarios: UsuarioSistema[]) {

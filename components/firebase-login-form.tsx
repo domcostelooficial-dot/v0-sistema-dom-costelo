@@ -102,11 +102,16 @@ export function FirebaseLoginForm({ onLogin }: FirebaseLoginFormProps) {
 
       // Verificar se usuario esta aprovado
       const usuarios = getUsuarios()
-      const usuarioSistema = usuarios.find(u => u.email === user.email)
+      const displayName = user.email?.split("@")[0] || user.uid
+      
+      // Buscar por email ou por login (para usuarios antigos)
+      let usuarioSistema = usuarios.find(u => u.email === user.email)
+      if (!usuarioSistema) {
+        usuarioSistema = usuarios.find(u => u.login.toLowerCase() === displayName.toLowerCase())
+      }
       
       if (!usuarioSistema) {
         // Usuario nao existe no sistema - criar como pendente
-        const displayName = user.email?.split("@")[0] || user.uid
         const novoUsuario: UsuarioSistema = {
           login: displayName,
           senha: "",
@@ -123,6 +128,7 @@ export function FirebaseLoginForm({ onLogin }: FirebaseLoginFormProps) {
         return
       }
 
+      // Usuarios antigos sem status sao considerados aprovados
       if (usuarioSistema.status === "pendente") {
         setError("Sua conta esta aguardando aprovacao do administrador.")
         setLoading(false)
@@ -135,8 +141,7 @@ export function FirebaseLoginForm({ onLogin }: FirebaseLoginFormProps) {
         return
       }
 
-      // Usuario aprovado - fazer login
-      const displayName = user.email?.split("@")[0] || user.uid
+      // Usuario aprovado ou sem status (antigos) - fazer login
       onLogin(displayName, usuarioSistema.role, usuarioSistema.permissoes)
     } catch (err) {
       setError(isSignUp ? "Erro ao criar conta. Tente novamente." : "Erro ao fazer login. Tente novamente.")
