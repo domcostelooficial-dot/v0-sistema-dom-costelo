@@ -42,9 +42,9 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Checkbox } from "@/components/ui/checkbox"
-import { Users, Shield, Key, PlusCircle, Edit, Trash2, Save } from "lucide-react"
+import { Users, Shield, Key, PlusCircle, Edit, Trash2, Save, UserCheck, UserX, Clock } from "lucide-react"
 import { getUsuarios, saveUsuarios } from "@/lib/store"
-import type { UsuarioSistema, UserRole, TabPermissao } from "@/lib/types"
+import type { UsuarioSistema, UserRole, TabPermissao, UserStatus } from "@/lib/types"
 import { toast } from "sonner"
 
 interface AdminViewProps {
@@ -235,8 +235,17 @@ export function AdminView({ currentUser, onPasswordChange }: AdminViewProps) {
 
   return (
     <div className="space-y-6">
-      <Tabs defaultValue="usuarios" className="w-full">
-        <TabsList className="grid w-full grid-cols-3">
+      <Tabs defaultValue="pendentes" className="w-full">
+        <TabsList className="grid w-full grid-cols-4">
+          <TabsTrigger value="pendentes" className="gap-2">
+            <Clock className="h-4 w-4" />
+            Pendentes
+            {usuarios.filter(u => u.status === "pendente").length > 0 && (
+              <Badge variant="destructive" className="ml-1 h-5 w-5 p-0 flex items-center justify-center text-xs">
+                {usuarios.filter(u => u.status === "pendente").length}
+              </Badge>
+            )}
+          </TabsTrigger>
           <TabsTrigger value="usuarios" className="gap-2">
             <Users className="h-4 w-4" />
             Usuários
@@ -250,6 +259,85 @@ export function AdminView({ currentUser, onPasswordChange }: AdminViewProps) {
             Minha Conta
           </TabsTrigger>
         </TabsList>
+
+        {/* Tab Pendentes */}
+        <TabsContent value="pendentes" className="space-y-4">
+          <Card className="border-border">
+            <CardHeader>
+              <CardTitle>Solicitações Pendentes</CardTitle>
+              <CardDescription>
+                Aprove ou rejeite novos usuários que criaram conta no sistema
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {usuarios.filter(u => u.status === "pendente").length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  <UserCheck className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                  <p>Nenhuma solicitação pendente</p>
+                </div>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow className="border-border hover:bg-transparent">
+                      <TableHead className="text-muted-foreground">Email</TableHead>
+                      <TableHead className="text-muted-foreground">Login</TableHead>
+                      <TableHead className="text-muted-foreground">Data de Criação</TableHead>
+                      <TableHead className="text-muted-foreground text-center">Ações</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {usuarios.filter(u => u.status === "pendente").map((user) => (
+                      <TableRow key={user.login} className="border-border">
+                        <TableCell>{user.email || "-"}</TableCell>
+                        <TableCell className="font-medium">{user.login}</TableCell>
+                        <TableCell className="text-muted-foreground">{user.dataCriacao || "-"}</TableCell>
+                        <TableCell className="text-center">
+                          <div className="flex items-center justify-center gap-2">
+                            <Button
+                              size="sm"
+                              className="gap-1 bg-success hover:bg-success/90"
+                              onClick={() => {
+                                const updated = usuarios.map(u => 
+                                  u.login === user.login 
+                                    ? { ...u, status: "aprovado" as UserStatus, permissoes: ["estoque", "entrada", "producao", "dashboard", "lista-compras"] as TabPermissao[] }
+                                    : u
+                                )
+                                setUsuarios(updated)
+                                saveUsuarios(updated)
+                                toast.success(`Usuário "${user.login}" aprovado com sucesso!`)
+                              }}
+                            >
+                              <UserCheck className="h-4 w-4" />
+                              Aprovar
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="destructive"
+                              className="gap-1"
+                              onClick={() => {
+                                const updated = usuarios.map(u => 
+                                  u.login === user.login 
+                                    ? { ...u, status: "rejeitado" as UserStatus }
+                                    : u
+                                )
+                                setUsuarios(updated)
+                                saveUsuarios(updated)
+                                toast.success(`Usuário "${user.login}" rejeitado.`)
+                              }}
+                            >
+                              <UserX className="h-4 w-4" />
+                              Rejeitar
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
 
         {/* Tab Usuários */}
         <TabsContent value="usuarios" className="space-y-4">
@@ -352,22 +440,30 @@ export function AdminView({ currentUser, onPasswordChange }: AdminViewProps) {
               <Table>
                 <TableHeader>
                   <TableRow className="border-border hover:bg-transparent">
-                    <TableHead className="text-muted-foreground">Login</TableHead>
+                    <TableHead className="text-muted-foreground">Login / Email</TableHead>
                     <TableHead className="text-muted-foreground">Perfil</TableHead>
+                    <TableHead className="text-muted-foreground">Status</TableHead>
                     <TableHead className="text-muted-foreground">Permissões</TableHead>
                     <TableHead className="text-muted-foreground text-center">Ações</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {usuarios.map((user) => (
+                  {usuarios.filter(u => u.status !== "pendente").map((user) => (
                     <TableRow key={user.login} className="border-border">
-                      <TableCell className="font-medium">
-                        {user.login}
-                        {user.login === currentUser && (
-                          <Badge variant="outline" className="ml-2">
-                            Você
-                          </Badge>
-                        )}
+                      <TableCell>
+                        <div className="flex flex-col">
+                          <span className="font-medium">
+                            {user.login}
+                            {user.login === currentUser && (
+                              <Badge variant="outline" className="ml-2">
+                                Você
+                              </Badge>
+                            )}
+                          </span>
+                          {user.email && (
+                            <span className="text-xs text-muted-foreground">{user.email}</span>
+                          )}
+                        </div>
                       </TableCell>
                       <TableCell>
                         {user.role === "admin" ? (
@@ -377,13 +473,22 @@ export function AdminView({ currentUser, onPasswordChange }: AdminViewProps) {
                         )}
                       </TableCell>
                       <TableCell>
+                        {user.status === "aprovado" ? (
+                          <Badge className="bg-success text-success-foreground">Aprovado</Badge>
+                        ) : user.status === "rejeitado" ? (
+                          <Badge variant="destructive">Rejeitado</Badge>
+                        ) : (
+                          <Badge variant="outline">-</Badge>
+                        )}
+                      </TableCell>
+                      <TableCell>
                         <div className="flex flex-wrap gap-1">
-                          {user.permissoes.slice(0, 3).map((perm) => (
+                          {user.permissoes && user.permissoes.slice(0, 3).map((perm) => (
                             <Badge key={perm} variant="outline" className="text-xs">
                               {allPermissoes.find((p) => p.id === perm)?.label || perm}
                             </Badge>
                           ))}
-                          {user.permissoes.length > 3 && (
+                          {user.permissoes && user.permissoes.length > 3 && (
                             <Badge variant="outline" className="text-xs">
                               +{user.permissoes.length - 3}
                             </Badge>
