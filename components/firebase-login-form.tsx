@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { FieldGroup, Field, FieldLabel } from "@/components/ui/field"
-import { Lock, User } from "lucide-react"
+import { Lock, User, Mail } from "lucide-react"
 import { signInWithEmail, signUpWithEmail } from "@/lib/firebase-auth"
 import { getUsuarios, saveUsuarios } from "@/lib/store"
 import type { UsuarioSistema } from "@/lib/types"
@@ -16,6 +16,7 @@ interface FirebaseLoginFormProps {
 }
 
 export function FirebaseLoginForm({ onLogin }: FirebaseLoginFormProps) {
+  const [nome, setNome] = useState("")
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [confirmPassword, setConfirmPassword] = useState("")
@@ -41,6 +42,11 @@ export function FirebaseLoginForm({ onLogin }: FirebaseLoginFormProps) {
 
     // Validacao para cadastro
     if (isSignUp) {
+      if (!nome.trim()) {
+        setError("Digite seu nome")
+        setLoading(false)
+        return
+      }
       if (password.length < 6) {
         setError("A senha deve ter no minimo 6 caracteres")
         setLoading(false)
@@ -77,6 +83,7 @@ export function FirebaseLoginForm({ onLogin }: FirebaseLoginFormProps) {
         if (!usuarios.some(u => u.email === user.email)) {
           const novoUsuario: UsuarioSistema = {
             login: displayName,
+            nome: nome.trim(),
             senha: "", // Senha gerenciada pelo Firebase
             email: user.email || "",
             role: "operador",
@@ -91,6 +98,7 @@ export function FirebaseLoginForm({ onLogin }: FirebaseLoginFormProps) {
         // Mostrar mensagem de sucesso e aguardar aprovacao
         setSuccess("Conta criada com sucesso! Aguarde a aprovacao do administrador para acessar o sistema.")
         setLoading(false)
+        setNome("")
         setEmail("")
         setPassword("")
         setConfirmPassword("")
@@ -237,11 +245,32 @@ export function FirebaseLoginForm({ onLogin }: FirebaseLoginFormProps) {
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
+            {isSignUp && (
+              <FieldGroup>
+                <Field>
+                  <FieldLabel htmlFor="nome">Nome Completo</FieldLabel>
+                  <div className="relative">
+                    <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      id="nome"
+                      type="text"
+                      value={nome}
+                      onChange={(e) => setNome(e.target.value)}
+                      placeholder="Digite seu nome completo"
+                      className="pl-10 bg-input border-border"
+                      required
+                      disabled={loading}
+                    />
+                  </div>
+                </Field>
+              </FieldGroup>
+            )}
+
             <FieldGroup>
               <Field>
                 <FieldLabel htmlFor="email">Email</FieldLabel>
                 <div className="relative">
-                  <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                   <Input
                     id="email"
                     type="email"
@@ -327,6 +356,7 @@ export function FirebaseLoginForm({ onLogin }: FirebaseLoginFormProps) {
                   setIsSignUp(!isSignUp)
                   setError("")
                   setSuccess("")
+                  setNome("")
                   setConfirmPassword("")
                 }}
                 disabled={loading}

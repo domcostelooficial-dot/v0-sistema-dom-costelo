@@ -1,18 +1,26 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { Item, HistoricoEntry, Receita } from "@/lib/types"
 import {
-  getEstoque,
-  saveEstoque,
-  getHistorico,
-  saveHistorico,
+  saveEstoque as saveEstoqueLocal,
+  getEstoque as getEstoqueLocal,
+  saveHistorico as saveHistoricoLocal,
+  getHistorico as getHistoricoLocal,
   getUser,
   saveUser,
   clearUser,
-  getReceitas,
-  saveReceitas,
+  getReceitas as getReceitasLocal,
+  saveReceitas as saveReceitasLocal,
 } from "@/lib/store"
+import {
+  saveEstoque as saveEstoqueFirebase,
+  getEstoque as getEstoqueFirebase,
+  saveHistorico as saveHistoricoFirebase,
+  getHistorico as getHistoricoFirebase,
+  saveReceitas as saveReceitasFirebase,
+  getReceitas as getReceitasFirebase,
+} from "@/lib/firebase-db"
 import { FirebaseLoginForm } from "@/components/firebase-login-form"
 import { AppSidebar } from "@/components/app-sidebar"
 import { EstoqueView } from "@/components/estoque-view"
@@ -22,8 +30,92 @@ import { FinanceiroView } from "@/components/financeiro-view"
 import { DashboardView } from "@/components/dashboard-view"
 import { ListaComprasView } from "@/components/lista-compras-view"
 import { AdminView } from "@/components/admin-view"
+import { Menu, X } from "lucide-react"
+import { Button } from "@/components/ui/button"
 
 type Tab = "estoque" | "entrada" | "producao" | "financeiro" | "dashboard" | "lista-compras" | "admin"
+
+// Funções wrapper que salvam em Firebase e localStorage
+async function saveEstoqueHybrid(user: string | null, itens: Item[]) {
+  saveEstoqueLocal(itens)
+  if (user) {
+    try {
+      await saveEstoqueFirebase(user, itens)
+      console.log("[v0] Estoque salvo no Firebase")
+    } catch (err) {
+      console.error("[v0] Erro ao salvar no Firebase:", err)
+    }
+  }
+}
+
+async function getEstoqueHybrid(user: string | null): Promise<Item[]> {
+  if (user) {
+    try {
+      const { data } = await getEstoqueFirebase(user)
+      if (data && data.length > 0) {
+        console.log("[v0] Estoque carregado do Firebase")
+        return data
+      }
+    } catch (err) {
+      console.error("[v0] Erro ao carregar do Firebase:", err)
+    }
+  }
+  return getEstoqueLocal()
+}
+
+async function saveHistoricoHybrid(user: string | null, historico: HistoricoEntry[]) {
+  saveHistoricoLocal(historico)
+  if (user) {
+    try {
+      await saveHistoricoFirebase(user, historico)
+      console.log("[v0] Histórico salvo no Firebase")
+    } catch (err) {
+      console.error("[v0] Erro ao salvar histórico no Firebase:", err)
+    }
+  }
+}
+
+async function getHistoricoHybrid(user: string | null): Promise<HistoricoEntry[]> {
+  if (user) {
+    try {
+      const { data } = await getHistoricoFirebase(user)
+      if (data && data.length > 0) {
+        console.log("[v0] Histórico carregado do Firebase")
+        return data
+      }
+    } catch (err) {
+      console.error("[v0] Erro ao carregar histórico do Firebase:", err)
+    }
+  }
+  return getHistoricoLocal()
+}
+
+async function saveReceitasHybrid(user: string | null, receitas: Receita[]) {
+  saveReceitasLocal(receitas)
+  if (user) {
+    try {
+      await saveReceitasFirebase(user, receitas)
+      console.log("[v0] Receitas salvas no Firebase")
+    } catch (err) {
+      console.error("[v0] Erro ao salvar receitas no Firebase:", err)
+    }
+  }
+}
+
+async function getReceitasHybrid(user: string | null): Promise<Receita[]> {
+  if (user) {
+    try {
+      const { data } = await getReceitasFirebase(user)
+      if (data && data.length > 0) {
+        console.log("[v0] Receitas carregadas do Firebase")
+        return data
+      }
+    } catch (err) {
+      console.error("[v0] Erro ao carregar receitas do Firebase:", err)
+    }
+  }
+  return getReceitasLocal()
+}
 
 export default function Home() {
   const [user, setUser] = useState<string | null>(null)
@@ -36,18 +128,22 @@ export default function Home() {
   const [historico, setHistorico] = useState<HistoricoEntry[]>([])
   const [receitas, setReceitas] = useState<Receita[]>([])
 
-  // Load data on mount
+  // Load data on mount and after login
   useEffect(() => {
-    const storedUser = getUser()
-    const storedItens = getEstoque()
-    const storedHistorico = getHistorico()
-    const storedReceitas = getReceitas()
+    const loadData = async () => {
+      const storedUser = getUser()
+      const storedItens = await getEstoqueHybrid(storedUser)
+      const storedHistorico = await getHistoricoHybrid(storedUser)
+      const storedReceitas = await getReceitasHybrid(storedUser)
 
-    setUser(storedUser)
-    setItens(storedItens)
-    setHistorico(storedHistorico)
-    setReceitas(storedReceitas)
-    setIsLoading(false)
+      setUser(storedUser)
+      setItens(storedItens)
+      setHistorico(storedHistorico)
+      setReceitas(storedReceitas)
+      setIsLoading(false)
+    }
+    
+    loadData()
   }, [])
 
   const handleLogin = (username: string, role: string, permissoes: string[]) => {
@@ -55,6 +151,18 @@ export default function Home() {
     setUser(username)
     setUserRole(role)
     setUserPermissoes(permissoes)
+    
+    // Recarregar dados do Firebase do novo usuario
+    const loadUserData = async () => {
+      const itens = await getEstoqueHybrid(username)
+      const historico = await getHistoricoHybrid(username)
+      const receitas = await getReceitasHybrid(username)
+      
+      setItens(itens)
+      setHistorico(historico)
+      setReceitas(receitas)
+    }
+    loadUserData()
     
     // Set first allowed tab as active
     const firstAllowedTab = permissoes[0] as Tab
@@ -89,7 +197,7 @@ export default function Home() {
         : item
     )
     setItens(updated)
-    saveEstoque(updated)
+    saveEstoqueHybrid(user, updated)
   }
 
   const handleAddItem = (newItem: Item) => {
@@ -104,7 +212,7 @@ export default function Home() {
     }
     const updated = [...itens, itemWithTimestamp]
     setItens(updated)
-    saveEstoque(updated)
+    saveEstoqueHybrid(user, updated)
   }
 
   const handleEditItem = (oldNome: string, updatedItem: Item) => {
@@ -122,13 +230,13 @@ export default function Home() {
         : item
     )
     setItens(updated)
-    saveEstoque(updated)
+    saveEstoqueHybrid(user, updated)
   }
 
   const handleDeleteItem = (nome: string) => {
     const updated = itens.filter((item) => item.nome !== nome)
     setItens(updated)
-    saveEstoque(updated)
+    saveEstoqueHybrid(user, updated)
   }
 
   const handleEntrada = (nome: string, qtd: number, custo: number) => {
@@ -149,7 +257,7 @@ export default function Home() {
         : item
     )
     setItens(updated)
-    saveEstoque(updated)
+    saveEstoqueHybrid(user, updated)
 
     // Add to historico
     const entry: HistoricoEntry = {
@@ -160,7 +268,7 @@ export default function Home() {
     }
     const newHistorico = [...historico, entry]
     setHistorico(newHistorico)
-    saveHistorico(newHistorico)
+    saveHistoricoHybrid(user, newHistorico)
   }
 
   const handleProduzir = (receita: Receita) => {
@@ -181,25 +289,25 @@ export default function Home() {
       return item
     })
     setItens(updated)
-    saveEstoque(updated)
+    saveEstoqueHybrid(user, updated)
   }
 
   const handleAddReceita = (receita: Receita) => {
     const newReceitas = [...receitas, receita]
     setReceitas(newReceitas)
-    saveReceitas(newReceitas)
+    saveReceitasHybrid(user, newReceitas)
   }
 
   const handleUpdateReceita = (receita: Receita) => {
     const updated = receitas.map((r) => (r.id === receita.id ? receita : r))
     setReceitas(updated)
-    saveReceitas(updated)
+    saveReceitasHybrid(user, updated)
   }
 
   const handleDeleteReceita = (id: string) => {
     const filtered = receitas.filter((r) => r.id !== id)
     setReceitas(filtered)
-    saveReceitas(filtered)
+    saveReceitasHybrid(user, filtered)
   }
 
   if (isLoading) {
