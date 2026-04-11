@@ -69,6 +69,8 @@ export function AdminView({ currentUser, onPasswordChange }: AdminViewProps) {
   const [selectedUser, setSelectedUser] = useState<UsuarioSistema | null>(null)
   const [formData, setFormData] = useState({
     login: "",
+    nome: "",
+    email: "",
     senha: "",
     role: "operador" as UserRole,
     permissoes: [] as TabPermissao[],
@@ -86,44 +88,50 @@ export function AdminView({ currentUser, onPasswordChange }: AdminViewProps) {
   }, [])
 
   const handleAddUser = () => {
-    if (!formData.login.trim() || !formData.senha.trim()) {
-      toast.error("Preencha login e senha")
+    if (!formData.nome.trim() || !formData.email.trim()) {
+      toast.error("Preencha nome e email")
       return
     }
 
-    if (usuarios.some((u) => u.login.toLowerCase() === formData.login.trim().toLowerCase())) {
-      toast.error("Já existe um usuário com este login")
+    if (usuarios.some((u) => u.email?.toLowerCase() === formData.email.trim().toLowerCase())) {
+      toast.error("Já existe um usuário com este email")
       return
     }
 
     const newUser: UsuarioSistema = {
-      login: formData.login.trim(),
-      senha: formData.senha,
+      login: formData.email.split("@")[0],
+      nome: formData.nome.trim(),
+      email: formData.email.trim().toLowerCase(),
+      senha: "",
       role: formData.role,
       permissoes: formData.permissoes,
+      status: "aprovado",
+      dataCriacao: new Date().toLocaleString("pt-BR"),
     }
 
     const updated = [...usuarios, newUser]
     setUsuarios(updated)
     saveUsuarios(updated)
     setIsAddDialogOpen(false)
-    setFormData({ login: "", senha: "", role: "operador", permissoes: [] })
-    toast.success(`Usuário "${newUser.login}" criado com sucesso!`)
+    setFormData({ login: "", nome: "", email: "", senha: "", role: "operador", permissoes: [] })
+    toast.success(`Usuário "${newUser.nome}" criado com sucesso!`)
   }
 
   const handleEditUser = () => {
     if (!selectedUser) return
 
-    if (!formData.login.trim() || !formData.senha.trim()) {
-      toast.error("Preencha login e senha")
+    if (!formData.nome.trim() || !formData.email.trim()) {
+      toast.error("Preencha nome e email")
       return
     }
 
     const updated = usuarios.map((u) =>
       u.login === selectedUser.login
         ? {
-            login: formData.login.trim(),
-            senha: formData.senha,
+            ...u,
+            login: formData.email.split("@")[0],
+            nome: formData.nome.trim(),
+            email: formData.email.trim().toLowerCase(),
             role: formData.role,
             permissoes: formData.permissoes,
           }
@@ -134,7 +142,7 @@ export function AdminView({ currentUser, onPasswordChange }: AdminViewProps) {
     saveUsuarios(updated)
     setIsEditDialogOpen(false)
     setSelectedUser(null)
-    toast.success(`Usuário "${formData.login}" atualizado com sucesso!`)
+    toast.success(`Usuário "${formData.nome}" atualizado com sucesso!`)
   }
 
   const handleDeleteUser = () => {
@@ -157,9 +165,11 @@ export function AdminView({ currentUser, onPasswordChange }: AdminViewProps) {
     setSelectedUser(user)
     setFormData({
       login: user.login,
+      nome: user.nome || "",
+      email: user.email || "",
       senha: user.senha,
       role: user.role,
-      permissoes: [...user.permissoes],
+      permissoes: user.permissoes ? [...user.permissoes] : [],
     })
     setIsEditDialogOpen(true)
   }
@@ -279,17 +289,17 @@ export function AdminView({ currentUser, onPasswordChange }: AdminViewProps) {
                 <Table>
                   <TableHeader>
                     <TableRow className="border-border hover:bg-transparent">
+                      <TableHead className="text-muted-foreground">Nome</TableHead>
                       <TableHead className="text-muted-foreground">Email</TableHead>
-                      <TableHead className="text-muted-foreground">Login</TableHead>
                       <TableHead className="text-muted-foreground">Data de Criação</TableHead>
                       <TableHead className="text-muted-foreground text-center">Ações</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {usuarios.filter(u => u.status === "pendente").map((user) => (
-                      <TableRow key={user.login} className="border-border">
-                        <TableCell>{user.email || "-"}</TableCell>
-                        <TableCell className="font-medium">{user.login}</TableCell>
+                      <TableRow key={user.email || user.login} className="border-border">
+                        <TableCell className="font-medium">{user.nome || user.login}</TableCell>
+                        <TableCell className="text-muted-foreground">{user.email || "-"}</TableCell>
                         <TableCell className="text-muted-foreground">{user.dataCriacao || "-"}</TableCell>
                         <TableCell className="text-center">
                           <div className="flex items-center justify-center gap-2">
@@ -365,26 +375,26 @@ export function AdminView({ currentUser, onPasswordChange }: AdminViewProps) {
                   </DialogHeader>
                   <div className="space-y-4 py-4">
                     <div className="space-y-2">
-                      <Label htmlFor="add-login">Login</Label>
+                      <Label htmlFor="add-nome">Nome</Label>
                       <Input
-                        id="add-login"
-                        value={formData.login}
+                        id="add-nome"
+                        value={formData.nome}
                         onChange={(e) =>
-                          setFormData({ ...formData, login: e.target.value })
+                          setFormData({ ...formData, nome: e.target.value })
                         }
-                        placeholder="Digite o login"
+                        placeholder="Digite o nome completo"
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="add-senha">Senha</Label>
+                      <Label htmlFor="add-email">Email</Label>
                       <Input
-                        id="add-senha"
-                        type="password"
-                        value={formData.senha}
+                        id="add-email"
+                        type="email"
+                        value={formData.email}
                         onChange={(e) =>
-                          setFormData({ ...formData, senha: e.target.value })
+                          setFormData({ ...formData, email: e.target.value })
                         }
-                        placeholder="Digite a senha"
+                        placeholder="Digite o email"
                       />
                     </div>
                     <div className="space-y-2">
@@ -426,7 +436,7 @@ export function AdminView({ currentUser, onPasswordChange }: AdminViewProps) {
                       variant="outline"
                       onClick={() => {
                         setIsAddDialogOpen(false)
-                        setFormData({ login: "", senha: "", role: "operador", permissoes: [] })
+                        setFormData({ login: "", nome: "", email: "", senha: "", role: "operador", permissoes: [] })
                       }}
                     >
                       Cancelar
@@ -440,7 +450,8 @@ export function AdminView({ currentUser, onPasswordChange }: AdminViewProps) {
               <Table>
                 <TableHeader>
                   <TableRow className="border-border hover:bg-transparent">
-                    <TableHead className="text-muted-foreground">Login / Email</TableHead>
+                    <TableHead className="text-muted-foreground">Nome</TableHead>
+                    <TableHead className="text-muted-foreground">Email</TableHead>
                     <TableHead className="text-muted-foreground">Perfil</TableHead>
                     <TableHead className="text-muted-foreground">Status</TableHead>
                     <TableHead className="text-muted-foreground">Permissões</TableHead>
@@ -449,21 +460,21 @@ export function AdminView({ currentUser, onPasswordChange }: AdminViewProps) {
                 </TableHeader>
                 <TableBody>
                   {usuarios.filter(u => u.status !== "pendente").map((user) => (
-                    <TableRow key={user.login} className="border-border">
+                    <TableRow key={user.email || user.login} className="border-border">
                       <TableCell>
                         <div className="flex flex-col">
                           <span className="font-medium">
-                            {user.login}
+                            {user.nome || user.login}
                             {user.login === currentUser && (
                               <Badge variant="outline" className="ml-2">
                                 Você
                               </Badge>
                             )}
                           </span>
-                          {user.email && (
-                            <span className="text-xs text-muted-foreground">{user.email}</span>
-                          )}
                         </div>
+                      </TableCell>
+                      <TableCell className="text-muted-foreground">
+                        {user.email || "-"}
                       </TableCell>
                       <TableCell>
                         {user.role === "admin" ? (
@@ -547,10 +558,10 @@ export function AdminView({ currentUser, onPasswordChange }: AdminViewProps) {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {usuarios.map((user) => (
-                      <TableRow key={user.login} className="border-border">
+                    {usuarios.filter(u => u.status === "aprovado").map((user) => (
+                      <TableRow key={user.email || user.login} className="border-border">
                         <TableCell className="font-medium">
-                          {user.login}
+                          {user.nome || user.login}
                           {user.role === "admin" && (
                             <Badge className="ml-2 bg-primary text-xs">Admin</Badge>
                           )}
@@ -558,7 +569,7 @@ export function AdminView({ currentUser, onPasswordChange }: AdminViewProps) {
                         {allPermissoes.map((perm) => (
                           <TableCell key={perm.id} className="text-center">
                             <Checkbox
-                              checked={user.permissoes.includes(perm.id)}
+                              checked={user.permissoes?.includes(perm.id) || false}
                               onCheckedChange={(checked) =>
                                 handleBulkPermissionChange(user.login, perm.id, checked as boolean)
                               }
@@ -664,26 +675,26 @@ export function AdminView({ currentUser, onPasswordChange }: AdminViewProps) {
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
-              <Label htmlFor="edit-login">Login</Label>
+              <Label htmlFor="edit-nome">Nome</Label>
               <Input
-                id="edit-login"
-                value={formData.login}
+                id="edit-nome"
+                value={formData.nome}
                 onChange={(e) =>
-                  setFormData({ ...formData, login: e.target.value })
+                  setFormData({ ...formData, nome: e.target.value })
                 }
-                placeholder="Digite o login"
+                placeholder="Digite o nome completo"
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="edit-senha">Senha</Label>
+              <Label htmlFor="edit-email">Email</Label>
               <Input
-                id="edit-senha"
-                type="password"
-                value={formData.senha}
+                id="edit-email"
+                type="email"
+                value={formData.email}
                 onChange={(e) =>
-                  setFormData({ ...formData, senha: e.target.value })
+                  setFormData({ ...formData, email: e.target.value })
                 }
-                placeholder="Digite a senha"
+                placeholder="Digite o email"
               />
             </div>
             <div className="space-y-2">
@@ -742,7 +753,7 @@ export function AdminView({ currentUser, onPasswordChange }: AdminViewProps) {
             <AlertDialogTitle>Confirmar Exclusão</AlertDialogTitle>
             <AlertDialogDescription>
               Tem certeza que deseja remover o usuário{" "}
-              <strong>{selectedUser?.login}</strong>? Esta ação não pode ser
+              <strong>{selectedUser?.nome || selectedUser?.login}</strong>? Esta ação não pode ser
               desfeita.
             </AlertDialogDescription>
           </AlertDialogHeader>

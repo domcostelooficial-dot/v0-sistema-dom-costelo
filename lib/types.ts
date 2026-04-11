@@ -31,6 +31,7 @@ export type UserStatus = "pendente" | "aprovado" | "rejeitado"
 export interface UsuarioSistema {
   login: string
   senha: string
+  nome?: string
   email?: string
   role: UserRole
   permissoes: TabPermissao[]
