@@ -9,6 +9,7 @@ import { FieldGroup, Field, FieldLabel } from "@/components/ui/field"
 import { Lock, User, Mail } from "lucide-react"
 import { signInWithEmail, signUpWithEmail } from "@/lib/firebase-auth"
 import { getUsuarios, saveUsuarios } from "@/lib/store"
+import { getAllUsuarios, createUsuarioProfile } from "@/lib/firebase-db"
 import type { UsuarioSistema } from "@/lib/types"
 
 interface FirebaseLoginFormProps {
@@ -25,13 +26,24 @@ export function FirebaseLoginForm({ onLogin }: FirebaseLoginFormProps) {
   const [loading, setLoading] = useState(false)
   const [isSignUp, setIsSignUp] = useState(false)
 
-  // Inicializar usuarios no localStorage quando o componente monta
+  // Inicializar usuarios do Firebase e localStorage quando o componente monta
   useEffect(() => {
-    try {
-      getUsuarios() // Isso faz a migracao de usuarios antigos se necessario
-    } catch (err) {
-      console.error("[v0] Erro ao inicializar usuarios:", err)
+    const loadUsuarios = async () => {
+      try {
+        // Carregar do localStorage primeiro
+        getUsuarios()
+        
+        // Tentar carregar do Firebase
+        const { data: firebaseUsuarios, error } = await getAllUsuarios()
+        if (!error && firebaseUsuarios && firebaseUsuarios.length > 0) {
+          // Sincronizar com localStorage
+          saveUsuarios(firebaseUsuarios)
+        }
+      } catch (err) {
+        console.error("[v0] Erro ao inicializar usuarios:", err)
+      }
     }
+    loadUsuarios()
   }, [])
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -75,7 +87,7 @@ export function FirebaseLoginForm({ onLogin }: FirebaseLoginFormProps) {
           return
         }
 
-        // Criar usuario pendente no sistema local
+        // Criar usuario pendente no sistema local e Firebase
         const usuarios = getUsuarios()
         const displayName = user.email?.split("@")[0] || user.uid
         
@@ -93,6 +105,10 @@ export function FirebaseLoginForm({ onLogin }: FirebaseLoginFormProps) {
           }
           usuarios.push(novoUsuario)
           saveUsuarios(usuarios)
+          
+          // Salvar no Firebase também
+          const { login, ...userData } = novoUsuario
+          await createUsuarioProfile(login, userData)
         }
 
         // Mostrar mensagem de sucesso e aguardar aprovacao
@@ -124,7 +140,7 @@ export function FirebaseLoginForm({ onLogin }: FirebaseLoginFormProps) {
         console.log("[v0] Admin master detectado - acesso garantido")
         const usuarios = getUsuarios()
         
-        // Garantir que admin existe no sistema local
+        // Garantir que admin existe no sistema local e Firebase
         let adminLocal = usuarios.find(u => u.email === emailAdmin)
         if (!adminLocal) {
           adminLocal = {
@@ -138,6 +154,10 @@ export function FirebaseLoginForm({ onLogin }: FirebaseLoginFormProps) {
           }
           usuarios.push(adminLocal)
           saveUsuarios(usuarios)
+          
+          // Salvar no Firebase também
+          const { login, ...userData } = adminLocal
+          await createUsuarioProfile(login, userData)
         }
         
         setLoading(false)
@@ -173,6 +193,11 @@ export function FirebaseLoginForm({ onLogin }: FirebaseLoginFormProps) {
           }
           usuarios.push(novoAdmin)
           saveUsuarios(usuarios)
+          
+          // Salvar no Firebase também
+          const { login, ...userData } = novoAdmin
+          await createUsuarioProfile(login, userData)
+          
           setLoading(false)
           onLogin(displayName, novoAdmin.role, novoAdmin.permissoes)
           return
@@ -191,6 +216,11 @@ export function FirebaseLoginForm({ onLogin }: FirebaseLoginFormProps) {
         }
         usuarios.push(novoUsuario)
         saveUsuarios(usuarios)
+        
+        // Salvar no Firebase também
+        const { login, ...userData } = novoUsuario
+        await createUsuarioProfile(login, userData)
+        
         setError("Sua conta esta pendente de aprovacao. Entre em contato com o administrador.")
         setLoading(false)
         return
