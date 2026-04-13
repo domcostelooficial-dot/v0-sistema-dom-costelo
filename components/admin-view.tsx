@@ -42,7 +42,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Checkbox } from "@/components/ui/checkbox"
-import { Users, Shield, Key, PlusCircle, Edit, Trash2, Save, UserCheck, UserX, Clock, Cloud, CloudOff } from "lucide-react"
+import { Users, Shield, Key, PlusCircle, Edit, Trash2, Save, UserCheck, UserX, Clock } from "lucide-react"
 import { getUsuarios, saveUsuarios } from "@/lib/store"
 import { 
   getAllUsuarios, 
@@ -90,8 +90,6 @@ export function AdminView({ currentUser, onPasswordChange }: AdminViewProps) {
     novaSenha: "",
     confirmarSenha: "",
   })
-  const [isCloudSynced, setIsCloudSynced] = useState(false)
-
   useEffect(() => {
     // Carregar usuários locais primeiro
     setUsuarios(getUsuarios())
@@ -103,10 +101,9 @@ export function AdminView({ currentUser, onPasswordChange }: AdminViewProps) {
         if (!error && data && data.length > 0) {
           setUsuarios(data)
           saveUsuarios(data) // Sincronizar com localStorage
-          setIsCloudSynced(true)
         }
       } catch (err) {
-        console.error("[v0] Erro ao carregar usuários do Firebase:", err)
+        console.error("[Firebase] Erro ao carregar usuários:", err)
       }
     }
     
@@ -117,7 +114,6 @@ export function AdminView({ currentUser, onPasswordChange }: AdminViewProps) {
       if (firebaseUsuarios.length > 0) {
         setUsuarios(firebaseUsuarios)
         saveUsuarios(firebaseUsuarios)
-        setIsCloudSynced(true)
       }
     })
     

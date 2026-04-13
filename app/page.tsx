@@ -131,7 +131,7 @@ export default function Home() {
   const [historico, setHistorico] = useState<HistoricoEntry[]>([])
   const [receitas, setReceitas] = useState<Receita[]>([])
 
-  // Load data on mount and setup real-time listeners
+  // Load data on mount
   useEffect(() => {
     const loadData = async () => {
       const storedUser = getUser()
@@ -147,8 +147,13 @@ export default function Home() {
     }
     
     loadData()
+  }, [])
+  
+  // Setup real-time listeners only when user is logged in
+  useEffect(() => {
+    if (!user) return
     
-    // Configurar listeners em tempo real para sincronização
+    // Configurar listeners em tempo real para sincronização (apenas quando logado)
     const unsubscribeEstoque = subscribeToEstoque((firebaseItens) => {
       if (firebaseItens && firebaseItens.length > 0) {
         setItens(firebaseItens)
@@ -170,13 +175,13 @@ export default function Home() {
       }
     })
     
-    // Cleanup listeners on unmount
+    // Cleanup listeners on unmount or logout
     return () => {
       unsubscribeEstoque()
       unsubscribeHistorico()
       unsubscribeReceitas()
     }
-  }, [])
+  }, [user])
 
   const handleLogin = (username: string, role: string, permissoes: string[]) => {
     saveUser(username)

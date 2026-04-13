@@ -8,29 +8,30 @@ service cloud.firestore {
       return request.auth != null;
     }
     
-    // Helper function to check if user is admin
-    function isAdmin() {
-      return isAuthenticated() && 
-             get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.role == 'admin';
-    }
-    
-    // Usuarios collection - only admins can read all, users can read their own
+    // Usuarios collection - qualquer usuário autenticado pode ler e escrever
+    // (o sistema gerencia permissões internamente)
     match /usuarios/{userId} {
-      // Admin can read/write all users
-      allow read: if isAdmin();
-      allow write: if isAdmin();
-      
-      // Users can read their own profile
-      allow read: if isAuthenticated() && request.auth.uid == userId;
+      allow read, write: if isAuthenticated();
     }
     
-    // User-specific data (estoque, historico, receitas)
+    // Estoque global - qualquer usuário autenticado pode ler e escrever
+    match /estoque/{docId} {
+      allow read, write: if isAuthenticated();
+    }
+    
+    // Histórico global - qualquer usuário autenticado pode ler e escrever
+    match /historico/{docId} {
+      allow read, write: if isAuthenticated();
+    }
+    
+    // Receitas globais - qualquer usuário autenticado pode ler e escrever
+    match /receitas/{docId} {
+      allow read, write: if isAuthenticated();
+    }
+    
+    // User-specific data (legado - para compatibilidade)
     match /users/{userId}/{document=**} {
-      // Users can only access their own data
       allow read, write: if isAuthenticated() && request.auth.uid == userId;
-      
-      // Admins can read all user data
-      allow read: if isAdmin();
     }
   }
 }

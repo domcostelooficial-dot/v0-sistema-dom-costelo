@@ -106,13 +106,19 @@ export async function saveUsuariosFirebase(usuarios: UsuarioSistema[]) {
 
 // Listener em tempo real para usuários
 export function subscribeToUsuarios(callback: (usuarios: UsuarioSistema[]) => void) {
-  return onSnapshot(collection(db, USUARIOS_COLLECTION), (snapshot) => {
-    const usuarios: UsuarioSistema[] = []
-    snapshot.forEach((docSnap) => {
-      usuarios.push({ login: docSnap.id, ...docSnap.data() } as UsuarioSistema)
-    })
-    callback(usuarios)
-  })
+  return onSnapshot(
+    collection(db, USUARIOS_COLLECTION), 
+    (snapshot) => {
+      const usuarios: UsuarioSistema[] = []
+      snapshot.forEach((docSnap) => {
+        usuarios.push({ login: docSnap.id, ...docSnap.data() } as UsuarioSistema)
+      })
+      callback(usuarios)
+    },
+    (error) => {
+      console.error("[Firebase] Erro no listener de usuários:", error.message)
+    }
+  )
 }
 
 // ========== ESTOQUE (GLOBAL) ==========
@@ -147,11 +153,17 @@ export async function getEstoque(userId: string) {
 
 // Listener em tempo real para estoque
 export function subscribeToEstoque(callback: (itens: Item[]) => void) {
-  return onSnapshot(doc(db, "estoque", "global"), (docSnap) => {
-    if (docSnap.exists()) {
-      callback(docSnap.data().itens as Item[])
+  return onSnapshot(
+    doc(db, "estoque", "global"), 
+    (docSnap) => {
+      if (docSnap.exists()) {
+        callback(docSnap.data().itens as Item[])
+      }
+    },
+    (error) => {
+      console.error("[Firebase] Erro no listener de estoque:", error.message)
     }
-  })
+  )
 }
 
 // ========== HISTORICO (GLOBAL) ==========
@@ -184,11 +196,17 @@ export async function getHistorico(userId: string) {
 
 // Listener em tempo real para histórico
 export function subscribeToHistorico(callback: (historico: HistoricoEntry[]) => void) {
-  return onSnapshot(doc(db, "historico", "global"), (docSnap) => {
-    if (docSnap.exists()) {
-      callback(docSnap.data().entries as HistoricoEntry[])
+  return onSnapshot(
+    doc(db, "historico", "global"), 
+    (docSnap) => {
+      if (docSnap.exists()) {
+        callback(docSnap.data().entries as HistoricoEntry[])
+      }
+    },
+    (error) => {
+      console.error("[Firebase] Erro no listener de histórico:", error.message)
     }
-  })
+  )
 }
 
 // ========== RECEITAS (GLOBAL) ==========
@@ -221,9 +239,15 @@ export async function getReceitas(userId: string) {
 
 // Listener em tempo real para receitas
 export function subscribeToReceitas(callback: (receitas: Receita[]) => void) {
-  return onSnapshot(doc(db, "receitas", "global"), (docSnap) => {
-    if (docSnap.exists()) {
-      callback(docSnap.data().receitas as Receita[])
+  return onSnapshot(
+    doc(db, "receitas", "global"), 
+    (docSnap) => {
+      if (docSnap.exists()) {
+        callback(docSnap.data().receitas as Receita[])
+      }
+    },
+    (error) => {
+      console.error("[Firebase] Erro no listener de receitas:", error.message)
     }
-  })
+  )
 }
