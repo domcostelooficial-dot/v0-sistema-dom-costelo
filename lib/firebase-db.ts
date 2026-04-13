@@ -11,22 +11,16 @@ import {
   query,
   where,
   Timestamp,
+  onSnapshot,
 } from "firebase/firestore"
 import { db } from "./firebase"
 import type { Item, HistoricoEntry, Receita, UsuarioSistema } from "./types"
 
-// Collections
+// Collections - dados globais compartilhados
 const USUARIOS_COLLECTION = "usuarios"
-const ESTOQUE_COLLECTION = "estoque"
-const HISTORICO_COLLECTION = "historico"
-const RECEITAS_COLLECTION = "receitas"
+const GLOBAL_DATA_DOC = "global/data"
 
-// Helper to get user-specific document path
-function getUserDocPath(userId: string, collection: string) {
-  return `users/${userId}/${collection}`
-}
-
-// ========== USUARIOS ==========
+// ========== USUARIOS (GLOBAL) ==========
 
 export async function createUsuarioProfile(
   userId: string,
@@ -35,6 +29,7 @@ export async function createUsuarioProfile(
   try {
     await setDoc(doc(db, USUARIOS_COLLECTION, userId), {
       ...data,
+      login: userId,
       createdAt: Timestamp.now(),
     })
     return { error: null }
@@ -48,7 +43,7 @@ export async function getUsuarioProfile(userId: string) {
     const docRef = doc(db, USUARIOS_COLLECTION, userId)
     const docSnap = await getDoc(docRef)
     if (docSnap.exists()) {
-      return { data: docSnap.data() as UsuarioSistema, error: null }
+      return { data: { login: docSnap.id, ...docSnap.data() } as UsuarioSistema, error: null }
     }
     return { data: null, error: "Usuário não encontrado" }
   } catch (error: any) {
@@ -75,8 +70,8 @@ export async function getAllUsuarios() {
   try {
     const querySnapshot = await getDocs(collection(db, USUARIOS_COLLECTION))
     const usuarios: UsuarioSistema[] = []
-    querySnapshot.forEach((doc) => {
-      usuarios.push({ login: doc.id, ...doc.data() } as UsuarioSistema)
+    querySnapshot.forEach((docSnap) => {
+      usuarios.push({ login: docSnap.id, ...docSnap.data() } as UsuarioSistema)
     })
     return { data: usuarios, error: null }
   } catch (error: any) {
@@ -93,13 +88,48 @@ export async function deleteUsuario(userId: string) {
   }
 }
 
-// ========== ESTOQUE ==========
+export async function saveUsuariosFirebase(usuarios: UsuarioSistema[]) {
+  try {
+    // Salvar cada usuário individualmente no Firebase
+    for (const user of usuarios) {
+      const { login, ...userData } = user
+      await setDoc(doc(db, USUARIOS_COLLECTION, login), {
+        ...userData,
+        updatedAt: Timestamp.now(),
+      })
+    }
+    return { error: null }
+  } catch (error: any) {
+    return { error: error.message }
+  }
+}
+
+// Listener em tempo real para usuários
+export function subscribeToUsuarios(callback: (usuarios: UsuarioSistema[]) => void) {
+  return onSnapshot(
+    collection(db, USUARIOS_COLLECTION), 
+    (snapshot) => {
+      const usuarios: UsuarioSistema[] = []
+      snapshot.forEach((docSnap) => {
+        usuarios.push({ login: docSnap.id, ...docSnap.data() } as UsuarioSistema)
+      })
+      callback(usuarios)
+    },
+    (error) => {
+      console.error("[Firebase] Erro no listener de usuários:", error.message)
+    }
+  )
+}
+
+// ========== ESTOQUE (GLOBAL) ==========
 
 export async function saveEstoque(userId: string, itens: Item[]) {
   try {
-    await setDoc(doc(db, `users/${userId}`, "estoque"), {
+    // Salvar no documento global para todos terem acesso
+    await setDoc(doc(db, "estoque", "global"), {
       itens,
       updatedAt: Timestamp.now(),
+      lastModifiedBy: userId,
     })
     return { error: null }
   } catch (error: any) {
@@ -109,7 +139,8 @@ export async function saveEstoque(userId: string, itens: Item[]) {
 
 export async function getEstoque(userId: string) {
   try {
-    const docRef = doc(db, `users/${userId}`, "estoque")
+    // Buscar do documento global
+    const docRef = doc(db, "estoque", "global")
     const docSnap = await getDoc(docRef)
     if (docSnap.exists()) {
       return { data: docSnap.data().itens as Item[], error: null }
@@ -120,13 +151,29 @@ export async function getEstoque(userId: string) {
   }
 }
 
-// ========== HISTORICO ==========
+// Listener em tempo real para estoque
+export function subscribeToEstoque(callback: (itens: Item[]) => void) {
+  return onSnapshot(
+    doc(db, "estoque", "global"), 
+    (docSnap) => {
+      if (docSnap.exists()) {
+        callback(docSnap.data().itens as Item[])
+      }
+    },
+    (error) => {
+      console.error("[Firebase] Erro no listener de estoque:", error.message)
+    }
+  )
+}
+
+// ========== HISTORICO (GLOBAL) ==========
 
 export async function saveHistorico(userId: string, historico: HistoricoEntry[]) {
   try {
-    await setDoc(doc(db, `users/${userId}`, "historico"), {
+    await setDoc(doc(db, "historico", "global"), {
       entries: historico,
       updatedAt: Timestamp.now(),
+      lastModifiedBy: userId,
     })
     return { error: null }
   } catch (error: any) {
@@ -136,7 +183,7 @@ export async function saveHistorico(userId: string, historico: HistoricoEntry[])
 
 export async function getHistorico(userId: string) {
   try {
-    const docRef = doc(db, `users/${userId}`, "historico")
+    const docRef = doc(db, "historico", "global")
     const docSnap = await getDoc(docRef)
     if (docSnap.exists()) {
       return { data: docSnap.data().entries as HistoricoEntry[], error: null }
@@ -147,13 +194,29 @@ export async function getHistorico(userId: string) {
   }
 }
 
-// ========== RECEITAS ==========
+// Listener em tempo real para histórico
+export function subscribeToHistorico(callback: (historico: HistoricoEntry[]) => void) {
+  return onSnapshot(
+    doc(db, "historico", "global"), 
+    (docSnap) => {
+      if (docSnap.exists()) {
+        callback(docSnap.data().entries as HistoricoEntry[])
+      }
+    },
+    (error) => {
+      console.error("[Firebase] Erro no listener de histórico:", error.message)
+    }
+  )
+}
+
+// ========== RECEITAS (GLOBAL) ==========
 
 export async function saveReceitas(userId: string, receitas: Receita[]) {
   try {
-    await setDoc(doc(db, `users/${userId}`, "receitas"), {
+    await setDoc(doc(db, "receitas", "global"), {
       receitas,
       updatedAt: Timestamp.now(),
+      lastModifiedBy: userId,
     })
     return { error: null }
   } catch (error: any) {
@@ -163,7 +226,7 @@ export async function saveReceitas(userId: string, receitas: Receita[]) {
 
 export async function getReceitas(userId: string) {
   try {
-    const docRef = doc(db, `users/${userId}`, "receitas")
+    const docRef = doc(db, "receitas", "global")
     const docSnap = await getDoc(docRef)
     if (docSnap.exists()) {
       return { data: docSnap.data().receitas as Receita[], error: null }
@@ -172,4 +235,19 @@ export async function getReceitas(userId: string) {
   } catch (error: any) {
     return { data: null, error: error.message }
   }
+}
+
+// Listener em tempo real para receitas
+export function subscribeToReceitas(callback: (receitas: Receita[]) => void) {
+  return onSnapshot(
+    doc(db, "receitas", "global"), 
+    (docSnap) => {
+      if (docSnap.exists()) {
+        callback(docSnap.data().receitas as Receita[])
+      }
+    },
+    (error) => {
+      console.error("[Firebase] Erro no listener de receitas:", error.message)
+    }
+  )
 }

@@ -20,6 +20,9 @@ import {
   getHistorico as getHistoricoFirebase,
   saveReceitas as saveReceitasFirebase,
   getReceitas as getReceitasFirebase,
+  subscribeToEstoque,
+  subscribeToHistorico,
+  subscribeToReceitas,
 } from "@/lib/firebase-db"
 import { FirebaseLoginForm } from "@/components/firebase-login-form"
 import { AppSidebar } from "@/components/app-sidebar"
@@ -128,7 +131,7 @@ export default function Home() {
   const [historico, setHistorico] = useState<HistoricoEntry[]>([])
   const [receitas, setReceitas] = useState<Receita[]>([])
 
-  // Load data on mount and after login
+  // Load data on mount
   useEffect(() => {
     const loadData = async () => {
       const storedUser = getUser()
@@ -145,6 +148,40 @@ export default function Home() {
     
     loadData()
   }, [])
+  
+  // Setup real-time listeners only when user is logged in
+  useEffect(() => {
+    if (!user) return
+    
+    // Configurar listeners em tempo real para sincronização (apenas quando logado)
+    const unsubscribeEstoque = subscribeToEstoque((firebaseItens) => {
+      if (firebaseItens && firebaseItens.length > 0) {
+        setItens(firebaseItens)
+        saveEstoqueLocal(firebaseItens)
+      }
+    })
+    
+    const unsubscribeHistorico = subscribeToHistorico((firebaseHistorico) => {
+      if (firebaseHistorico) {
+        setHistorico(firebaseHistorico)
+        saveHistoricoLocal(firebaseHistorico)
+      }
+    })
+    
+    const unsubscribeReceitas = subscribeToReceitas((firebaseReceitas) => {
+      if (firebaseReceitas && firebaseReceitas.length > 0) {
+        setReceitas(firebaseReceitas)
+        saveReceitasLocal(firebaseReceitas)
+      }
+    })
+    
+    // Cleanup listeners on unmount or logout
+    return () => {
+      unsubscribeEstoque()
+      unsubscribeHistorico()
+      unsubscribeReceitas()
+    }
+  }, [user])
 
   const handleLogin = (username: string, role: string, permissoes: string[]) => {
     saveUser(username)

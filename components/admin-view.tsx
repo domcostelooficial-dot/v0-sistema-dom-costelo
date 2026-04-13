@@ -44,6 +44,14 @@ import {
 import { Checkbox } from "@/components/ui/checkbox"
 import { Users, Shield, Key, PlusCircle, Edit, Trash2, Save, UserCheck, UserX, Clock } from "lucide-react"
 import { getUsuarios, saveUsuarios } from "@/lib/store"
+import { 
+  getAllUsuarios, 
+  saveUsuariosFirebase, 
+  subscribeToUsuarios,
+  createUsuarioProfile,
+  updateUsuarioProfile,
+  deleteUsuario as deleteUsuarioFirebase
+} from "@/lib/firebase-db"
 import type { UsuarioSistema, UserRole, TabPermissao, UserStatus } from "@/lib/types"
 import { toast } from "sonner"
 
@@ -82,12 +90,37 @@ export function AdminView({ currentUser, onPasswordChange }: AdminViewProps) {
     novaSenha: "",
     confirmarSenha: "",
   })
-
   useEffect(() => {
+    // Carregar usuários locais primeiro
     setUsuarios(getUsuarios())
+    
+    // Tentar carregar do Firebase e configurar listener em tempo real
+    const loadFromFirebase = async () => {
+      try {
+        const { data, error } = await getAllUsuarios()
+        if (!error && data && data.length > 0) {
+          setUsuarios(data)
+          saveUsuarios(data) // Sincronizar com localStorage
+        }
+      } catch (err) {
+        console.error("[Firebase] Erro ao carregar usuários:", err)
+      }
+    }
+    
+    loadFromFirebase()
+    
+    // Listener em tempo real para sincronização
+    const unsubscribe = subscribeToUsuarios((firebaseUsuarios) => {
+      if (firebaseUsuarios.length > 0) {
+        setUsuarios(firebaseUsuarios)
+        saveUsuarios(firebaseUsuarios)
+      }
+    })
+    
+    return () => unsubscribe()
   }, [])
 
-  const handleAddUser = () => {
+  const handleAddUser = async () => {
     if (!formData.nome.trim() || !formData.email.trim()) {
       toast.error("Preencha nome e email")
       return
@@ -112,12 +145,17 @@ export function AdminView({ currentUser, onPasswordChange }: AdminViewProps) {
     const updated = [...usuarios, newUser]
     setUsuarios(updated)
     saveUsuarios(updated)
+    
+    // Salvar no Firebase
+    const { login, ...userData } = newUser
+    await createUsuarioProfile(login, userData)
+    
     setIsAddDialogOpen(false)
     setFormData({ login: "", nome: "", email: "", senha: "", role: "operador", permissoes: [] })
-    toast.success(`Usuário "${newUser.nome}" criado com sucesso!`)
+    toast.success(`Usuário "${newUser.nome}" criado e sincronizado na nuvem!`)
   }
 
-  const handleEditUser = () => {
+  const handleEditUser = async () => {
     if (!selectedUser) return
 
     if (!formData.nome.trim() || !formData.email.trim()) {
@@ -125,27 +163,34 @@ export function AdminView({ currentUser, onPasswordChange }: AdminViewProps) {
       return
     }
 
+    const updatedUserData = {
+      nome: formData.nome.trim(),
+      email: formData.email.trim().toLowerCase(),
+      role: formData.role,
+      permissoes: formData.permissoes,
+    }
+
     const updated = usuarios.map((u) =>
       u.login === selectedUser.login
         ? {
             ...u,
-            login: formData.email.split("@")[0],
-            nome: formData.nome.trim(),
-            email: formData.email.trim().toLowerCase(),
-            role: formData.role,
-            permissoes: formData.permissoes,
+            ...updatedUserData,
           }
         : u
     )
 
     setUsuarios(updated)
     saveUsuarios(updated)
+    
+    // Atualizar no Firebase
+    await updateUsuarioProfile(selectedUser.login, updatedUserData)
+    
     setIsEditDialogOpen(false)
     setSelectedUser(null)
-    toast.success(`Usuário "${formData.nome}" atualizado com sucesso!`)
+    toast.success(`Usuário "${formData.nome}" atualizado e sincronizado na nuvem!`)
   }
 
-  const handleDeleteUser = () => {
+  const handleDeleteUser = async () => {
     if (!selectedUser) return
 
     if (selectedUser.login === currentUser) {
@@ -156,9 +201,13 @@ export function AdminView({ currentUser, onPasswordChange }: AdminViewProps) {
     const updated = usuarios.filter((u) => u.login !== selectedUser.login)
     setUsuarios(updated)
     saveUsuarios(updated)
+    
+    // Remover do Firebase
+    await deleteUsuarioFirebase(selectedUser.login)
+    
     setIsDeleteDialogOpen(false)
     setSelectedUser(null)
-    toast.success(`Usuário "${selectedUser.login}" removido com sucesso!`)
+    toast.success(`Usuário "${selectedUser.login}" removido e sincronizado na nuvem!`)
   }
 
   const openEditDialog = (user: UsuarioSistema) => {
@@ -191,22 +240,27 @@ export function AdminView({ currentUser, onPasswordChange }: AdminViewProps) {
     })
   }
 
-  const handleBulkPermissionChange = (userId: string, permissao: TabPermissao, checked: boolean) => {
+  const handleBulkPermissionChange = async (userId: string, permissao: TabPermissao, checked: boolean) => {
+    const newPermissoes = checked
+      ? [...(usuarios.find(u => u.login === userId)?.permissoes || []), permissao]
+      : (usuarios.find(u => u.login === userId)?.permissoes || []).filter((p) => p !== permissao)
+    
     const updated = usuarios.map((u) => {
       if (u.login === userId) {
-        const newPermissoes = checked
-          ? [...u.permissoes, permissao]
-          : u.permissoes.filter((p) => p !== permissao)
         return { ...u, permissoes: newPermissoes }
       }
       return u
     })
     setUsuarios(updated)
     saveUsuarios(updated)
-    toast.success("Permissões atualizadas!")
+    
+    // Atualizar no Firebase
+    await updateUsuarioProfile(userId, { permissoes: newPermissoes })
+    
+    toast.success("Permissões atualizadas e sincronizadas na nuvem!")
   }
 
-  const handleChangePassword = () => {
+  const handleChangePassword = async () => {
     const { senhaAtual, novaSenha, confirmarSenha } = passwordForm
 
     if (!senhaAtual || !novaSenha || !confirmarSenha) {
@@ -236,8 +290,12 @@ export function AdminView({ currentUser, onPasswordChange }: AdminViewProps) {
 
     setUsuarios(updated)
     saveUsuarios(updated)
+    
+    // Atualizar no Firebase
+    await updateUsuarioProfile(currentUser, { senha: novaSenha })
+    
     setPasswordForm({ senhaAtual: "", novaSenha: "", confirmarSenha: "" })
-    toast.success("Senha alterada com sucesso!")
+    toast.success("Senha alterada e sincronizada na nuvem!")
     
     // Notificar o componente pai para fazer logout ou atualizar
     onPasswordChange()
@@ -306,15 +364,18 @@ export function AdminView({ currentUser, onPasswordChange }: AdminViewProps) {
                             <Button
                               size="sm"
                               className="gap-1 bg-success hover:bg-success/90"
-                              onClick={() => {
+                              onClick={async () => {
+                                const newData = { 
+                                  status: "aprovado" as UserStatus, 
+                                  permissoes: ["estoque", "entrada", "producao", "dashboard", "lista-compras"] as TabPermissao[] 
+                                }
                                 const updated = usuarios.map(u => 
-                                  u.login === user.login 
-                                    ? { ...u, status: "aprovado" as UserStatus, permissoes: ["estoque", "entrada", "producao", "dashboard", "lista-compras"] as TabPermissao[] }
-                                    : u
+                                  u.login === user.login ? { ...u, ...newData } : u
                                 )
                                 setUsuarios(updated)
                                 saveUsuarios(updated)
-                                toast.success(`Usuário "${user.login}" aprovado com sucesso!`)
+                                await updateUsuarioProfile(user.login, newData)
+                                toast.success(`Usuário "${user.login}" aprovado e sincronizado na nuvem!`)
                               }}
                             >
                               <UserCheck className="h-4 w-4" />
@@ -324,14 +385,14 @@ export function AdminView({ currentUser, onPasswordChange }: AdminViewProps) {
                               size="sm"
                               variant="destructive"
                               className="gap-1"
-                              onClick={() => {
+                              onClick={async () => {
+                                const newData = { status: "rejeitado" as UserStatus }
                                 const updated = usuarios.map(u => 
-                                  u.login === user.login 
-                                    ? { ...u, status: "rejeitado" as UserStatus }
-                                    : u
+                                  u.login === user.login ? { ...u, ...newData } : u
                                 )
                                 setUsuarios(updated)
                                 saveUsuarios(updated)
+                                await updateUsuarioProfile(user.login, newData)
                                 toast.success(`Usuário "${user.login}" rejeitado.`)
                               }}
                             >
