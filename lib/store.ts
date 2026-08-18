@@ -42,6 +42,15 @@ const defaultUsuarios: UsuarioSistema[] = [
     permissoes: ["estoque", "entrada", "dashboard", "lista-compras"],
     status: "aprovado",
   },
+  {
+    login: "samuel@domcostelo.com",
+    senha: "dom123",
+    nome: "Samuel",
+    email: "samuel@domcostelo.com",
+    role: "operador",
+    permissoes: ["estoque", "entrada", "dashboard", "lista-compras"],
+    status: "aprovado",
+  },
 ]
 
 export function getEstoque(): Item[] {
