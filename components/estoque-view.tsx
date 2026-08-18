@@ -66,9 +66,11 @@ interface EstoqueViewProps {
   onAddItem: (item: Item) => void
   onEditItem: (oldNome: string, item: Item) => void
   onDeleteItem: (nome: string) => void
+  userRole: "admin" | "operador"
 }
 
-export function EstoqueView({ itens, onUpdateItem, onAddItem, onEditItem, onDeleteItem }: EstoqueViewProps) {
+export function EstoqueView({ itens, onUpdateItem, onAddItem, onEditItem, onDeleteItem, userRole }: EstoqueViewProps) {
+  const isAdmin = userRole === "admin"
   const [search, setSearch] = useState("")
   const [categoriaFilter, setCategoriaFilter] = useState<string>("todas")
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
@@ -177,7 +179,7 @@ export function EstoqueView({ itens, onUpdateItem, onAddItem, onEditItem, onDele
   }
 
   const handleDeleteItem = () => {
-    if (!selectedItem) return
+    if (!isAdmin || !selectedItem) return
     
     onDeleteItem(selectedItem.nome)
     setIsDeleteDialogOpen(false)
@@ -453,14 +455,17 @@ export function EstoqueView({ itens, onUpdateItem, onAddItem, onEditItem, onDele
                         >
                           <Edit className="h-3 w-3" />
                         </Button>
-                        <Button
-                          variant="outline"
-                          size="icon"
-                          className="h-8 w-8 text-destructive hover:text-destructive"
-                          onClick={() => openDeleteDialog(item)}
-                        >
-                          <Trash2 className="h-3 w-3" />
-                        </Button>
+                        {isAdmin && (
+                          <Button
+                            variant="outline"
+                            size="icon"
+                            className="h-8 w-8 text-destructive hover:text-destructive"
+                            onClick={() => openDeleteDialog(item)}
+                            aria-label={`Excluir ${item.nome}`}
+                          >
+                            <Trash2 className="h-3 w-3" />
+                          </Button>
+                        )}
                       </div>
                     </TableCell>
                   </TableRow>

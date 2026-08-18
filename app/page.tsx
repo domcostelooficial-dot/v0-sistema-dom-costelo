@@ -302,6 +302,7 @@ export default function Home() {
   }
 
   const handleDeleteItem = (nome: string) => {
+    if (userRole !== "admin") return
     const updated = itens.filter((item) => item.nome !== nome)
     setItens(updated)
     saveEstoqueHybrid(user, updated)
@@ -440,6 +441,7 @@ export default function Home() {
               onAddItem={handleAddItem}
               onEditItem={handleEditItem}
               onDeleteItem={handleDeleteItem}
+              userRole={userRole as "admin" | "operador"}
             />
           )}
           {activeTab === "entrada" && (
