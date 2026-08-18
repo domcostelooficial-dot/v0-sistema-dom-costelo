@@ -28,7 +28,6 @@ import { FirebaseLoginForm } from "@/components/firebase-login-form"
 import { AppSidebar } from "@/components/app-sidebar"
 import { EstoqueView } from "@/components/estoque-view"
 import { EntradaView } from "@/components/entrada-view"
-import { ProducaoView } from "@/components/producao-view"
 import { FinanceiroView } from "@/components/financeiro-view"
 import { DashboardView } from "@/components/dashboard-view"
 import { ListaComprasView } from "@/components/lista-compras-view"
@@ -36,7 +35,7 @@ import { AdminView } from "@/components/admin-view"
 import { Menu, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 
-type Tab = "estoque" | "entrada" | "producao" | "financeiro" | "dashboard" | "lista-compras" | "admin"
+type Tab = "estoque" | "entrada" | "financeiro" | "dashboard" | "lista-compras" | "admin"
 
 // Funções wrapper que salvam em Firebase e localStorage
 async function saveEstoqueHybrid(user: string | null, itens: Item[]) {
@@ -379,7 +378,6 @@ export default function Home() {
             <h1 className="text-2xl font-bold text-foreground capitalize">
               {activeTab === "estoque" && "Controle de Estoque"}
               {activeTab === "entrada" && "Entrada de Mercadoria"}
-              {activeTab === "producao" && "Produção"}
               {activeTab === "financeiro" && "Financeiro"}
               {activeTab === "dashboard" && "Dashboard"}
               {activeTab === "lista-compras" && "Lista de Compras"}
@@ -390,8 +388,6 @@ export default function Home() {
                 "Gerencie os itens do seu estoque"}
               {activeTab === "entrada" &&
                 "Registre novas entradas de mercadoria"}
-              {activeTab === "producao" &&
-                "Transforme ingredientes em produtos"}
               {activeTab === "financeiro" &&
                 "Acompanhe seus gastos e histórico"}
               {activeTab === "dashboard" &&
@@ -415,16 +411,6 @@ export default function Home() {
           )}
           {activeTab === "entrada" && (
             <EntradaView itens={itens} onEntrada={handleEntrada} />
-          )}
-          {activeTab === "producao" && (
-            <ProducaoView
-              itens={itens}
-              receitas={receitas}
-              onProduzir={handleProduzir}
-              onAddReceita={handleAddReceita}
-              onUpdateReceita={handleUpdateReceita}
-              onDeleteReceita={handleDeleteReceita}
-            />
           )}
           {activeTab === "financeiro" && (
             <FinanceiroView historico={historico} />

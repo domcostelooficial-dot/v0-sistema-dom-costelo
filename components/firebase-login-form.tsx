@@ -149,7 +149,7 @@ export function FirebaseLoginForm({ onLogin }: FirebaseLoginFormProps) {
             senha: "",
             email: emailAdmin,
             role: "admin",
-            permissoes: ["estoque", "entrada", "producao", "financeiro", "dashboard", "lista-compras", "admin"],
+            permissoes: ["estoque", "entrada", "financeiro", "dashboard", "lista-compras", "admin"],
             status: "aprovado",
             dataCriacao: new Date().toLocaleString("pt-BR"),
           }
@@ -162,7 +162,7 @@ export function FirebaseLoginForm({ onLogin }: FirebaseLoginFormProps) {
         }
         
         setLoading(false)
-        onLogin("admin", "admin", ["estoque", "entrada", "producao", "financeiro", "dashboard", "lista-compras", "admin"])
+        onLogin("admin", "admin", ["estoque", "entrada", "financeiro", "dashboard", "lista-compras", "admin"])
         return
       }
 
@@ -188,7 +188,7 @@ export function FirebaseLoginForm({ onLogin }: FirebaseLoginFormProps) {
             senha: "",
             email: user!.email || "",
             role: "admin",
-            permissoes: ["estoque", "entrada", "producao", "financeiro", "dashboard", "lista-compras", "admin"],
+            permissoes: ["estoque", "entrada", "financeiro", "dashboard", "lista-compras", "admin"],
             status: "aprovado",
             dataCriacao: new Date().toLocaleString("pt-BR"),
           }

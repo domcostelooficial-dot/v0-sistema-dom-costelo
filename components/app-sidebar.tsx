@@ -6,7 +6,6 @@ import { Button } from "@/components/ui/button"
 import {
   Package,
   Truck,
-  ChefHat,
   DollarSign,
   BarChart3,
   LogOut,
@@ -16,7 +15,7 @@ import {
   Settings,
 } from "lucide-react"
 
-type Tab = "estoque" | "entrada" | "producao" | "financeiro" | "dashboard" | "lista-compras" | "admin"
+type Tab = "estoque" | "entrada" | "financeiro" | "dashboard" | "lista-compras" | "admin"
 
 interface AppSidebarProps {
   activeTab: Tab
@@ -32,7 +31,6 @@ interface AppSidebarProps {
 const menuItems = [
   { id: "estoque" as Tab, label: "Estoque", icon: Package },
   { id: "entrada" as Tab, label: "Entrada", icon: Truck },
-  { id: "producao" as Tab, label: "Produção", icon: ChefHat },
   { id: "financeiro" as Tab, label: "Financeiro", icon: DollarSign },
   { id: "dashboard" as Tab, label: "Dashboard", icon: BarChart3 },
   { id: "lista-compras" as Tab, label: "Lista de Compras", icon: ShoppingCart },
