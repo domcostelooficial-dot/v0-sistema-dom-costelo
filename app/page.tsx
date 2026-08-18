@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
-import { Item, HistoricoEntry, Receita } from "@/lib/types"
+import { Item, HistoricoEntry, Receita, Insumo, CompraRegistro, defaultInsumos } from "@/lib/types"
 import {
   saveEstoque as saveEstoqueLocal,
   getEstoque as getEstoqueLocal,
@@ -23,6 +23,10 @@ import {
   subscribeToEstoque,
   subscribeToHistorico,
   subscribeToReceitas,
+  getInsumos,
+  saveInsumos,
+  getComprasHistorico,
+  saveComprasHistorico,
 } from "@/lib/firebase-db"
 import { FirebaseLoginForm } from "@/components/firebase-login-form"
 import { AppSidebar } from "@/components/app-sidebar"
@@ -140,6 +144,20 @@ export default function Home() {
   const [itens, setItens] = useState<Item[]>([])
   const [historico, setHistorico] = useState<HistoricoEntry[]>([])
   const [receitas, setReceitas] = useState<Receita[]>([])
+  const [insumos, setInsumos] = useState<Insumo[]>(defaultInsumos)
+  const [comprasHistorico, setComprasHistorico] = useState<CompraRegistro[]>([])
+
+  const getComprasHybrid = async () => {
+    try {
+      const [insumosResult, historicoResult] = await Promise.all([getInsumos(), getComprasHistorico()])
+      if (insumosResult.length > 0) setInsumos(insumosResult)
+      if (historicoResult.length > 0) setComprasHistorico(historicoResult)
+    } catch (err) {
+      console.error("[v0] Erro ao carregar dados financeiros do estoque:", err)
+    }
+  }
+  const persistirInsumos = (data: Insumo[]) => { setInsumos(data); saveInsumos(data).catch((err) => console.error("[v0] Erro ao salvar preços:", err)) }
+  const persistirCompras = (data: CompraRegistro[]) => { setComprasHistorico(data); saveComprasHistorico(data).catch((err) => console.error("[v0] Erro ao salvar compras:", err)) }
 
   // Load data on mount
   useEffect(() => {
@@ -148,6 +166,7 @@ export default function Home() {
       const storedItens = await getEstoqueHybrid(storedUser)
       const storedHistorico = await getHistoricoHybrid(storedUser)
       const storedReceitas = await getReceitasHybrid(storedUser)
+      await getComprasHybrid()
 
       setUser(storedUser)
       setItens(storedItens)
@@ -205,6 +224,7 @@ export default function Home() {
       const itens = await getEstoqueHybrid(username)
       const historico = await getHistoricoHybrid(username)
       const receitas = await getReceitasHybrid(username)
+      await getComprasHybrid()
       
       setItens(itens)
       setHistorico(historico)
@@ -434,6 +454,10 @@ export default function Home() {
             <ListaComprasView
               itens={itens}
               user={user}
+              insumos={insumos}
+              historico={comprasHistorico}
+              onSaveInsumos={persistirInsumos}
+              onSaveHistorico={persistirCompras}
               onUpdateEstoque={(nome, qtd) => {
                 const item = itens.find((current) => current.nome === nome)
                 if (item) handleUpdateItem(nome, item.atual + qtd)
