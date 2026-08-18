@@ -257,10 +257,10 @@ export function FirebaseLoginForm({ onLogin }: FirebaseLoginFormProps) {
       <Card className="w-full max-w-md border-border">
         <CardHeader className="space-y-1 text-center">
           <div className="flex justify-center mb-4">
-            <div className="relative w-24 h-24">
+            <div className="relative w-64 h-36">
               <Image
-                src="/logo.jpg"
-                alt="Dom Costelo Logo"
+                src="https://hebbkx1anhila5yf.public.blob.vercel-storage.com/1_20260424_133557_0000-df20aL2H0s0hc4p0RXFd0STSUMJ4s8.png"
+                alt="Dom Costelo — A Casa da Costelinha"
                 fill
                 className="object-contain"
                 priority

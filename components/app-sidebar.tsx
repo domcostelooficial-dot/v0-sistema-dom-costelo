@@ -86,11 +86,11 @@ export function AppSidebar({
           <div className="border-b border-sidebar-border p-6">
             <div className="flex items-center gap-3">
               <Image
-                src="/logo.jpg"
-                alt="Dom Costelo Logo"
-                width={48}
-                height={48}
-                className="rounded-full"
+                src="https://hebbkx1anhila5yf.public.blob.vercel-storage.com/1_20260424_133557_0000-df20aL2H0s0hc4p0RXFd0STSUMJ4s8.png"
+                alt="Dom Costelo — A Casa da Costelinha"
+                width={180}
+                height={103}
+                className="h-auto w-44 object-contain"
               />
               <div>
                 <h1 className="font-bold text-sidebar-foreground">
