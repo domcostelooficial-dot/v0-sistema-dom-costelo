@@ -1,4 +1,4 @@
-export type UnidadeInsumo = "un" | "g" | "kg" | "ml" | "l" | "pacote" | "caixa" | "bobina" | "maço" | "pct"
+export type UnidadeInsumo = "un" | "g" | "kg" | "ml" | "l"
 export type CategoriaInsumo = "Carnes" | "Pães" | "Queijos" | "Molhos" | "Batatas/congelados" | "Bebidas" | "Embalagens" | "Mercearia"
 
 export interface Item {
@@ -13,9 +13,6 @@ export interface Item {
   unidadeEmbalagem?: UnidadeInsumo
   custoUnitario?: number
   fornecedor?: string
-  precoReferencia?: number
-  unidadeReferencia?: string
-  ultimaAtualizacaoPreco?: string
   ultimaAlteracao?: {
     usuario: string
     data: string
