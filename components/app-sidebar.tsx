@@ -77,26 +77,24 @@ export function AppSidebar({
       {/* Sidebar */}
       <aside
         className={cn(
-          "fixed left-0 top-0 z-40 h-full w-64 border-r border-border bg-sidebar transition-transform duration-300 md:translate-x-0",
+          "fixed left-0 top-0 z-40 h-full w-64 border-r border-sidebar-border bg-sidebar transition-transform duration-300 md:translate-x-0",
           isOpen ? "translate-x-0" : "-translate-x-full"
         )}
       >
         <div className="flex h-full flex-col">
           {/* Header */}
-          <div className="border-b border-sidebar-border p-6">
-            <div className="flex items-center gap-3">
+          <div className="border-b border-sidebar-border px-5 py-6">
+            <div className="flex flex-col items-start gap-3">
               <Image
-                src="/logo.jpg"
-                alt="Dom Costelo Logo"
-                width={48}
-                height={48}
-                className="rounded-full"
+                src="https://hebbkx1anhila5yf.public.blob.vercel-storage.com/1_20260424_133557_0000-df20aL2H0s0hc4p0RXFd0STSUMJ4s8.png"
+                alt="Dom Costelo — A Casa da Costelinha"
+                width={180}
+                height={103}
+                className="h-auto w-48 object-contain"
               />
-              <div>
-                <h1 className="font-bold text-sidebar-foreground">
-                  Dom Costelo
-                </h1>
-                <p className="text-xs text-muted-foreground">PRO</p>
+              <div className="flex items-center gap-2">
+                <span className="h-1.5 w-1.5 rounded-full bg-primary" aria-hidden="true" />
+                <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-sidebar-foreground/60">Gestão profissional</p>
               </div>
             </div>
           </div>
@@ -112,10 +110,10 @@ export function AppSidebar({
                       if (window.innerWidth < 768) onToggle()
                     }}
                     className={cn(
-                      "flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
+                      "flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors",
                       activeTab === item.id
-                        ? "bg-sidebar-accent text-primary"
-                        : "text-sidebar-foreground hover:bg-sidebar-accent/50"
+                        ? "bg-sidebar-accent text-sidebar-accent-foreground shadow-sm"
+                        : "text-sidebar-foreground/75 hover:bg-sidebar-accent/10 hover:text-sidebar-foreground"
                     )}
                   >
                     <item.icon className="h-4 w-4" />

@@ -404,10 +404,11 @@ export default function Home() {
       />
 
       <main className="min-h-screen md:ml-64">
-        <div className="p-4 pt-16 md:p-8 md:pt-8">
+        <div className="p-4 pt-16 md:p-10 md:pt-10">
           {/* Header */}
-          <div className="mb-8">
-            <h1 className="text-2xl font-bold text-foreground capitalize">
+          <div className="mb-8 flex flex-col gap-2 border-b border-border/70 pb-7">
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">Dom Costelo · Gestão</p>
+            <h1 className="text-3xl font-bold tracking-tight text-foreground capitalize">
               {activeTab === "estoque" && "Controle de Estoque"}
               {activeTab === "entrada" && "Entrada de Mercadoria"}
               {activeTab === "financeiro" && "Financeiro"}

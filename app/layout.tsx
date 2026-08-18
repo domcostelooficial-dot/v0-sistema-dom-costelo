@@ -12,21 +12,8 @@ export const metadata: Metadata = {
   description: 'Sistema de gestão para restaurante com controle de estoque, produção e financeiro',
   generator: 'v0.app',
   icons: {
-    icon: [
-      {
-        url: '/icon-light-32x32.png',
-        media: '(prefers-color-scheme: light)',
-      },
-      {
-        url: '/icon-dark-32x32.png',
-        media: '(prefers-color-scheme: dark)',
-      },
-      {
-        url: '/icon.svg',
-        type: 'image/svg+xml',
-      },
-    ],
-    apple: '/apple-icon.png',
+    icon: 'https://hebbkx1anhila5yf.public.blob.vercel-storage.com/1_20260424_133557_0000-df20aL2H0s0hc4p0RXFd0STSUMJ4s8.png',
+    apple: 'https://hebbkx1anhila5yf.public.blob.vercel-storage.com/1_20260424_133557_0000-df20aL2H0s0hc4p0RXFd0STSUMJ4s8.png',
   },
 }
 
@@ -36,8 +23,8 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang="pt-BR">
-      <body className="font-sans antialiased">
+    <html lang="pt-BR" className="bg-background">
+      <body className="bg-background font-sans text-foreground antialiased">
         {children}
         <Toaster />
         {process.env.NODE_ENV === 'production' && <Analytics />}
