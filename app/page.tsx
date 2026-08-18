@@ -37,6 +37,16 @@ import { Button } from "@/components/ui/button"
 
 type Tab = "estoque" | "entrada" | "financeiro" | "dashboard" | "lista-compras" | "admin"
 
+const ITENS_REMOVIDOS = new Set(["Costela Crua", "Contra filé", "Manteiga de Garrafa", "Limoneto"])
+
+function limparItensEstoque(itens: Item[]) {
+  const vistos = new Set<string>()
+  return itens
+    .filter((item) => !ITENS_REMOVIDOS.has(item.nome))
+    .map((item) => item.nome === "Aji Sal para churrasco" ? { ...item, nome: "Sal" } : item)
+    .filter((item) => !vistos.has(item.nome) && (vistos.add(item.nome), true))
+}
+
 // Funções wrapper que salvam em Firebase e localStorage
 async function saveEstoqueHybrid(user: string | null, itens: Item[]) {
   saveEstoqueLocal(itens)
@@ -56,13 +66,13 @@ async function getEstoqueHybrid(user: string | null): Promise<Item[]> {
       const { data } = await getEstoqueFirebase(user)
       if (data && data.length > 0) {
         console.log("[v0] Estoque carregado do Firebase")
-        return data
+        return limparItensEstoque(data)
       }
     } catch (err) {
       console.error("[v0] Erro ao carregar do Firebase:", err)
     }
   }
-  return getEstoqueLocal()
+  return limparItensEstoque(getEstoqueLocal())
 }
 
 async function saveHistoricoHybrid(user: string | null, historico: HistoricoEntry[]) {
@@ -155,8 +165,9 @@ export default function Home() {
     // Configurar listeners em tempo real para sincronização (apenas quando logado)
     const unsubscribeEstoque = subscribeToEstoque((firebaseItens) => {
       if (firebaseItens && firebaseItens.length > 0) {
-        setItens(firebaseItens)
-        saveEstoqueLocal(firebaseItens)
+        const itensLimpos = limparItensEstoque(firebaseItens)
+        setItens(itensLimpos)
+        saveEstoqueLocal(itensLimpos)
       }
     })
     
