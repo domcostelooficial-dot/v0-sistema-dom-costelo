@@ -125,7 +125,7 @@ export interface Receita {
 
 const defaultInsumoRows: Array<[string, UnidadeInsumo, number, number, UnidadeInsumo, CategoriaInsumo]> = [
   ["Pão brioche", "un", 2.07, 1, "un", "Pães"], ["Pão australiano", "un", 2.53, 1, "un", "Pães"], ["Blend bovino 180g", "un", 6.35, 1, "un", "Carnes"],
-  ["Cheddar cremoso", "g", 50, 1500, "g", "Queijos"], ["Cream cheese", "g", 60, 1500, "g", "Queijos"], ["Bacon", "g", 32, 1000, "g", "Carnes"], ["Bacon fatiado", "g", 32, 1000, "g", "Carnes"], ["Barbecue", "g", 40, 3500, "g", "Molhos"], ["Costela bovina desfiada", "g", 80, 1000, "g", "Carnes"], ["Mussarela", "g", 43, 1000, "g", "Queijos"], ["Batata frita", "g", 10, 1000, "g", "Batatas/congelados"], ["Anel de cebola", "g", 22, 1000, "g", "Batatas/congelados"], ["Farofa de bacon", "g", 55, 1000, "g", "Mercearia"], ["Cebolinha", "g", 30, 1000, "g", "Mercearia"], ["Embalagem H7", "un", 50, 100, "un", "Embalagens"], ["Saco Kraft", "un", 70, 100, "un", "Embalagens"], ["Papel acoplado", "un", 35, 200, "un", "Embalagens"]
+  ["Cheddar cremoso", "g", 50, 1500, "g", "Queijos"], ["Cream cheese", "g", 60, 1500, "g", "Queijos"], ["Bacon", "g", 32, 1000, "g", "Carnes"], ["Bacon Fatiado", "g", 32, 1000, "g", "Carnes"], ["Barbecue", "g", 40, 3500, "g", "Molhos"], ["Costela bovina desfiada", "g", 80, 1000, "g", "Carnes"], ["Mussarela", "g", 43, 1000, "g", "Queijos"], ["Batata frita", "g", 10, 1000, "g", "Batatas/congelados"], ["Anel de cebola", "g", 22, 1000, "g", "Batatas/congelados"], ["Farofa de bacon", "g", 55, 1000, "g", "Mercearia"], ["Cebolinha", "g", 30, 1000, "g", "Mercearia"], ["Embalagem H7", "un", 50, 100, "un", "Embalagens"], ["Saco Kraft", "un", 70, 100, "un", "Embalagens"], ["Papel acoplado", "un", 35, 200, "un", "Embalagens"], ["Sacola para Refrigerante", "un", 0, 1, "un", "Embalagens"]
 ]
 export const defaultInsumos: Insumo[] = defaultInsumoRows.map(([nome, unidade, precoCompra, quantidadeEmbalagem, unidadeEmbalagem, categoria]) => ({ nome, unidade, precoCompra, quantidadeEmbalagem, unidadeEmbalagem, categoria, custoUnitario: precoCompra / quantidadeEmbalagem, min: 0, atual: 0 }))
 
@@ -167,6 +167,7 @@ export const defaultItens: Item[] = [
   { nome: "Costela Pronta", min: 2, atual: 2, categoria: "Carnes" },
   { nome: "Costela Desfiada", min: 2, atual: 2, categoria: "Carnes" },
   { nome: "Bacon em cubos", min: 2, atual: 2, categoria: "Carnes" },
+  { nome: "Bacon Fatiado", min: 2, atual: 2, categoria: "Carnes" },
 
   { nome: "Pão de Australiano Aussie", min: 12, atual: 12, categoria: "Padaria" },
   { nome: "Pão brioche 4CT", min: 12, atual: 12, categoria: "Padaria" },
@@ -203,6 +204,7 @@ export const defaultItens: Item[] = [
   { nome: "Garfo descartável", min: 1, atual: 1, categoria: "Embalagens" },
   { nome: "Saco de embalar batata", min: 1, atual: 1, categoria: "Embalagens" },
   { nome: "Papel Celofane", min: 1, atual: 1, categoria: "Embalagens" },
+  { nome: "Sacola para Refrigerante", min: 1, atual: 1, categoria: "Embalagens" },
 
   { nome: "Água para consumo", min: 2, atual: 2, categoria: "Bebidas" },
   { nome: "Água com gás", min: 6, atual: 6, categoria: "Bebidas" },
