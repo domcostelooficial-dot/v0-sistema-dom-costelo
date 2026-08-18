@@ -33,6 +33,15 @@ const defaultUsuarios: UsuarioSistema[] = [
     permissoes: ["estoque", "entrada", "dashboard", "lista-compras"],
     status: "aprovado",
   },
+  {
+    login: "joseane@domcostelo.com",
+    senha: "dom123",
+    nome: "Joseane",
+    email: "joseane@domcostelo.com",
+    role: "operador",
+    permissoes: ["estoque", "entrada", "dashboard", "lista-compras"],
+    status: "aprovado",
+  },
 ]
 
 export function getEstoque(): Item[] {
@@ -99,8 +108,16 @@ export function getUsuarios(): UsuarioSistema[] {
     }
     return u
   })
+
+  // Inclui novos usuários padrão sem sobrescrever cadastros existentes.
+  const novosUsuarios = defaultUsuarios.filter(
+    (padrao) => !migratedUsuarios.some((usuario) => usuario.login === padrao.login)
+  )
+  if (novosUsuarios.length > 0) {
+    needsUpdate = true
+    migratedUsuarios.push(...novosUsuarios)
+  }
   
-  // Salvar se houve migracao
   if (needsUpdate) {
     localStorage.setItem(USUARIOS_KEY, JSON.stringify(migratedUsuarios))
   }
