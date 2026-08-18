@@ -42,7 +42,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Checkbox } from "@/components/ui/checkbox"
-import { Users, Shield, Key, PlusCircle, Edit, Trash2, Save, UserCheck, UserX, Clock } from "lucide-react"
+import { Users, Shield, Key, PlusCircle, Edit, Trash2, Save, UserCheck, UserX, Clock, Eye, EyeOff, RefreshCw } from "lucide-react"
 import { getUsuarios, saveUsuarios } from "@/lib/store"
 import { 
   getAllUsuarios, 
@@ -74,6 +74,7 @@ export function AdminView({ currentUser, onPasswordChange }: AdminViewProps) {
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
   const [selectedUser, setSelectedUser] = useState<UsuarioSistema | null>(null)
+  const [showFormPassword, setShowFormPassword] = useState(false)
   const [formData, setFormData] = useState({
     login: "",
     nome: "",
@@ -120,8 +121,13 @@ export function AdminView({ currentUser, onPasswordChange }: AdminViewProps) {
   }, [])
 
   const handleAddUser = async () => {
-    if (!formData.nome.trim() || !formData.email.trim()) {
-      toast.error("Preencha nome e email")
+    if (!formData.nome.trim() || !formData.email.trim() || !formData.senha.trim()) {
+      toast.error("Preencha nome, email e senha")
+      return
+    }
+
+    if (formData.senha.length < 6) {
+      toast.error("A senha deve ter pelo menos 6 caracteres")
       return
     }
 
@@ -134,7 +140,7 @@ export function AdminView({ currentUser, onPasswordChange }: AdminViewProps) {
       login: formData.email.split("@")[0],
       nome: formData.nome.trim(),
       email: formData.email.trim().toLowerCase(),
-      senha: "",
+      senha: formData.senha,
       role: formData.role,
       permissoes: formData.permissoes,
       status: "aprovado",
@@ -162,12 +168,18 @@ export function AdminView({ currentUser, onPasswordChange }: AdminViewProps) {
       return
     }
 
-    const updatedUserData = {
+    if (formData.senha && formData.senha.length < 6) {
+      toast.error("A nova senha deve ter pelo menos 6 caracteres")
+      return
+    }
+
+    const updatedUserData: Partial<UsuarioSistema> = {
       nome: formData.nome.trim(),
       email: formData.email.trim().toLowerCase(),
       role: formData.role,
       permissoes: formData.permissoes,
     }
+    if (formData.senha) updatedUserData.senha = formData.senha
 
     const updated = usuarios.map((u) =>
       u.login === selectedUser.login
@@ -225,6 +237,15 @@ export function AdminView({ currentUser, onPasswordChange }: AdminViewProps) {
   const openDeleteDialog = (user: UsuarioSistema) => {
     setSelectedUser(user)
     setIsDeleteDialogOpen(true)
+  }
+
+  const generatePassword = () => {
+    const chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789"
+    const values = new Uint32Array(10)
+    crypto.getRandomValues(values)
+    const senha = Array.from(values, (value) => chars[value % chars.length]).join("")
+    setFormData((prev) => ({ ...prev, senha }))
+    setShowFormPassword(true)
   }
 
   const handlePermissaoToggle = (permissao: TabPermissao) => {
@@ -456,6 +477,28 @@ export function AdminView({ currentUser, onPasswordChange }: AdminViewProps) {
                         }
                         placeholder="Digite o email"
                       />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="add-senha">Senha de acesso</Label>
+                      <div className="flex gap-2">
+                        <div className="relative flex-1">
+                          <Input
+                            id="add-senha"
+                            type={showFormPassword ? "text" : "password"}
+                            value={formData.senha}
+                            onChange={(e) => setFormData({ ...formData, senha: e.target.value })}
+                            placeholder="Digite ou gere uma senha"
+                            className="pr-10"
+                          />
+                          <button type="button" aria-label={showFormPassword ? "Ocultar senha" : "Mostrar senha"} onClick={() => setShowFormPassword((value) => !value)} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
+                            {showFormPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                          </button>
+                        </div>
+                        <Button type="button" variant="outline" size="icon" onClick={generatePassword} aria-label="Gerar senha">
+                          <RefreshCw className="h-4 w-4" />
+                        </Button>
+                      </div>
+                      <p className="text-xs text-muted-foreground">Mínimo de 6 caracteres. Você pode gerar uma senha segura.</p>
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="add-role">Perfil</Label>
@@ -756,6 +799,28 @@ export function AdminView({ currentUser, onPasswordChange }: AdminViewProps) {
                 }
                 placeholder="Digite o email"
               />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-senha">Nova senha</Label>
+              <div className="flex gap-2">
+                <div className="relative flex-1">
+                  <Input
+                    id="edit-senha"
+                    type={showFormPassword ? "text" : "password"}
+                    value={formData.senha}
+                    onChange={(e) => setFormData({ ...formData, senha: e.target.value })}
+                    placeholder="Deixe vazio para manter a senha atual"
+                    className="pr-10"
+                  />
+                  <button type="button" aria-label={showFormPassword ? "Ocultar senha" : "Mostrar senha"} onClick={() => setShowFormPassword((value) => !value)} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
+                    {showFormPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </button>
+                </div>
+                <Button type="button" variant="outline" size="icon" onClick={generatePassword} aria-label="Gerar nova senha">
+                  <RefreshCw className="h-4 w-4" />
+                </Button>
+              </div>
+              <p className="text-xs text-muted-foreground">Deixe vazio para não alterar a senha atual.</p>
             </div>
             <div className="space-y-2">
               <Label htmlFor="edit-role">Perfil</Label>
