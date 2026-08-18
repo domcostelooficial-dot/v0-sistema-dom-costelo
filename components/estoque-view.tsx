@@ -82,6 +82,9 @@ export function EstoqueView({ itens, onUpdateItem, onAddItem, onEditItem, onDele
     categoria: "Carnes",
     min: 1,
     atual: 0,
+    unidadeEstoque: "Unidade",
+    quantidadePorEmbalagem: 1,
+    unidadeConteudo: "un",
   })
 
   const filteredItens = useMemo(() => {
@@ -147,12 +150,15 @@ export function EstoqueView({ itens, onUpdateItem, onAddItem, onEditItem, onDele
       categoria: formData.categoria,
       min: formData.min,
       atual: formData.atual,
+      unidadeEstoque: formData.unidadeEstoque,
+      quantidadePorEmbalagem: formData.quantidadePorEmbalagem,
+      unidadeConteudo: formData.unidadeConteudo,
       ultimaAlteracao: undefined,
     }
 
     onAddItem(newItem)
     setIsAddDialogOpen(false)
-    setFormData({ nome: "", categoria: "Carnes", min: 1, atual: 0 })
+    setFormData({ nome: "", categoria: "Carnes", min: 1, atual: 0, unidadeEstoque: "Unidade", quantidadePorEmbalagem: 1, unidadeConteudo: "un" })
     toast.success(`Item "${newItem.nome}" adicionado com sucesso!`)
   }
 
@@ -170,6 +176,9 @@ export function EstoqueView({ itens, onUpdateItem, onAddItem, onEditItem, onDele
       categoria: formData.categoria,
       min: formData.min,
       atual: formData.atual,
+      unidadeEstoque: formData.unidadeEstoque,
+      quantidadePorEmbalagem: formData.quantidadePorEmbalagem,
+      unidadeConteudo: formData.unidadeConteudo,
     }
 
     onEditItem(selectedItem.nome, updatedItem)
@@ -194,6 +203,9 @@ export function EstoqueView({ itens, onUpdateItem, onAddItem, onEditItem, onDele
       categoria: item.categoria,
       min: item.min,
       atual: item.atual,
+      unidadeEstoque: item.unidadeEstoque ?? "Unidade",
+      quantidadePorEmbalagem: item.quantidadePorEmbalagem ?? 1,
+      unidadeConteudo: item.unidadeConteudo ?? "un",
     })
     setIsEditDialogOpen(true)
   }
@@ -312,6 +324,20 @@ export function EstoqueView({ itens, onUpdateItem, onAddItem, onEditItem, onDele
                       </SelectContent>
                     </Select>
                   </div>
+                  <div className="grid grid-cols-3 gap-3">
+                    <div className="space-y-2">
+                      <Label htmlFor="add-unidade">Unidade de estoque</Label>
+                      <Input id="add-unidade" value={formData.unidadeEstoque} onChange={(e) => setFormData({ ...formData, unidadeEstoque: e.target.value })} placeholder="Pacote" />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="add-conteudo">Qtd. embalagem</Label>
+                      <Input id="add-conteudo" type="number" min="0" value={formData.quantidadePorEmbalagem} onChange={(e) => setFormData({ ...formData, quantidadePorEmbalagem: Number(e.target.value) })} />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="add-unidade-conteudo">Unidade conteúdo</Label>
+                      <Input id="add-unidade-conteudo" value={formData.unidadeConteudo} onChange={(e) => setFormData({ ...formData, unidadeConteudo: e.target.value })} placeholder="kg" />
+                    </div>
+                  </div>
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label htmlFor="add-min">Estoque Mínimo</Label>
@@ -344,7 +370,7 @@ export function EstoqueView({ itens, onUpdateItem, onAddItem, onEditItem, onDele
                     variant="outline"
                     onClick={() => {
                       setIsAddDialogOpen(false)
-                      setFormData({ nome: "", categoria: "Carnes", min: 1, atual: 0 })
+                      setFormData({ nome: "", categoria: "Carnes", min: 1, atual: 0, unidadeEstoque: "Unidade", quantidadePorEmbalagem: 1, unidadeConteudo: "un" })
                     }}
                   >
                     Cancelar
@@ -389,6 +415,7 @@ export function EstoqueView({ itens, onUpdateItem, onAddItem, onEditItem, onDele
                 <TableRow className="border-border hover:bg-transparent">
                   <TableHead className="text-muted-foreground">Item</TableHead>
                   <TableHead className="text-muted-foreground">Categoria</TableHead>
+                  <TableHead className="text-muted-foreground">Embalagem</TableHead>
                   <TableHead className="text-muted-foreground text-center">Mínimo</TableHead>
                   <TableHead className="text-muted-foreground text-center">Atual</TableHead>
                   <TableHead className="text-muted-foreground text-center">Status</TableHead>
@@ -404,6 +431,9 @@ export function EstoqueView({ itens, onUpdateItem, onAddItem, onEditItem, onDele
                     </TableCell>
                     <TableCell className="text-muted-foreground">
                       {item.categoria}
+                    </TableCell>
+                    <TableCell className="text-muted-foreground text-xs">
+                      {item.quantidadePorEmbalagem ?? 1} {item.unidadeConteudo ?? "un"} / {item.unidadeEstoque ?? "Unidade"}
                     </TableCell>
                     <TableCell className="text-center text-muted-foreground">
                       {item.min}
@@ -516,6 +546,20 @@ export function EstoqueView({ itens, onUpdateItem, onAddItem, onEditItem, onDele
                   ))}
                 </SelectContent>
               </Select>
+            </div>
+            <div className="grid grid-cols-3 gap-3">
+              <div className="space-y-2">
+                <Label htmlFor="edit-unidade">Unidade de estoque</Label>
+                <Input id="edit-unidade" value={formData.unidadeEstoque} onChange={(e) => setFormData({ ...formData, unidadeEstoque: e.target.value })} />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-conteudo">Qtd. embalagem</Label>
+                <Input id="edit-conteudo" type="number" min="0" value={formData.quantidadePorEmbalagem} onChange={(e) => setFormData({ ...formData, quantidadePorEmbalagem: Number(e.target.value) })} />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-unidade-conteudo">Unidade conteúdo</Label>
+                <Input id="edit-unidade-conteudo" value={formData.unidadeConteudo} onChange={(e) => setFormData({ ...formData, unidadeConteudo: e.target.value })} />
+              </div>
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">

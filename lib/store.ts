@@ -1,6 +1,6 @@
 "use client"
 
-import { Item, HistoricoEntry, Receita, UsuarioSistema, defaultItens, defaultReceitas } from "./types"
+import { Item, HistoricoEntry, Receita, UsuarioSistema, defaultItens, defaultReceitas, catalogoEmbalagens } from "./types"
 
 const ESTOQUE_KEY = "dom-costelo-estoque"
 const HISTORICO_KEY = "dom-costelo-historico"
@@ -53,10 +53,19 @@ const defaultUsuarios: UsuarioSistema[] = [
   },
 ]
 
+function enriquecerItens(itens: Item[]) {
+  return itens.map((item) => {
+    const cadastro = catalogoEmbalagens.find(([nome]) => nome.toLowerCase() === item.nome.toLowerCase())
+    if (!cadastro) return item
+    const [, unidadeEstoque, quantidadePorEmbalagem, unidadeConteudo, categoria] = cadastro
+    return { ...item, categoria, unidadeEstoque, quantidadePorEmbalagem, unidadeConteudo }
+  })
+}
+
 export function getEstoque(): Item[] {
-  if (typeof window === "undefined") return defaultItens
+  if (typeof window === "undefined") return enriquecerItens(defaultItens)
   const stored = localStorage.getItem(ESTOQUE_KEY)
-  return stored ? JSON.parse(stored) : defaultItens
+  return enriquecerItens(stored ? JSON.parse(stored) : defaultItens)
 }
 
 export function saveEstoque(itens: Item[]) {

@@ -8,6 +8,9 @@ export interface Item {
   categoria: string
   preco?: number
   unidade?: UnidadeInsumo
+  unidadeEstoque?: string
+  quantidadePorEmbalagem?: number
+  unidadeConteudo?: string
   precoCompra?: number
   quantidadeEmbalagem?: number
   unidadeEmbalagem?: UnidadeInsumo
@@ -164,6 +167,12 @@ export const categorias = [
 ] as const
 
 export type Categoria = (typeof categorias)[number]
+
+export const catalogoEmbalagens: Array<[string, string, number, string, string]> = [
+  ["Carne de hambúrguer", "Unidade", 180, "g", "Carnes"], ["Costela Pronta", "Unidade", 1, "kg", "Carnes"], ["Costela Desfiada", "Kg", 1, "kg", "Carnes"], ["Bacon em cubos", "Kg", 1, "kg", "Carnes"], ["Bacon Fatiado", "Kg", 1, "kg", "Carnes"], ["Pão Australiano Aussie", "Unidade", 1, "un", "Padaria"], ["Pão brioche 4CT", "Unidade", 1, "un", "Padaria"], ["Batata", "Pacote", 2, "kg", "Insumos"], ["Anel de cebola", "Pacote", 1, "kg", "Insumos"], ["Mussarela", "Kg", 1, "kg", "Insumos"], ["Cream cheese", "Pacote", 1.5, "kg", "Insumos"], ["Cheddar Polenghi profissional", "Pacote", 1.5, "kg", "Insumos"], ["Molho de Cheddar", "Pacote", 1.5, "kg", "Insumos"], ["Óleo", "Unidade", 800, "ml", "Insumos"], ["Sal", "Pacote", 1, "kg", "Insumos"], ["Barbecue", "Unidade", 3.5, "kg", "Insumos"], ["Alho torrado", "Pacote", 1, "kg", "Insumos"], ["Cebolinha", "Unidade/maço", 100, "g", "Insumos"], ["Temperos", "Pacote", 1.9, "kg", "Insumos"], ["Pimenta Biquinho", "Pacote", 2, "kg", "Insumos"],
+  ["Embalagem H7", "Unidade", 1, "un", "Embalagens"], ["Embalagem H2", "Unidade", 1, "un", "Embalagens"], ["Embalagem de prato feito", "Unidade", 1, "un", "Embalagens"], ["Embalagem para talher", "Pacote", 100, "un", "Embalagens"], ["Embalagem de farofa", "Unidade", 1, "un", "Embalagens"], ["Lacre para delivery", "Bobina", 500, "un", "Embalagens"], ["Lacre para o forno", "Pacote", 100, "un", "Embalagens"], ["Guardanapo", "Pacote", 100, "un", "Embalagens"], ["Saco Kraft G", "Unidade", 1, "un", "Embalagens"], ["Saco Kraft GG (extra)", "Unidade", 1, "un", "Embalagens"], ["Papel acoplado metalizado", "Pacote", 200, "un", "Embalagens"], ["Papel acoplado (comum)", "Pacote", 200, "un", "Embalagens"], ["Palito para hambúrguer", "Pacote", 200, "un", "Embalagens"], ["Grampo da embalagem", "Pacote", 1000, "un", "Embalagens"], ["Copo descartável", "Pacote", 100, "un", "Embalagens"], ["Garfo descartável", "Pacote", 50, "un", "Embalagens"], ["Saco de embalar batata", "Bobina", 500, "un", "Embalagens"], ["Papel Celofane", "Bobina", 65, "metro", "Embalagens"], ["Sacola para Refrigerante", "Bobina", 100, "un", "Embalagens"],
+  ["Água para consumo", "Unidade", 1.5, "L", "Bebidas"], ["Água com gás", "Unidade", 500, "ml", "Bebidas"], ["Água normal", "Unidade", 500, "ml", "Bebidas"], ["Coca Zero 1,5L", "Unidade", 1.5, "L", "Bebidas"], ["Coca-Cola 1,5L", "Unidade", 1.5, "L", "Bebidas"], ["Del Valle 1,5L", "Unidade", 1.5, "L", "Bebidas"], ["Guaraná 1L", "Unidade", 1, "L", "Bebidas"], ["Coca Lata 350ml", "Unidade", 350, "ml", "Bebidas"], ["Guaraná lata 350ml", "Unidade", 350, "ml", "Bebidas"], ["Arroz", "Pacote", 5, "kg", "Cozinha"], ["Farofa", "Pacote", 900, "g", "Cozinha"], ["Veja multiuso", "Unidade", 500, "ml", "Limpeza"], ["Perfex", "Pacote", 100, "un", "Limpeza"], ["Detergente", "Unidade", 5, "L", "Limpeza"], ["Esponja de louça", "Pacote", 4, "un", "Limpeza"], ["Saco de lixo 30L", "Bobina", 25, "sacos", "Limpeza"], ["Saco de lixo 100L", "Bobina", 25, "sacos", "Limpeza"], ["Desinfetante", "Unidade", 1, "L", "Limpeza"], ["Touca", "Pacote", 100, "un", "Operacional"], ["Gás 13kg", "Unidade", 13, "kg", "Operacional"], ["Gás de maçarico", "Unidade", 300, "g", "Operacional"], ["Bobina térmica 80mm", "Bobina", 30, "metro", "Operacional"],
+]
 
 export const defaultItens: Item[] = [
   { nome: "Carne de hambúrguer", min: 12, atual: 12, categoria: "Carnes" },
