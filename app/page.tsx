@@ -49,10 +49,11 @@ function limparItensEstoque(itens: Item[]) {
 
 // Funções wrapper que salvam em Firebase e localStorage
 async function saveEstoqueHybrid(user: string | null, itens: Item[]) {
-  saveEstoqueLocal(itens)
+  const itensPersistidos = limparItensEstoque(itens)
+  saveEstoqueLocal(itensPersistidos)
   if (user) {
     try {
-      await saveEstoqueFirebase(user, itens)
+      await saveEstoqueFirebase(user, itensPersistidos)
       console.log("[v0] Estoque salvo no Firebase")
     } catch (err) {
       console.error("[v0] Erro ao salvar no Firebase:", err)
