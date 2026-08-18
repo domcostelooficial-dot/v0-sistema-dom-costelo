@@ -1,13 +1,88 @@
+export type UnidadeInsumo = "un" | "g" | "kg" | "ml" | "l"
+export type CategoriaInsumo = "Carnes" | "Pães" | "Queijos" | "Molhos" | "Batatas/congelados" | "Bebidas" | "Embalagens" | "Mercearia"
+
 export interface Item {
   nome: string
   min: number
   atual: number
   categoria: string
   preco?: number
+  unidade?: UnidadeInsumo
+  precoCompra?: number
+  quantidadeEmbalagem?: number
+  unidadeEmbalagem?: UnidadeInsumo
+  custoUnitario?: number
+  fornecedor?: string
   ultimaAlteracao?: {
     usuario: string
     data: string
   }
+}
+
+export interface Insumo extends Item {
+  categoria: CategoriaInsumo
+  unidade: UnidadeInsumo
+  precoCompra: number
+  quantidadeEmbalagem: number
+  unidadeEmbalagem: UnidadeInsumo
+  custoUnitario: number
+}
+
+export interface IngredienteFicha {
+  insumoNome: string
+  quantidade: number
+  unidade: UnidadeInsumo
+}
+
+export interface FichaTecnica {
+  id: string
+  nome: string
+  precoVenda: number
+  ingredientes: IngredienteFicha[]
+  metaCmv?: number
+}
+
+export interface VendaProduto {
+  id: string
+  produtoNome: string
+  quantidade: number
+  data: string
+}
+
+export interface PrevisaoVenda {
+  produtoNome: string
+  quantidade: number
+}
+
+export interface CompraRegistro {
+  id: string
+  data: string
+  fornecedor: string
+  insumoNome: string
+  quantidade: number
+  unidade: UnidadeInsumo
+  precoUnitario: number
+  valorTotal: number
+  precoAnterior: number
+  variacao: number
+  adicionadaAoEstoque?: boolean
+}
+
+export interface ListaCompraItem {
+  insumoNome: string
+  categoria: CategoriaInsumo
+  unidade: UnidadeInsumo
+  necessidade: number
+  estoque: number
+  quantidadeComprar: number
+  quantidadeEmbalagem: number
+  embalagens: number
+  precoEmbalagem: number
+  valorEstimado: number
+  comprado?: boolean
+  quantidadeReal?: number
+  valorUnitarioReal?: number
+  fornecedor?: string
 }
 
 export interface HistoricoEntry {
@@ -47,6 +122,21 @@ export interface Receita {
   outputItem: string
   outputQtd: number
 }
+
+const defaultInsumoRows: Array<[string, UnidadeInsumo, number, number, UnidadeInsumo, CategoriaInsumo]> = [
+  ["Pão brioche", "un", 2.07, 1, "un", "Pães"], ["Pão australiano", "un", 2.53, 1, "un", "Pães"], ["Blend bovino 180g", "un", 6.35, 1, "un", "Carnes"],
+  ["Cheddar cremoso", "g", 50, 1500, "g", "Queijos"], ["Cream cheese", "g", 60, 1500, "g", "Queijos"], ["Bacon", "g", 32, 1000, "g", "Carnes"], ["Barbecue", "g", 40, 3500, "g", "Molhos"], ["Costela bovina desfiada", "g", 80, 1000, "g", "Carnes"], ["Mussarela", "g", 43, 1000, "g", "Queijos"], ["Batata frita", "g", 10, 1000, "g", "Batatas/congelados"], ["Anel de cebola", "g", 22, 1000, "g", "Batatas/congelados"], ["Farofa de bacon", "g", 55, 1000, "g", "Mercearia"], ["Cebolinha", "g", 30, 1000, "g", "Mercearia"], ["Embalagem H7", "un", 50, 100, "un", "Embalagens"], ["Saco Kraft", "un", 70, 100, "un", "Embalagens"], ["Papel acoplado", "un", 35, 200, "un", "Embalagens"]
+]
+export const defaultInsumos: Insumo[] = defaultInsumoRows.map(([nome, unidade, precoCompra, quantidadeEmbalagem, unidadeEmbalagem, categoria]) => ({ nome, unidade, precoCompra, quantidadeEmbalagem, unidadeEmbalagem, categoria, custoUnitario: precoCompra / quantidadeEmbalagem, min: 0, atual: 0 }))
+
+export const defaultFichasTecnicas: FichaTecnica[] = [
+  { id: "super-bacon-bbq", nome: "SUPER BACON BBQ", precoVenda: 35, ingredientes: [{ insumoNome: "Pão brioche", quantidade: 1, unidade: "un" }, { insumoNome: "Blend bovino 180g", quantidade: 1, unidade: "un" }, { insumoNome: "Cheddar cremoso", quantidade: 30, unidade: "g" }, { insumoNome: "Bacon", quantidade: 40, unidade: "g" }, { insumoNome: "Barbecue", quantidade: 20, unidade: "g" }, { insumoNome: "Saco Kraft", quantidade: 1, unidade: "un" }, { insumoNome: "Papel acoplado", quantidade: 1, unidade: "un" }] },
+  { id: "costeloburguer", nome: "COSTELOBURGUER", precoVenda: 35, ingredientes: [{ insumoNome: "Pão australiano", quantidade: 1, unidade: "un" }, { insumoNome: "Blend bovino 180g", quantidade: 1, unidade: "un" }, { insumoNome: "Mussarela", quantidade: 25, unidade: "g" }, { insumoNome: "Cream cheese", quantidade: 30, unidade: "g" }, { insumoNome: "Costela bovina desfiada", quantidade: 40, unidade: "g" }, { insumoNome: "Anel de cebola", quantidade: 40, unidade: "g" }, { insumoNome: "Barbecue", quantidade: 20, unidade: "g" }, { insumoNome: "Saco Kraft", quantidade: 1, unidade: "un" }, { insumoNome: "Papel acoplado", quantidade: 1, unidade: "un" }] },
+  { id: "dom-supreme", nome: "DOM SUPREME", precoVenda: 35, ingredientes: [{ insumoNome: "Pão australiano", quantidade: 1, unidade: "un" }, { insumoNome: "Blend bovino 180g", quantidade: 1, unidade: "un" }, { insumoNome: "Cheddar cremoso", quantidade: 30, unidade: "g" }, { insumoNome: "Farofa de bacon", quantidade: 40, unidade: "g" }, { insumoNome: "Anel de cebola", quantidade: 40, unidade: "g" }, { insumoNome: "Saco Kraft", quantidade: 1, unidade: "un" }, { insumoNome: "Papel acoplado", quantidade: 1, unidade: "un" }] },
+  { id: "dom-cheddar", nome: "DOM CHEDDAR", precoVenda: 35, ingredientes: [{ insumoNome: "Pão brioche", quantidade: 1, unidade: "un" }, { insumoNome: "Blend bovino 180g", quantidade: 1, unidade: "un" }, { insumoNome: "Cheddar cremoso", quantidade: 30, unidade: "g" }, { insumoNome: "Farofa de bacon", quantidade: 40, unidade: "g" }, { insumoNome: "Anel de cebola", quantidade: 40, unidade: "g" }, { insumoNome: "Saco Kraft", quantidade: 1, unidade: "un" }, { insumoNome: "Papel acoplado", quantidade: 1, unidade: "un" }] },
+  { id: "batata-dom-costelo", nome: "BATATA DOM COSTELO", precoVenda: 35, ingredientes: [{ insumoNome: "Batata frita", quantidade: 400, unidade: "g" }, { insumoNome: "Cream cheese", quantidade: 100, unidade: "g" }, { insumoNome: "Costela bovina desfiada", quantidade: 80, unidade: "g" }, { insumoNome: "Barbecue", quantidade: 50, unidade: "g" }, { insumoNome: "Embalagem H7", quantidade: 1, unidade: "un" }, { insumoNome: "Saco Kraft", quantidade: 1, unidade: "un" }] },
+  { id: "batata-cheddar-bacon", nome: "BATATA CHEDDAR E BACON", precoVenda: 32, ingredientes: [{ insumoNome: "Batata frita", quantidade: 400, unidade: "g" }, { insumoNome: "Cheddar cremoso", quantidade: 100, unidade: "g" }, { insumoNome: "Farofa de bacon", quantidade: 80, unidade: "g" }, { insumoNome: "Embalagem H7", quantidade: 1, unidade: "un" }, { insumoNome: "Saco Kraft", quantidade: 1, unidade: "un" }] }
+]
 
 export const defaultReceitas: Receita[] = [
   {

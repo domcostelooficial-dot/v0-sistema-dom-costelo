@@ -14,7 +14,7 @@ import {
   onSnapshot,
 } from "firebase/firestore"
 import { db } from "./firebase"
-import type { Item, HistoricoEntry, Receita, UsuarioSistema } from "./types"
+import type { Item, HistoricoEntry, Receita, UsuarioSistema, Insumo, FichaTecnica, VendaProduto, CompraRegistro } from "./types"
 
 // Collections - dados globais compartilhados
 const USUARIOS_COLLECTION = "usuarios"
@@ -238,6 +238,36 @@ export async function getReceitas(userId: string) {
 }
 
 // Listener em tempo real para receitas
+export async function getCollectionData<T>(collectionName: string): Promise<T[]> {
+  const snapshot = await getDocs(collection(db, collectionName))
+  return snapshot.docs.map((item) => ({ id: item.id, ...item.data() }) as T)
+}
+
+export async function upsertCollectionData<T extends { id?: string }>(collectionName: string, data: T[]) {
+  for (const item of data) {
+    const id = item.id || crypto.randomUUID()
+    await setDoc(doc(db, collectionName, id), { ...item, id, updatedAt: Timestamp.now() })
+  }
+}
+
+export async function saveComprasData<T>(collectionName: string, data: T[]) {
+  await setDoc(doc(db, "compras", collectionName), { data, updatedAt: Timestamp.now() })
+}
+
+export async function getComprasData<T>(collectionName: string): Promise<T[]> {
+  const snapshot = await getDoc(doc(db, "compras", collectionName))
+  return snapshot.exists() ? (snapshot.data().data as T[]) : []
+}
+
+export async function getInsumos() { return getComprasData<Insumo>("insumos") }
+export async function saveInsumos(data: Insumo[]) { return saveComprasData("insumos", data) }
+export async function getFichasTecnicas() { return getComprasData<FichaTecnica>("fichas-tecnicas") }
+export async function saveFichasTecnicas(data: FichaTecnica[]) { return saveComprasData("fichas-tecnicas", data) }
+export async function getVendasProdutos() { return getComprasData<VendaProduto>("vendas") }
+export async function saveVendasProdutos(data: VendaProduto[]) { return saveComprasData("vendas", data) }
+export async function getComprasHistorico() { return getComprasData<CompraRegistro>("historico") }
+export async function saveComprasHistorico(data: CompraRegistro[]) { return saveComprasData("historico", data) }
+
 export function subscribeToReceitas(callback: (receitas: Receita[]) => void) {
   return onSnapshot(
     doc(db, "receitas", "global"), 

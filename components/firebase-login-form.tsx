@@ -8,6 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { FieldGroup, Field, FieldLabel } from "@/components/ui/field"
 import { Lock, User, Mail } from "lucide-react"
 import { signInWithEmail, signUpWithEmail } from "@/lib/firebase-auth"
+import type { User as FirebaseUser } from "firebase/auth"
 import { getUsuarios, saveUsuarios } from "@/lib/store"
 import { getAllUsuarios, createUsuarioProfile } from "@/lib/firebase-db"
 import type { UsuarioSistema } from "@/lib/types"
@@ -72,8 +73,8 @@ export function FirebaseLoginForm({ onLogin }: FirebaseLoginFormProps) {
     }
 
     try {
-      let user
-      let authError
+      let user: FirebaseUser | null = null
+      let authError: string | null = null
 
       if (isSignUp) {
         // Criar nova conta no Firebase
@@ -89,15 +90,15 @@ export function FirebaseLoginForm({ onLogin }: FirebaseLoginFormProps) {
 
         // Criar usuario pendente no sistema local e Firebase
         const usuarios = getUsuarios()
-        const displayName = user.email?.split("@")[0] || user.uid
+        const displayName = user!.email?.split("@")[0] || user!.uid
         
         // Verificar se ja existe
-        if (!usuarios.some(u => u.email === user.email)) {
+        if (!usuarios.some(u => u.email === user!.email)) {
           const novoUsuario: UsuarioSistema = {
             login: displayName,
             nome: nome.trim(),
             senha: "", // Senha gerenciada pelo Firebase
-            email: user.email || "",
+            email: user!.email || "",
             role: "operador",
             permissoes: [],
             status: "pendente",
@@ -136,7 +137,7 @@ export function FirebaseLoginForm({ onLogin }: FirebaseLoginFormProps) {
       // Verificar se é o administrador master (sempre tem acesso)
       const emailAdmin = "admin@domcostelo.com"
       
-      if (user.email === emailAdmin) {
+      if (user!.email === emailAdmin) {
         console.log("[v0] Admin master detectado - acesso garantido")
         const usuarios = getUsuarios()
         
@@ -167,10 +168,10 @@ export function FirebaseLoginForm({ onLogin }: FirebaseLoginFormProps) {
 
       // Verificar se usuario esta aprovado
       const usuarios = getUsuarios()
-      const displayName = user.email?.split("@")[0] || user.uid
+      const displayName = user!.email?.split("@")[0] || user!.uid
       
       // Buscar por email ou por login (para usuarios antigos)
-      let usuarioSistema = usuarios.find(u => u.email === user.email)
+      let usuarioSistema = usuarios.find(u => u.email === user!.email)
       if (!usuarioSistema) {
         usuarioSistema = usuarios.find(u => u.login.toLowerCase() === displayName.toLowerCase())
       }
@@ -185,7 +186,7 @@ export function FirebaseLoginForm({ onLogin }: FirebaseLoginFormProps) {
           const novoAdmin: UsuarioSistema = {
             login: displayName,
             senha: "",
-            email: user.email || "",
+            email: user!.email || "",
             role: "admin",
             permissoes: ["estoque", "entrada", "producao", "financeiro", "dashboard", "lista-compras", "admin"],
             status: "aprovado",
@@ -208,7 +209,7 @@ export function FirebaseLoginForm({ onLogin }: FirebaseLoginFormProps) {
         const novoUsuario: UsuarioSistema = {
           login: displayName,
           senha: "",
-          email: user.email || "",
+          email: user!.email || "",
           role: "operador",
           permissoes: [],
           status: "pendente",

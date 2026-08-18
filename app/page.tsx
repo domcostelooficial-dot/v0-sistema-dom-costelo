@@ -433,7 +433,14 @@ export default function Home() {
             <DashboardView itens={itens} historico={historico} />
           )}
           {activeTab === "lista-compras" && (
-            <ListaComprasView itens={itens} />
+            <ListaComprasView
+              itens={itens}
+              user={user}
+              onUpdateEstoque={(nome, qtd) => {
+                const item = itens.find((current) => current.nome === nome)
+                if (item) handleUpdateItem(nome, item.atual + qtd)
+              }}
+            />
           )}
           {activeTab === "admin" && userRole === "admin" && (
             <AdminView currentUser={user} onPasswordChange={handlePasswordChange} />
