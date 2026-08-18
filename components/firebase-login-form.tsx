@@ -83,7 +83,19 @@ export function FirebaseLoginForm({ onLogin }: FirebaseLoginFormProps) {
         authError = result.error
 
         if (authError || !user) {
-          setError("Erro ao criar conta. Verifique os dados.")
+          const mensagem = authError?.toLowerCase() ?? ""
+          if (mensagem.includes("email-already-in-use")) {
+            setError("Este email já está cadastrado. Faça login ou use outro email.")
+          } else if (mensagem.includes("invalid-email")) {
+            setError("Digite um email válido.")
+          } else if (mensagem.includes("weak-password")) {
+            setError("A senha deve ter pelo menos 6 caracteres.")
+          } else if (mensagem.includes("operation-not-allowed")) {
+            setError("O cadastro por email está desativado no Firebase. Ative o provedor Email/Senha no Firebase Console.")
+          } else {
+            setError("Não foi possível criar a conta. Verifique o email e tente novamente.")
+            console.error("[v0] Erro detalhado ao criar conta Firebase:", authError)
+          }
           setLoading(false)
           return
         }
