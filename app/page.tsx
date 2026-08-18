@@ -28,7 +28,6 @@ import { FirebaseLoginForm } from "@/components/firebase-login-form"
 import { AppSidebar } from "@/components/app-sidebar"
 import { EstoqueView } from "@/components/estoque-view"
 import { EntradaView } from "@/components/entrada-view"
-import { ProducaoView } from "@/components/producao-view"
 import { FinanceiroView } from "@/components/financeiro-view"
 import { DashboardView } from "@/components/dashboard-view"
 import { ListaComprasView } from "@/components/lista-compras-view"
@@ -36,14 +35,25 @@ import { AdminView } from "@/components/admin-view"
 import { Menu, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 
-type Tab = "estoque" | "entrada" | "producao" | "financeiro" | "dashboard" | "lista-compras" | "admin"
+type Tab = "estoque" | "entrada" | "financeiro" | "dashboard" | "lista-compras" | "admin"
+
+const ITENS_REMOVIDOS = new Set(["Costela Crua", "Contra filé", "Manteiga de Garrafa", "Limoneto"])
+
+function limparItensEstoque(itens: Item[]) {
+  const vistos = new Set<string>()
+  return itens
+    .filter((item) => !ITENS_REMOVIDOS.has(item.nome))
+    .map((item) => item.nome === "Aji Sal para churrasco" ? { ...item, nome: "Sal" } : item)
+    .filter((item) => !vistos.has(item.nome) && (vistos.add(item.nome), true))
+}
 
 // Funções wrapper que salvam em Firebase e localStorage
 async function saveEstoqueHybrid(user: string | null, itens: Item[]) {
-  saveEstoqueLocal(itens)
+  const itensPersistidos = limparItensEstoque(itens)
+  saveEstoqueLocal(itensPersistidos)
   if (user) {
     try {
-      await saveEstoqueFirebase(user, itens)
+      await saveEstoqueFirebase(user, itensPersistidos)
       console.log("[v0] Estoque salvo no Firebase")
     } catch (err) {
       console.error("[v0] Erro ao salvar no Firebase:", err)
@@ -57,13 +67,13 @@ async function getEstoqueHybrid(user: string | null): Promise<Item[]> {
       const { data } = await getEstoqueFirebase(user)
       if (data && data.length > 0) {
         console.log("[v0] Estoque carregado do Firebase")
-        return data
+        return limparItensEstoque(data)
       }
     } catch (err) {
       console.error("[v0] Erro ao carregar do Firebase:", err)
     }
   }
-  return getEstoqueLocal()
+  return limparItensEstoque(getEstoqueLocal())
 }
 
 async function saveHistoricoHybrid(user: string | null, historico: HistoricoEntry[]) {
@@ -156,8 +166,9 @@ export default function Home() {
     // Configurar listeners em tempo real para sincronização (apenas quando logado)
     const unsubscribeEstoque = subscribeToEstoque((firebaseItens) => {
       if (firebaseItens && firebaseItens.length > 0) {
-        setItens(firebaseItens)
-        saveEstoqueLocal(firebaseItens)
+        const itensLimpos = limparItensEstoque(firebaseItens)
+        setItens(itensLimpos)
+        saveEstoqueLocal(itensLimpos)
       }
     })
     
@@ -379,7 +390,6 @@ export default function Home() {
             <h1 className="text-2xl font-bold text-foreground capitalize">
               {activeTab === "estoque" && "Controle de Estoque"}
               {activeTab === "entrada" && "Entrada de Mercadoria"}
-              {activeTab === "producao" && "Produção"}
               {activeTab === "financeiro" && "Financeiro"}
               {activeTab === "dashboard" && "Dashboard"}
               {activeTab === "lista-compras" && "Lista de Compras"}
@@ -390,8 +400,6 @@ export default function Home() {
                 "Gerencie os itens do seu estoque"}
               {activeTab === "entrada" &&
                 "Registre novas entradas de mercadoria"}
-              {activeTab === "producao" &&
-                "Transforme ingredientes em produtos"}
               {activeTab === "financeiro" &&
                 "Acompanhe seus gastos e histórico"}
               {activeTab === "dashboard" &&
@@ -416,16 +424,6 @@ export default function Home() {
           {activeTab === "entrada" && (
             <EntradaView itens={itens} onEntrada={handleEntrada} />
           )}
-          {activeTab === "producao" && (
-            <ProducaoView
-              itens={itens}
-              receitas={receitas}
-              onProduzir={handleProduzir}
-              onAddReceita={handleAddReceita}
-              onUpdateReceita={handleUpdateReceita}
-              onDeleteReceita={handleDeleteReceita}
-            />
-          )}
           {activeTab === "financeiro" && (
             <FinanceiroView historico={historico} />
           )}
@@ -433,7 +431,14 @@ export default function Home() {
             <DashboardView itens={itens} historico={historico} />
           )}
           {activeTab === "lista-compras" && (
-            <ListaComprasView itens={itens} />
+            <ListaComprasView
+              itens={itens}
+              user={user}
+              onUpdateEstoque={(nome, qtd) => {
+                const item = itens.find((current) => current.nome === nome)
+                if (item) handleUpdateItem(nome, item.atual + qtd)
+              }}
+            />
           )}
           {activeTab === "admin" && userRole === "admin" && (
             <AdminView currentUser={user} onPasswordChange={handlePasswordChange} />

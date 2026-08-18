@@ -63,7 +63,6 @@ interface AdminViewProps {
 const allPermissoes: { id: TabPermissao; label: string }[] = [
   { id: "estoque", label: "Estoque" },
   { id: "entrada", label: "Entrada" },
-  { id: "producao", label: "Produção" },
   { id: "financeiro", label: "Financeiro" },
   { id: "dashboard", label: "Dashboard" },
   { id: "lista-compras", label: "Lista de Compras" },
@@ -367,7 +366,7 @@ export function AdminView({ currentUser, onPasswordChange }: AdminViewProps) {
                               onClick={async () => {
                                 const newData = { 
                                   status: "aprovado" as UserStatus, 
-                                  permissoes: ["estoque", "entrada", "producao", "dashboard", "lista-compras"] as TabPermissao[] 
+                                  permissoes: ["estoque", "entrada", "dashboard", "lista-compras"] as TabPermissao[] 
                                 }
                                 const updated = usuarios.map(u => 
                                   u.login === user.login ? { ...u, ...newData } : u

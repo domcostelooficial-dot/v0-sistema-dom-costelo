@@ -14,7 +14,7 @@ const defaultUsuarios: UsuarioSistema[] = [
     senha: "123",
     email: "thiago@domcostelo.com",
     role: "admin",
-    permissoes: ["estoque", "entrada", "producao", "financeiro", "dashboard", "lista-compras", "admin"],
+    permissoes: ["estoque", "entrada", "financeiro", "dashboard", "lista-compras", "admin"],
     status: "aprovado",
   },
   {
@@ -22,7 +22,7 @@ const defaultUsuarios: UsuarioSistema[] = [
     senha: "456",
     email: "debora@domcostelo.com",
     role: "operador",
-    permissoes: ["estoque", "entrada", "producao", "dashboard", "lista-compras"],
+    permissoes: ["estoque", "entrada", "dashboard", "lista-compras"],
     status: "aprovado",
   },
   {
@@ -30,7 +30,7 @@ const defaultUsuarios: UsuarioSistema[] = [
     senha: "789",
     email: "marcos@domcostelo.com",
     role: "operador",
-    permissoes: ["estoque", "entrada", "producao", "dashboard", "lista-compras"],
+    permissoes: ["estoque", "entrada", "dashboard", "lista-compras"],
     status: "aprovado",
   },
 ]
