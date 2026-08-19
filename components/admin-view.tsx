@@ -60,6 +60,12 @@ interface AdminViewProps {
   onPasswordChange: () => void
 }
 
+const permissoesPorPerfil: Record<Exclude<UserRole, "owner">, TabPermissao[]> = {
+  admin: ["estoque", "entrada", "saida", "inventario", "financeiro", "dashboard", "lista-compras", "cmv", "admin"],
+  operador: ["estoque", "entrada", "saida", "inventario", "lista-compras"],
+  analista: ["estoque", "dashboard", "financeiro", "lista-compras", "cmv"],
+}
+
 const allPermissoes: { id: TabPermissao; label: string }[] = [
   { id: "estoque", label: "Estoque" },
   { id: "entrada", label: "Entrada" },
@@ -131,7 +137,7 @@ export function AdminView({ currentUser, onPasswordChange }: AdminViewProps) {
       login: formData.email.split("@")[0],
       nome: formData.nome.trim(),
       email: formData.email.trim().toLowerCase(),
-      role: formData.role === "owner" ? "operador" : formData.role,
+      role: formData.role,
       permissoes: formData.permissoes,
       status: "aprovado",
       dataCriacao: new Date().toLocaleString("pt-BR"),
@@ -448,15 +454,17 @@ export function AdminView({ currentUser, onPasswordChange }: AdminViewProps) {
                       <Select
                         value={formData.role}
                         onValueChange={(value: UserRole) =>
-                          setFormData({ ...formData, role: value })
+                          setFormData({ ...formData, role: value, permissoes: value === "owner" ? [] : permissoesPorPerfil[value] })
                         }
                       >
                         <SelectTrigger id="add-role">
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="admin">Administrador</SelectItem>
-                          <SelectItem value="operador">Operador</SelectItem>
+<SelectItem value="admin">Administrador</SelectItem>
+                      <SelectItem value="operador">Operador</SelectItem>
+                      <SelectItem value="analista">Analista</SelectItem>
+                          <SelectItem value="analista">Analista</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
@@ -525,6 +533,10 @@ export function AdminView({ currentUser, onPasswordChange }: AdminViewProps) {
                       <TableCell>
                         {user.role === "admin" ? (
                           <Badge className="bg-primary">Administrador</Badge>
+                        ) : user.role === "analista" ? (
+                          <Badge variant="outline">Analista</Badge>
+                        ) : user.role === "owner" ? (
+                          <Badge className="bg-primary">Responsável principal</Badge>
                         ) : (
                           <Badge variant="secondary">Operador</Badge>
                         )}
@@ -700,6 +712,10 @@ export function AdminView({ currentUser, onPasswordChange }: AdminViewProps) {
                   <span className="text-muted-foreground">Perfil:</span>
                   {usuarios.find((u) => u.login === currentUser)?.role === "admin" ? (
                     <Badge className="bg-primary">Administrador</Badge>
+                  ) : usuarios.find((u) => u.login === currentUser)?.role === "analista" ? (
+                    <Badge variant="outline">Analista</Badge>
+                  ) : usuarios.find((u) => u.login === currentUser)?.role === "owner" ? (
+                    <Badge className="bg-primary">Responsável principal</Badge>
                   ) : (
                     <Badge variant="secondary">Operador</Badge>
                   )}
@@ -751,12 +767,13 @@ export function AdminView({ currentUser, onPasswordChange }: AdminViewProps) {
                   setFormData({ ...formData, role: value })
                 }
               >
-                <SelectTrigger id="edit-role">
+                <SelectTrigger id="edit-role" disabled={selectedUser?.role === "owner"}>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="admin">Administrador</SelectItem>
                   <SelectItem value="operador">Operador</SelectItem>
+                  <SelectItem value="analista">Analista</SelectItem>
                 </SelectContent>
               </Select>
             </div>

@@ -208,7 +208,7 @@ export interface HistoricoEntry {
   data: string
 }
 
-export type UserRole = "owner" | "admin" | "operador"
+export type UserRole = "owner" | "admin" | "operador" | "analista"
 
 export type TabPermissao = "estoque" | "entrada" | "saida" | "inventario" | "financeiro" | "dashboard" | "lista-compras" | "cmv" | "admin"
 
