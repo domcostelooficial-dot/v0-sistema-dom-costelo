@@ -21,6 +21,10 @@ describe("movimentações de estoque", () => {
     expect(estorno.movimentacaoOrigemId).toBe(origem.id)
     expect(estorno.movimentacaoOriginalId).toBe(origem.id)
     expect(estorno.quantidade).toBe(-2)
+    expect(estorno.dataMovimentacao).toBe("2026-01-02T10:00:00.000Z")
+    expect(estorno.criadoEm).toBe("2026-01-02T10:00:00.000Z")
+    expect(estorno.criadoPorUid).toBe("u2")
+    expect(origem.dataMovimentacao).toBe("2026-01-01T10:00:00.000Z")
     expect(origem.status).toBe("efetivada")
   })
 
