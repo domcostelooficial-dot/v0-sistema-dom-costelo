@@ -49,6 +49,7 @@ import {
   PlusCircle,
   Plus,
   Minus,
+  Pencil,
   Trash2,
 } from "lucide-react"
 import dynamic from "next/dynamic"
@@ -176,6 +177,14 @@ export function EstoqueView({ itens, onUpdateItem, onAddItem, onEditItem, onDele
     
     if (!formData.nome.trim()) {
       toast.error("Digite um nome para o item")
+      return
+    }
+    if (formData.min < 0 || formData.atual < 0 || formData.quantidadePorEmbalagem < 0) {
+      toast.error("Os valores numéricos não podem ser negativos")
+      return
+    }
+    if (itens.some((item) => item.nome.toLowerCase() === formData.nome.trim().toLowerCase() && item.nome !== selectedItem.nome)) {
+      toast.error("Já existe um item com este nome")
       return
     }
 
@@ -470,6 +479,7 @@ export function EstoqueView({ itens, onUpdateItem, onAddItem, onEditItem, onDele
                       <div className="flex items-center justify-center gap-1">
                         <Button variant="outline" size="icon" className="size-8" aria-label={`Diminuir ${item.nome}`} onClick={() => onUpdateItem(item.nome, Math.max(0, item.atual - 1))}><Minus /></Button>
                         <Button variant="outline" size="icon" className="size-8" aria-label={`Adicionar ${item.nome}`} onClick={() => onUpdateItem(item.nome, item.atual + 1)}><Plus /></Button>
+                        <Button variant="outline" size="icon" className="size-8" aria-label={`Editar ${item.nome}`} onClick={() => openEditDialog(item)}><Pencil className="h-3 w-3" /></Button>
                         {isAdmin && (
                           <Button
                             variant="outline"
