@@ -45,6 +45,17 @@ export async function createUsuarioProfile(
   }
 }
 
+export async function getUsuarioProfileByEmail(email: string) {
+  try {
+    const snapshot = await getDocs(collection(db, USUARIOS_COLLECTION))
+    const normalized = email.trim().toLowerCase()
+    const match = snapshot.docs.find((item) => String(item.data().email || "").trim().toLowerCase() === normalized)
+    return match ? { data: { login: match.id, ...match.data() } as UsuarioSistema, error: null } : { data: null, error: "Usuário não encontrado" }
+  } catch (error: any) {
+    return { data: null, error: error.message }
+  }
+}
+
 export async function getUsuarioProfile(userId: string) {
   try {
     const docRef = doc(db, USUARIOS_COLLECTION, userId)
