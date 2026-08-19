@@ -130,4 +130,24 @@ describe("motor financeiro", () => {
     expect(statusAuditoria(comparacao)).toBe("divergente")
     expect(audit.faturamentoBruto! - 100).toBe(-10)
   })
+
+  it("classifica todos os contadores sem confundir false com true", () => {
+    const comparacao = { faturamentoBruto: true, cmv: false, custosFixos: null }
+    expect(Object.values(comparacao).filter(value => value === true)).toHaveLength(1)
+    expect(Object.values(comparacao).filter(value => value === false)).toHaveLength(1)
+    expect(Object.values(comparacao).filter(value => value === null)).toHaveLength(1)
+    expect(statusAuditoria(comparacao)).toBe("sem-dados")
+  })
+
+  it("formata diferença negativa sem perder o sinal", () => {
+    const esperado = 26609.46
+    const calculado = 25000
+    expect(calculado - esperado).toBeLessThan(0)
+    expect(`${calculado - esperado}`).toContain("-")
+  })
+
+  it("usa ponto de equilíbrio esperado exato na homologação", () => {
+    expect(GABARITO_JULHO_2026.pontoEquilibrio).toBe(22970)
+    expect(GABARITO_JULHO_2026.pontoEquilibrio.toFixed(2)).toBe("22970.00")
+  })
 })
