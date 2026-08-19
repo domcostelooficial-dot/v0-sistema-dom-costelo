@@ -331,7 +331,15 @@ export async function migrarCustosMestresDomCosteloV1(master: Insumo[]) {
 export async function migrarFichasTecnicasV2(seed: FichaTecnica[], insumos: Insumo[], aliases: Record<string, string[]> = {}) {
   const settingsRef = doc(db, "settings", "system")
   const settingsSnap = await getDoc(settingsRef)
-  if (settingsSnap.data()?.fichasTecnicasDomCosteloV2Aplicada === true) return { applied: false, skipped: true, data: await getFichasTecnicas(), errors: [] as string[] }
+  if (settingsSnap.data()?.fichasTecnicasDomCosteloV2Aplicada === true) {
+    const existing = await getFichasTecnicas()
+    const migrated = existing.map((ficha) => {
+      const seedFicha = seed.find((item) => item.id === ficha.id || normalizarNomeInsumo(item.nome) === normalizarNomeInsumo(ficha.nome))
+      return ficha.precoVenda > 0 || !seedFicha ? ficha : { ...ficha, precoVenda: seedFicha.precoVenda }
+    })
+    if (migrated.some((ficha, index) => ficha.precoVenda !== existing[index]?.precoVenda)) await saveFichasTecnicas(migrated)
+    return { applied: false, skipped: true, data: migrated, errors: [] as string[] }
+  }
   const existing = await getFichasTecnicas()
   const errors: string[] = []
   const desired = seed.map((ficha) => ({ ...ficha, ingredientes: ficha.ingredientes.map((ingrediente) => ({ ...ingrediente, insumoId: ingrediente.insumoId, insumoNome: ingrediente.insumoNome })) }))
@@ -340,7 +348,7 @@ export async function migrarFichasTecnicasV2(seed: FichaTecnica[], insumos: Insu
     const resultado = resolverIngredientesFicha(ficha, insumos.map((item) => ({ ...item, aliases: [...(item.aliases ?? []), ...(aliases[item.id ?? ""] ?? []), ...(aliases[item.nome] ?? [])] })))
     if (!resultado.ok) { errors.push(`${resultado.codigo}:${resultado.ficha}:${resultado.ingrediente}`); continue }
     const atual = existing.find((item) => item.id === ficha.id) ?? existing.find((item) => normalizarNomeInsumo(item.nome) === normalizarNomeInsumo(ficha.nome))
-    resolved.push({ ...resultado.ficha, precoVenda: atual?.precoVenda ?? ficha.precoVenda, id: atual?.id ?? ficha.id })
+    resolved.push({ ...resultado.ficha, precoVenda: atual?.precoVenda && atual.precoVenda > 0 ? atual.precoVenda : ficha.precoVenda, id: atual?.id ?? ficha.id })
   }
   if (errors.length > 0) return { applied: false, skipped: false, data: existing, errors }
   const porId = new Map(existing.map((item) => [item.id, item]))
