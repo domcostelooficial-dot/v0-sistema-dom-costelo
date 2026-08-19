@@ -128,11 +128,6 @@ export interface HistoricoEntry {
   data: string
 }
 
-export interface Usuario {
-  user: string
-  pass: string
-}
-
 export type UserRole = "owner" | "admin" | "operador"
 
 export type TabPermissao = "estoque" | "entrada" | "financeiro" | "dashboard" | "lista-compras" | "cmv" | "admin"
@@ -142,7 +137,6 @@ export type UserStatus = "pendente" | "aprovado" | "rejeitado"
 export interface UsuarioSistema {
   uid?: string
   login: string
-  senha?: string
   nome?: string
   email?: string
   role: UserRole
