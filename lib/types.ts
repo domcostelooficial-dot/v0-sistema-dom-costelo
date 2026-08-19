@@ -210,7 +210,7 @@ export interface HistoricoEntry {
 
 export type UserRole = "owner" | "admin" | "operador"
 
-export type TabPermissao = "estoque" | "entrada" | "financeiro" | "dashboard" | "lista-compras" | "cmv" | "admin"
+export type TabPermissao = "estoque" | "entrada" | "saida" | "inventario" | "financeiro" | "dashboard" | "lista-compras" | "cmv" | "admin"
 
 export type UserStatus = "pendente" | "aprovado" | "rejeitado"
 

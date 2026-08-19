@@ -55,7 +55,7 @@ export function AppSidebar({
   // Filter menu items based on permissions
   const filteredMenuItems = menuItems.filter((item) => {
     if (item.id === "admin") {
-      return userRole === "admin"
+      return userRole === "admin" || userRole === "owner"
     }
     if (item.id === "cmv") {
       return true

@@ -418,7 +418,7 @@ export default function Home() {
   }
 
   const handleDeleteItem = (nome: string) => {
-    if (userRole !== "admin") return
+    if (userRole !== "owner" && userRole !== "admin") return
     const updated = itens.filter((item) => item.nome !== nome)
     setItens(updated)
     saveEstoqueHybrid(user, updated)
