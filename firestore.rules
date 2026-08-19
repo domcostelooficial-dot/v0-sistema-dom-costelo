@@ -65,7 +65,7 @@ service cloud.firestore {
     }
     match /movimentacoesEstoque/{movimentacaoId} {
       allow read: if isOperatorOrHigher();
-      allow create: if isOperatorOrHigher() && request.resource.data.tipo != 'ajuste_inventario';
+      allow create: if (request.resource.data.tipo == 'ajuste_inventario' && isAdminOrOwner()) || (request.resource.data.tipo != 'ajuste_inventario' && isOperatorOrHigher());
       allow update: if isAdminOrOwner();
       allow delete: if false;
     }
