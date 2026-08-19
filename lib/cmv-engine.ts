@@ -17,7 +17,9 @@ export function converterQuantidade(quantidade: number, origem: string, destino:
 export function custoIngrediente(ingrediente: IngredienteFicha, insumos: Insumo[]) {
   const insumo = insumos.find((item) => ingrediente.insumoId ? item.id === ingrediente.insumoId : item.nome.toLowerCase() === ingrediente.insumoNome.toLowerCase())
   if (!insumo) return 0
-  return converterQuantidade(ingrediente.quantidade, ingrediente.unidade, insumo.unidadeEmbalagem || insumo.unidade) * custoPorUnidade(insumo)
+  const unidadeEmbalagem = insumo.unidadeEmbalagem || insumo.unidade
+  const quantidadeNaEmbalagem = converterQuantidade(ingrediente.quantidade, ingrediente.unidade, unidadeEmbalagem) / Math.max(insumo.quantidadeEmbalagem || 1, 0.0001)
+  return quantidadeNaEmbalagem * insumo.precoCompra
 }
 
 export function calcularFicha(ficha: FichaTecnica, insumos: Insumo[]) {

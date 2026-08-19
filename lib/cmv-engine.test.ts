@@ -28,6 +28,13 @@ describe("CMV", () => {
     expect(result.markup).toBeCloseTo(10 / 2.075)
   })
 
+  it("mantém custos individuais sem calcular média", () => {
+    const a: Insumo = { ...mussarela, id: "a", nome: "A", unidade: "un", unidadeEmbalagem: "un", precoCompra: 2, quantidadeEmbalagem: 1 }
+    const b: Insumo = { ...mussarela, id: "b", nome: "B", unidade: "un", unidadeEmbalagem: "un", precoCompra: 6, quantidadeEmbalagem: 1 }
+    expect(custoIngrediente({ insumoNome: "A", quantidade: 1, unidade: "un" }, [a, b])).toBe(2)
+    expect(custoIngrediente({ insumoNome: "B", quantidade: 1, unidade: "un" }, [a, b])).toBe(6)
+  })
+
   it("não cria percentuais para preço ou CMV inválidos", () => {
     const semPreco = calcularFicha({ id: "sem-preco", nome: "Sem preço", precoVenda: 0, ingredientes: [] }, [])
     const semCusto = calcularFicha({ id: "sem-custo", nome: "Sem custo", precoVenda: 10, ingredientes: [] }, [])
@@ -35,5 +42,7 @@ describe("CMV", () => {
     expect(semPreco.markup).toBeNull()
     expect(semCusto.markup).toBeNull()
     expect(custoIngrediente({ insumoNome: "Inexistente", quantidade: 10, unidade: "g" }, [])).toBe(0)
+    expect(custoIngrediente({ insumoNome: "Mussarela", quantidade: 0, unidade: "g" }, [mussarela])).toBe(0)
+    expect(Number.isFinite(custoPorUnidade({ ...mussarela, quantidadeEmbalagem: 0 }))).toBe(true)
   })
 })

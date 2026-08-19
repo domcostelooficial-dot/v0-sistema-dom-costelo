@@ -267,6 +267,14 @@ export async function getInsumos() { return getComprasData<Insumo>("insumos") }
 export async function saveInsumos(data: Insumo[]) { return saveComprasData("insumos", data) }
 export async function getFichasTecnicas() { return getComprasData<FichaTecnica>("fichas-tecnicas") }
 export async function saveFichasTecnicas(data: FichaTecnica[]) { return saveComprasData("fichas-tecnicas", data) }
+
+export async function initializeFichasTecnicas(seed: FichaTecnica[], seedVersion = 1) {
+  const existing = await getFichasTecnicas()
+  if (existing.length > 0) return { data: existing, seeded: false }
+  await saveFichasTecnicas(seed)
+  await setDoc(doc(db, "settings", "system"), { seedVersion, updatedAt: Timestamp.now() }, { merge: true })
+  return { data: seed, seeded: true }
+}
 export async function getVendasProdutos() { return getComprasData<VendaProduto>("vendas") }
 export async function saveVendasProdutos(data: VendaProduto[]) { return saveComprasData("vendas", data) }
 export async function getComprasHistorico() { return getComprasData<CompraRegistro>("historico") }

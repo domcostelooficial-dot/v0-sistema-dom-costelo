@@ -23,6 +23,7 @@ import {
   getInsumos,
   saveInsumos,
   getFichasTecnicas,
+  initializeFichasTecnicas,
   saveFichasTecnicas,
   getComprasHistorico,
   saveComprasHistorico,
@@ -149,7 +150,8 @@ export default function Home() {
   const [receitas, setReceitas] = useState<Receita[]>([])
   const [insumos, setInsumos] = useState<Insumo[]>(defaultInsumos)
   const [comprasHistorico, setComprasHistorico] = useState<CompraRegistro[]>([])
-  const [fichasTecnicas, setFichasTecnicas] = useState(seedFichas)
+  const [fichasTecnicas, setFichasTecnicas] = useState<typeof seedFichas>([])
+  const [fichasLoading, setFichasLoading] = useState(true)
   const persistirFichas = (data: typeof seedFichas) => { setFichasTecnicas(data); saveFichasTecnicas(data).catch((err) => console.error("[v0] Erro ao salvar fichas:", err)) }
 
   const getComprasHybrid = async () => {
@@ -171,8 +173,6 @@ export default function Home() {
       const storedItens = await getEstoqueHybrid(null)
       const storedHistorico = await getHistoricoHybrid(null)
       const storedReceitas = await getReceitasHybrid(null)
-      await getComprasHybrid()
-
       setItens(storedItens)
       setHistorico(storedHistorico)
       setReceitas(storedReceitas)
@@ -227,6 +227,9 @@ export default function Home() {
       const itens = await getEstoqueHybrid(username)
       const historico = await getHistoricoHybrid(username)
       const receitas = await getReceitasHybrid(username)
+      const fichas = await initializeFichasTecnicas(seedFichas)
+      setFichasTecnicas(fichas.data)
+      setFichasLoading(false)
       await getComprasHybrid()
       
       setItens(itens)

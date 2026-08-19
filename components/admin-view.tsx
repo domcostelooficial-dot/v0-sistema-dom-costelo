@@ -52,8 +52,8 @@ import {
 } from "@/lib/firebase-db"
 import type { UsuarioSistema, UserRole, TabPermissao, UserStatus } from "@/lib/types"
 import { toast } from "sonner"
-import { updatePassword } from "firebase/auth"
 import { auth } from "@/lib/firebase"
+import { changePassword } from "@/lib/firebase-auth"
 
 interface AdminViewProps {
   currentUser: string
@@ -149,6 +149,11 @@ export function AdminView({ currentUser, onPasswordChange }: AdminViewProps) {
   const handleEditUser = async () => {
     if (!selectedUser) return
 
+    if (selectedUser.role === "owner" && formData.role !== "owner") {
+      toast.error("Não é possível alterar a função do Responsável Principal.")
+      return
+    }
+
     if (!formData.nome.trim() || !formData.email.trim()) {
       toast.error("Preencha nome e email")
       return
@@ -183,8 +188,8 @@ export function AdminView({ currentUser, onPasswordChange }: AdminViewProps) {
   const handleDeleteUser = async () => {
     if (!selectedUser) return
 
-    if (selectedUser.login === currentUser) {
-      toast.error("Você não pode remover seu próprio usuário!")
+    if (selectedUser.login === currentUser || selectedUser.role === "owner") {
+      toast.error(selectedUser.role === "owner" ? "Não é possível remover o último Responsável Principal." : "Você não pode remover seu próprio usuário!")
       return
     }
 
@@ -269,10 +274,9 @@ export function AdminView({ currentUser, onPasswordChange }: AdminViewProps) {
       toast.error("Sessão Firebase não encontrada")
       return
     }
-    try {
-      await updatePassword(auth.currentUser, novaSenha)
-    } catch {
-      toast.error("O Firebase exige uma sessão recente. Faça login novamente e tente outra vez.")
+    const result = await changePassword(auth.currentUser, senhaAtual, novaSenha)
+    if (result.error) {
+      toast.error(result.error)
       return
     }
     setPasswordForm({ senhaAtual: "", novaSenha: "", confirmarSenha: "" })
