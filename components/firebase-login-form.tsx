@@ -9,7 +9,7 @@ import { FieldGroup, Field, FieldLabel } from "@/components/ui/field"
 import { Lock, User, Mail } from "lucide-react"
 import { signInWithEmail, signUpWithEmail } from "@/lib/firebase-auth"
 import type { User as FirebaseUser } from "firebase/auth"
-import { createUsuarioProfile, getUsuarioProfile, getUsuarioProfileByEmail } from "@/lib/firebase-db"
+import { createUsuarioProfile, getUsuarioProfile } from "@/lib/firebase-db"
 import { signOut } from "firebase/auth"
 import { auth } from "@/lib/firebase"
 import type { UsuarioSistema } from "@/lib/types"
@@ -64,19 +64,6 @@ export function FirebaseLoginForm({ onLogin }: FirebaseLoginFormProps) {
         ])
 
       if (isSignUp) {
-        const existingProfile = await comTempoLimite(getUsuarioProfileByEmail(emailNormalizado), "O Firebase demorou para consultar a solicitação.")
-        if (existingProfile.data) {
-          if (existingProfile.data.status === "pendente") {
-            setError("Sua solicitação já foi enviada e aguarda aprovação do administrador.")
-          } else if (existingProfile.data.status === "aprovado") {
-            setError("Este email já está aprovado. Faça login para acessar o sistema.")
-          } else {
-            setError("Esta solicitação foi rejeitada. Entre em contato com o administrador para uma nova análise.")
-          }
-          setLoading(false)
-          return
-        }
-
         // Criar nova conta no Firebase
         const result = await comTempoLimite(signUpWithEmail(emailNormalizado, password), "O Firebase demorou para responder ao criar a conta.")
         user = result.user

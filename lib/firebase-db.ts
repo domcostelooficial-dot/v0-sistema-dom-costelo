@@ -45,17 +45,6 @@ export async function createUsuarioProfile(
   }
 }
 
-export async function getUsuarioProfileByEmail(email: string) {
-  try {
-    const snapshot = await getDocs(collection(db, USUARIOS_COLLECTION))
-    const normalized = email.trim().toLowerCase()
-    const match = snapshot.docs.find((item) => String(item.data().email || "").trim().toLowerCase() === normalized)
-    return match ? { data: { login: match.id, ...match.data() } as UsuarioSistema, error: null } : { data: null, error: "Usuário não encontrado" }
-  } catch (error: any) {
-    return { data: null, error: error.message }
-  }
-}
-
 export async function getUsuarioProfile(userId: string) {
   try {
     const docRef = doc(db, USUARIOS_COLLECTION, userId)
@@ -125,7 +114,7 @@ export async function saveUsuariosFirebase(usuarios: UsuarioSistema[]) {
 // Listener em tempo real para usuários
 export function subscribeToUsuarios(callback: (usuarios: UsuarioSistema[]) => void) {
   return onSnapshot(
-    collection(db, USUARIOS_COLLECTION), 
+    collection(db, USUARIOS_COLLECTION),
     (snapshot) => {
       const usuarios: UsuarioSistema[] = []
       snapshot.forEach((docSnap) => {
@@ -172,7 +161,7 @@ export async function getEstoque(userId: string) {
 // Listener em tempo real para estoque
 export function subscribeToEstoque(callback: (itens: Item[]) => void) {
   return onSnapshot(
-    doc(db, "estoque", "global"), 
+doc(db, "estoque", "global"),
     (docSnap) => {
       if (docSnap.exists()) {
         callback(docSnap.data().itens as Item[])
@@ -215,7 +204,7 @@ export async function getHistorico(userId: string) {
 // Listener em tempo real para histórico
 export function subscribeToHistorico(callback: (historico: HistoricoEntry[]) => void) {
   return onSnapshot(
-    doc(db, "historico", "global"), 
+doc(db, "historico", "global"),
     (docSnap) => {
       if (docSnap.exists()) {
         callback(docSnap.data().entries as HistoricoEntry[])
@@ -543,7 +532,7 @@ export async function estornarMovimentacaoAtomica(params: { movimentoId: string;
 
 export function subscribeToReceitas(callback: (receitas: Receita[]) => void) {
   return onSnapshot(
-    doc(db, "receitas", "global"), 
+doc(db, "receitas", "global"),
     (docSnap) => {
       if (docSnap.exists()) {
         callback(docSnap.data().receitas as Receita[])
