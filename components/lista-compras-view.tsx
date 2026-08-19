@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { ClipboardList, History, Package, Pencil, Plus, ShoppingCart, TrendingUp } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -10,10 +10,12 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import type { Item, Insumo, CompraRegistro, CategoriaInsumo, UnidadeInsumo } from "@/lib/types"
+import { catalogoCompletoCompras } from "@/lib/compras-engine"
 
 const dinheiro = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })
 const hoje = () => new Date().toISOString().slice(0, 10)
 const normalizar = (i: Insumo): Insumo => ({ ...i, precoReferencia: i.precoReferencia ?? i.precoCompra, unidadeReferencia: i.unidadeReferencia ?? i.unidade, custoUnitario: (i.precoReferencia ?? i.precoCompra) / Math.max(i.quantidadeEmbalagem, 1) })
+
 
 interface Props {
   itens: Item[]
@@ -26,8 +28,9 @@ interface Props {
 }
 
 export function ListaComprasView({ itens, insumos: initialInsumos = [], historico: initialHistorico = [], onSaveInsumos, onSaveHistorico, onUpdateEstoque }: Props) {
-  const [insumos, setInsumos] = useState(() => initialInsumos.map(normalizar))
+  const [insumos, setInsumos] = useState(() => catalogoCompletoCompras(itens, initialInsumos))
   const [historico, setHistorico] = useState(initialHistorico)
+  useEffect(() => { setInsumos(catalogoCompletoCompras(itens, initialInsumos)) }, [itens, initialInsumos])
   const [tab, setTab] = useState("lista")
   const [categoria, setCategoria] = useState<string>("todas")
   const [fornecedor, setFornecedor] = useState("")
