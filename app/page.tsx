@@ -60,7 +60,7 @@ import { DashboardView } from "@/components/dashboard-view"
 import { ListaComprasView } from "@/components/lista-compras-view"
 import { AdminView } from "@/components/admin-view"
 import { CmvView } from "@/components/cmv-view"
-import { seedFichas, calcularConsumoVenda } from "@/lib/cmv-engine"
+import { seedFichas, calcularConsumoVenda, migrarFichasParaCarneKg } from "@/lib/cmv-engine"
 import { Menu, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { signOut } from "firebase/auth"
@@ -185,9 +185,11 @@ export default function Home() {
   const getComprasHybrid = async () => {
     try {
   const [insumosResult, historicoResult, fichasResult, movimentacoesResult] = await Promise.all([getInsumos(), getComprasHistorico(), getFichasTecnicas(), getMovimentacoesEstoque()])
-  if (insumosResult.length > 0) setInsumos(insumosResult)
+  const carneOficial = defaultInsumos.find((item) => item.id === "carne-hamburguer-kg")!
+  const insumosOperacionais = insumosResult.length > 0 ? (insumosResult.some((item) => item.id === carneOficial.id || item.nome === carneOficial.nome) ? insumosResult : [...insumosResult, carneOficial]) : defaultInsumos
+  if (insumosResult.length > 0) { setInsumos(insumosOperacionais); if (insumosOperacionais.length !== insumosResult.length && (userRole === "owner" || userRole === "admin")) saveInsumos(insumosOperacionais).catch((err) => console.error("[v0] Erro ao adicionar carne oficial:", err)) }
   if (historicoResult.length > 0) setComprasHistorico(historicoResult)
-  if (fichasResult.length > 0) setFichasTecnicas(fichasResult)
+  if (fichasResult.length > 0) { const migradas = migrarFichasParaCarneKg(fichasResult, insumosOperacionais); setFichasTecnicas(migradas); if (JSON.stringify(migradas) !== JSON.stringify(fichasResult) && (userRole === "owner" || userRole === "admin")) saveFichasTecnicas(migradas).catch((err) => console.error("[v0] Erro ao migrar fichas:", err)) }
   if (movimentacoesResult.length > 0) setMovimentacoes(movimentacoesResult)
     } catch (err) {
       console.error("[v0] Erro ao carregar dados financeiros do estoque:", err)

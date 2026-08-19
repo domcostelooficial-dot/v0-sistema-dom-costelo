@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { Calculator, Copy, Pencil, Plus, Save, Search, Trash2, TrendingDown, TrendingUp, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -31,6 +31,15 @@ export function CmvView({ insumos, fichas, userRole, onSaveInsumos, onSaveFichas
   const [draftInsumo, setDraftInsumo] = useState<Insumo | null>(null)
   const [draftInsumoMode, setDraftInsumoMode] = useState<"create" | "edit">("edit")
   const canManageInsumos = userRole === "owner" || userRole === "admin"
+  useEffect(() => {
+    if (!draftFicha || !insumos.length) return
+    const resolvidos = draftFicha.ingredientes.map((item) => {
+      const nome = item.insumoNome.trim().toLocaleLowerCase("pt-BR")
+      const encontrado = insumos.find((insumo) => insumo.id === item.insumoId || insumo.nome.toLocaleLowerCase("pt-BR") === nome || insumo.aliases?.some((alias) => alias.toLocaleLowerCase("pt-BR") === nome))
+      return encontrado && (item.insumoId !== encontrado.id || item.insumoNome !== encontrado.nome) ? { ...item, insumoId: encontrado.id, insumoNome: encontrado.nome } : item
+    })
+    if (JSON.stringify(resolvidos) !== JSON.stringify(draftFicha.ingredientes)) setDraftFicha({ ...draftFicha, ingredientes: resolvidos })
+  }, [draftFicha, insumos])
   const termoBusca = search.trim().toLocaleLowerCase("pt-BR")
   const filtered = insumos.filter((item) => showInactive || item.ativo !== false).filter((item) => !termoBusca || [item.nome, item.categoria, ...(item.aliases ?? [])].some((valor) => valor.toLocaleLowerCase("pt-BR").includes(termoBusca)))
   const selectedFicha = fichas.find((item) => item.id === selected)

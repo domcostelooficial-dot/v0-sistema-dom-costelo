@@ -13,6 +13,17 @@ const mussarela: Insumo = {
 }
 
 describe("CMV", () => {
+  it("calcula Carne de hambúrguer a R$37/kg com 180g por R$6,66", () => {
+    const carne: Insumo = { ...mussarela, id: "carne-hamburguer-kg", nome: "Carne de hambúrguer", unidade: "kg", unidadeCompra: "kg", unidadeEmbalagem: "kg", unidadeConteudo: "kg", precoCompra: 37, quantidadeEmbalagem: 1 }
+    expect(custoIngrediente({ insumoId: carne.id, insumoNome: carne.nome, quantidade: 180, unidade: "g" }, [carne])).toBeCloseTo(6.66)
+    expect(custoIngrediente({ insumoId: carne.id, insumoNome: carne.nome, quantidade: 160, unidade: "g" }, [carne])).toBeCloseTo(5.92)
+  })
+
+  it("recalcula a carne quando o preço por kg muda para R$40", () => {
+    const carne: Insumo = { ...mussarela, id: "carne-hamburguer-kg", nome: "Carne de hambúrguer", unidade: "kg", unidadeCompra: "kg", unidadeEmbalagem: "kg", unidadeConteudo: "kg", precoCompra: 40, quantidadeEmbalagem: 1 }
+    expect(custoIngrediente({ insumoId: carne.id, insumoNome: carne.nome, quantidade: 180, unidade: "g" }, [carne])).toBeCloseTo(7.2)
+  })
+
   it("calcula custo por grama e ingrediente sem dividir pela quantidade de ingredientes", () => {
     expect(custoPorUnidade(mussarela)).toBe(0.043)
     expect(custoIngrediente({ insumoNome: "Mussarela", quantidade: 25, unidade: "g" }, [mussarela])).toBeCloseTo(1.075)
@@ -39,7 +50,7 @@ describe("CMV", () => {
     const ficha: FichaTecnica = { id: "hamb", nome: "Hambúrguer", precoVenda: 20, ingredientes: [{ insumoId: "mussarela", insumoNome: "Mussarela", quantidade: 25, unidade: "g" }] }
     const result = calcularConsumoVenda({ id: "v1", produtoNome: "Hambúrguer", quantidade: 4, fichaTecnicaId: "hamb" }, ficha, [mussarela], [{ id: "mussarela", insumoId: "mussarela", nome: "Mussarela", atual: 3, min: 0, categoria: "Queijos", unidadeEstoque: "kg" }])
     expect(result.ok).toBe(true)
-    if (result.ok) expect(result.consumos[0].quantidadeBase).toBeCloseTo(0.1)
+    if (result.ok) { expect(result.consumos[0].quantidadeBase).toBeCloseTo(0.1); const tres = calcularConsumoVenda({ id: "v2", produtoNome: "Hambúrguer", quantidade: 3, fichaTecnicaId: "hamb" }, ficha, [mussarela], [{ id: "mussarela", insumoId: "mussarela", nome: "Mussarela", atual: 3, min: 0, categoria: "Queijos", unidadeEstoque: "kg" }]); expect(tres.ok && tres.consumos[0].quantidadeBase).toBeCloseTo(0.075) }
   })
 
   it("bloqueia ficha ausente ou insumo não vinculado", () => {
