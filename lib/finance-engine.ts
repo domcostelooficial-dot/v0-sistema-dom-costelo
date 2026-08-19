@@ -28,6 +28,11 @@ export interface VendaFinanceira {
   taxaCanalPercentual: number; taxaCanalValor: number; taxaPercentualNaVenda: number; taxaFixaNaVenda: number
   taxaValorNaVenda: number; taxaTotalValor: number; receitaLiquida: number; cmvUnitarioNaVenda: number
   cmvTotalNaVenda: number; margemContribuicao: number; createdAt: string; createdBy?: string
+  fichaTecnicaId?: string
+  statusBaixa?: "pendente" | "baixada" | "bloqueada" | "cancelada"
+  baixaId?: string
+  motivoBloqueio?: string
+  estoqueStatus?: "pendente" | "baixada" | "bloqueada" | "cancelada"
   /** Aliases somente para leitura de registros antigos. */
   precoUnitario?: number; faturamentoBruto?: number; taxaPercentual?: number; valorTaxa?: number; cmvUnitario?: number; cmvTotal?: number; faturamentoLiquido?: number; canal?: CanalVenda
 }

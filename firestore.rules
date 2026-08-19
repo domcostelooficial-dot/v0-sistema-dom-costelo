@@ -65,7 +65,7 @@ service cloud.firestore {
     }
     match /movimentacoesEstoque/{movimentacaoId} {
       allow read: if isOperatorOrHigher();
-      allow create: if isOperatorOrHigher();
+      allow create: if (request.resource.data.tipo == 'ajuste_inventario' && isAdminOrOwner()) || (request.resource.data.tipo == 'saida_venda' && isOperatorOrHigher()) || (request.resource.data.tipo != 'ajuste_inventario' && request.resource.data.tipo != 'saida_venda' && isOperatorOrHigher());
       allow update: if isAdminOrOwner();
       allow delete: if false;
     }
@@ -78,6 +78,17 @@ service cloud.firestore {
       allow read: if isOperatorOrHigher();
       allow create, update: if isAdminOrOwner();
       allow delete: if isOwner();
+    }
+    match /baixasVendas/{baixaId} {
+      allow read: if isOperatorOrHigher();
+      allow create: if isOperatorOrHigher();
+      allow update: if isAdminOrOwner();
+      allow delete: if false;
+    }
+    match /compras/vendas {
+      allow read: if isOperatorOrHigher();
+      allow create, update: if isAdminOrOwner();
+      allow delete: if false;
     }
     match /compras/{docId} {
       allow read: if isOperatorOrHigher();

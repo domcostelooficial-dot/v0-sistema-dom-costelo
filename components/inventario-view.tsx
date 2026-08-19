@@ -1,0 +1,31 @@
+"use client"
+
+import { useMemo, useState } from "react"
+import type { Item, MovimentacaoEstoque } from "@/lib/types"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Input } from "@/components/ui/input"
+import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
+import { Label } from "@/components/ui/label"
+import { Textarea } from "@/components/ui/textarea"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog"
+
+type MotivoInventario = "contagem_fisica" | "correcao_cadastro" | "perda_nao_registrada" | "entrada_nao_registrada" | "erro_operacional" | "outro"
+
+export function InventarioView({ itens, userRole, onAplicar }: { itens: Item[]; userRole: string; onAplicar: (item: Item, base: number, contado: number, motivo: MotivoInventario, observacao?: string) => Promise<void> }) {
+  const [contagens, setContagens] = useState<Record<string, string>>({})
+  const [selecionado, setSelecionado] = useState<{ item: Item; base: number; contado: number; diferenca: number } | null>(null)
+  const [motivo, setMotivo] = useState<MotivoInventario | "">("")
+  const [observacao, setObservacao] = useState("")
+  const [busca, setBusca] = useState("")
+  const [submitting, setSubmitting] = useState(false)
+  const podeAplicar = userRole === "owner" || userRole === "admin"
+  const lista = useMemo(() => itens.filter((item) => item.ativo !== false && item.naoVinculado !== true && item.nome.toLowerCase().includes(busca.toLowerCase())), [itens, busca])
+  const confirmar = async () => {
+    if (!selecionado || !motivo || (motivo === "outro" && !observacao.trim()) || submitting) return
+    setSubmitting(true)
+    try { await onAplicar(selecionado.item, selecionado.base, selecionado.contado, motivo, observacao.trim() || undefined); setSelecionado(null); setMotivo(""); setObservacao(""); setContagens((current) => ({ ...current, [selecionado.item.nome]: "" })) } finally { setSubmitting(false) }
+  }
+  return <Card><CardHeader><CardTitle>Inventário</CardTitle><div className="flex flex-col gap-2"><Label htmlFor="inventario-busca">Buscar produto</Label><Input id="inventario-busca" value={busca} onChange={(event) => setBusca(event.target.value)} placeholder="Produto" /></div></CardHeader><CardContent><div className="overflow-x-auto"><table className="w-full text-sm"><thead><tr className="border-b text-left"><th className="p-3">Produto</th><th className="p-3">Categoria</th><th className="p-3">Unidade</th><th className="p-3">Estoque no sistema</th><th className="p-3">Estoque contado</th><th className="p-3">Diferença</th><th className="p-3">Situação</th><th className="p-3">Ação</th></tr></thead><tbody>{lista.map((item) => { const raw = contagens[item.nome] ?? ""; const contado = raw === "" ? null : Number(raw); const diferenca = contado === null || !Number.isFinite(contado) ? null : contado - item.atual; const situacao = diferenca === null ? "Pendente" : diferenca === 0 ? "OK" : diferenca < 0 ? "FALTA" : "SOBRA"; return <tr key={item.nome} className="border-b"><td className="p-3 font-medium">{item.nome}</td><td className="p-3">{item.categoria}</td><td className="p-3">{item.unidadeEstoque ?? item.unidade ?? "—"}</td><td className="p-3">{item.atual}</td><td className="p-3"><Input className="w-28" type="number" min="0" step="any" value={raw} onChange={(event) => setContagens((current) => ({ ...current, [item.nome]: event.target.value }))} aria-label={`Estoque contado de ${item.nome}`} /></td><td className="p-3">{diferenca === null ? "—" : diferenca > 0 ? `+${diferenca}` : diferenca}</td><td className="p-3"><Badge variant={situacao === "OK" ? "secondary" : situacao === "FALTA" ? "destructive" : "outline"}>{situacao}</Badge></td><td className="p-3">{diferenca !== null && diferenca !== 0 && contado !== null && <Button size="sm" disabled={!podeAplicar} onClick={() => setSelecionado({ item, base: item.atual, contado, diferenca })}>Aplicar ajuste</Button>}</td></tr> })}</tbody></table></div>{!podeAplicar && <p className="mt-4 text-sm text-muted-foreground">Você pode consultar o inventário, mas somente owner/admin podem aplicar ajustes.</p>}<AlertDialog open={Boolean(selecionado)} onOpenChange={(open) => !submitting && !open && setSelecionado(null)}><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Confirmar ajuste de inventário?</AlertDialogTitle><AlertDialogDescription>{selecionado && <span className="flex flex-col gap-1"><span>Produto: {selecionado.item.nome}</span><span>Estoque no sistema: {selecionado.base} {selecionado.item.unidadeEstoque}</span><span>Estoque contado: {selecionado.contado} {selecionado.item.unidadeEstoque}</span><span>Diferença: {selecionado.diferenca > 0 ? "+" : ""}{selecionado.diferenca}</span></span>}</AlertDialogDescription></AlertDialogHeader><div className="flex flex-col gap-3"><Label>Motivo</Label><Select value={motivo} onValueChange={(value) => setMotivo(value as MotivoInventario)}><SelectTrigger><SelectValue placeholder="Selecione o motivo" /></SelectTrigger><SelectContent><SelectItem value="contagem_fisica">Contagem física</SelectItem><SelectItem value="correcao_cadastro">Correção de cadastro</SelectItem><SelectItem value="perda_nao_registrada">Perda não registrada</SelectItem><SelectItem value="entrada_nao_registrada">Entrada não registrada</SelectItem><SelectItem value="erro_operacional">Erro operacional</SelectItem><SelectItem value="outro">Outro</SelectItem></SelectContent></Select><Label htmlFor="inventario-observacao">Observação {motivo === "outro" ? "(obrigatória)" : "(opcional)"}</Label><Textarea id="inventario-observacao" value={observacao} onChange={(event) => setObservacao(event.target.value)} /></div><AlertDialogFooter><AlertDialogCancel disabled={submitting}>Cancelar</AlertDialogCancel><AlertDialogAction disabled={!motivo || (motivo === "outro" && !observacao.trim()) || submitting} onClick={async (event) => { event.preventDefault(); await confirmar() }}>{submitting ? "Aplicando..." : "Confirmar ajuste"}</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog></CardContent></Card>
+}
