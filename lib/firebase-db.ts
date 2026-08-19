@@ -17,6 +17,7 @@ import {
 import { db } from "./firebase"
 import type { Item, HistoricoEntry, Receita, UsuarioSistema, Insumo, FichaTecnica, VendaProduto, CompraRegistro, FinanceConfig, VendaFinanceira, DespesaFinanceira, MovimentacaoEstoque } from "./types"
 import type { FinanceAuditSnapshot } from "./finance-engine"
+import { resolverIngredientesFicha, normalizarNomeInsumo } from "./cmv-engine"
 
 // Collections - dados globais compartilhados
 const USUARIOS_COLLECTION = "usuarios"
@@ -285,6 +286,29 @@ export async function initializeFichasTecnicas(seed: FichaTecnica[], seedVersion
   await saveFichasTecnicas(seed)
   await setDoc(doc(db, "settings", "system"), { seedVersion, updatedAt: Timestamp.now() }, { merge: true })
   return { data: seed, seeded: true }
+}
+
+export async function migrarFichasTecnicasV2(seed: FichaTecnica[], insumos: Insumo[], aliases: Record<string, string[]> = {}) {
+  const settingsRef = doc(db, "settings", "system")
+  const settingsSnap = await getDoc(settingsRef)
+  if (settingsSnap.data()?.fichasTecnicasDomCosteloV2Aplicada === true) return { applied: false, skipped: true, data: await getFichasTecnicas(), errors: [] as string[] }
+  const existing = await getFichasTecnicas()
+  const errors: string[] = []
+  const desired = seed.map((ficha) => ({ ...ficha, ingredientes: ficha.ingredientes.map((ingrediente) => ({ ...ingrediente, insumoId: ingrediente.insumoId, insumoNome: ingrediente.insumoNome })) }))
+  const resolved: FichaTecnica[] = []
+  for (const ficha of desired) {
+    const resultado = resolverIngredientesFicha(ficha, insumos.map((item) => ({ ...item, aliases: [...(item.aliases ?? []), ...(aliases[item.id ?? ""] ?? []), ...(aliases[item.nome] ?? [])] })))
+    if (!resultado.ok) { errors.push(`${resultado.codigo}:${resultado.ficha}:${resultado.ingrediente}`); continue }
+    const atual = existing.find((item) => item.id === ficha.id) ?? existing.find((item) => normalizarNomeInsumo(item.nome) === normalizarNomeInsumo(ficha.nome))
+    resolved.push({ ...resultado.ficha, precoVenda: atual?.precoVenda ?? ficha.precoVenda, id: atual?.id ?? ficha.id })
+  }
+  if (errors.length > 0) return { applied: false, skipped: false, data: existing, errors }
+  const porId = new Map(existing.map((item) => [item.id, item]))
+  for (const ficha of resolved) porId.set(ficha.id, ficha)
+  const data = [...porId.values()]
+  await saveFichasTecnicas(data)
+  await setDoc(settingsRef, { fichasTecnicasDomCosteloV2Aplicada: true, fichasTecnicasDomCosteloV2AplicadaEm: Timestamp.now(), fichasTecnicasDomCosteloV2Count: resolved.length }, { merge: true })
+  return { applied: true, skipped: false, data, errors: [] as string[] }
 }
 export async function getVendasProdutos() { return getComprasData<VendaProduto>("vendas") }
 export async function saveVendasProdutos(data: VendaProduto[]) { return saveComprasData("vendas", data) }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { calcularFicha, calcularConsumoVenda, converterQuantidadeFichaParaEstoque, custoIngrediente, custoPorUnidade } from "./cmv-engine"
+import { calcularFicha, calcularConsumoVenda, converterQuantidadeFichaParaEstoque, custoIngrediente, custoPorUnidade, resolverIngredientesFicha } from "./cmv-engine"
 import type { FichaTecnica, Insumo } from "./types"
 
 const mussarela: Insumo = {
@@ -13,6 +13,12 @@ const mussarela: Insumo = {
 }
 
 describe("CMV", () => {
+  it("resolve ingrediente por ID, nome e alias exato", () => {
+    const insumos = [{ ...mussarela, aliases: ["Queijo mussarela"] }]
+    expect(resolverIngredientesFicha({ id: "f", nome: "Ficha", precoVenda: 0, ingredientes: [{ insumoNome: "Queijo mussarela", quantidade: 1, unidade: "g" }] }, insumos).ok).toBe(true)
+    expect(resolverIngredientesFicha({ id: "f", nome: "Ficha", precoVenda: 0, ingredientes: [{ insumoNome: "Farofa de bacon", quantidade: 1, unidade: "g" }] }, insumos).ok).toBe(false)
+  })
+
   it("calcula Carne de hambúrguer a R$37/kg com 180g por R$6,66", () => {
     const carne: Insumo = { ...mussarela, id: "carne-hamburguer-kg", nome: "Carne de hambúrguer", unidade: "kg", unidadeCompra: "kg", unidadeEmbalagem: "kg", unidadeConteudo: "kg", precoCompra: 37, quantidadeEmbalagem: 1 }
     expect(custoIngrediente({ insumoId: carne.id, insumoNome: carne.nome, quantidade: 180, unidade: "g" }, [carne])).toBeCloseTo(6.66)

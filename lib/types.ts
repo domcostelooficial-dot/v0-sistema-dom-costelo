@@ -236,12 +236,16 @@ export type { CanalVenda, FinanceConfig, VendaFinanceira, DespesaFinanceira } fr
 
 const defaultInsumoRows: Array<[string, UnidadeInsumo, number, number, UnidadeInsumo, CategoriaInsumo]> = [
   ["Pão brioche 4CT", "un", 2.07, 1, "un", "Pães"], ["Pão Australiano Aussie", "un", 2.53, 1, "un", "Pães"], ["Carne de hambúrguer", "kg", 37, 1, "kg", "Carnes"],
-  ["Cheddar Polenghi profissional", "pacote", 60, 1.5, "kg", "Queijos"], ["Cream cheese", "pacote", 60, 1.5, "kg", "Queijos"], ["Bacon em cubos", "kg", 32, 1, "kg", "Carnes"], ["Bacon fatiado", "kg", 32, 1, "kg", "Carnes"], ["Barbecue", "kg", 40, 3.5, "kg", "Molhos"], ["Costela Desfiada", "kg", 80, 1, "kg", "Carnes"], ["Mussarela", "kg", 43, 1, "kg", "Queijos"], ["Batata frita", "pacote", 20, 2, "kg", "Batatas/congelados"], ["Anel de cebola", "kg", 22, 1, "kg", "Batatas/congelados"], ["Farofa", "kg", 55, 1, "kg", "Mercearia"], ["Cebolinha", "maço", 3, 100, "g", "Mercearia"], ["Embalagem H7", "un", 50, 100, "un", "Embalagens"], ["Saco Kraft", "un", 70, 100, "un", "Embalagens"], ["Papel acoplado", "un", 35, 200, "un", "Embalagens"], ["Sacola para Refrigerante", "un", 0, 1, "un", "Embalagens"]
+  ["Cheddar Polenghi profissional", "pacote", 60, 1.5, "kg", "Queijos"], ["Cream cheese", "pacote", 60, 1.5, "kg", "Queijos"], ["Bacon em cubos", "kg", 32, 1, "kg", "Carnes"], ["Bacon fatiado", "kg", 32, 1, "kg", "Carnes"], ["Barbecue", "kg", 40, 3.5, "kg", "Molhos"], ["Costela Desfiada", "kg", 80, 1, "kg", "Carnes"], ["Costela bovina", "kg", 80, 1, "kg", "Carnes"], ["Mussarela", "kg", 43, 1, "kg", "Queijos"], ["Batata frita", "pacote", 20, 2, "kg", "Batatas/congelados"], ["Anel de cebola", "kg", 22, 1, "kg", "Batatas/congelados"], ["Farofa", "kg", 55, 1, "kg", "Mercearia"], ["Farofa de bacon", "kg", 55, 1, "kg", "Mercearia"], ["Cebolinha", "maço", 3, 100, "g", "Mercearia"], ["Onion Rings", "kg", 22, 1, "kg", "Batatas/congelados"], ["Costela suína", "kg", 80, 1, "kg", "Carnes"], ["Tempero do Dom", "aplicação", 0, 1, "aplicação", "Temperos"], ["Alho torrado", "kg", 40, 1, "kg", "Temperos"], ["Pimenta Biquinho", "kg", 40, 1, "kg", "Temperos"], ["Sal de parrilla", "kg", 20, 1, "kg", "Temperos"], ["Embalagem H7", "un", 50, 100, "un", "Embalagens"], ["Embalagem H2", "un", 40, 100, "un", "Embalagens"], ["Saco Kraft G", "un", 70, 100, "un", "Embalagens"], ["Papel acoplado metalizado", "un", 35, 200, "un", "Embalagens"], ["Arroz", "kg", 8, 1, "kg", "Mercearia"], ["Sacola para Refrigerante", "un", 0, 1, "un", "Embalagens"]
 ]
-const aliasesPorInsumo: Record<string, string[]> = {
+export const aliasesPorInsumo: Record<string, string[]> = {
   "Carne de hambúrguer": ["Carne de hambúrguer / Blend 180g", "Blend bovino 180g", "Blend 180g"],
   "Pão Australiano Aussie": ["Pão australiano", "Pão de Australiano Aussie", "Pão Australiano"],
   "Pão brioche 4CT": ["Pão brioche", "Pão Brioche"],
+  "Cream cheese": ["Cream Cheese"],
+  "Onion Rings": ["Anel de cebola"],
+  "Saco Kraft G": ["Saco Kraft"],
+  "Papel acoplado metalizado": ["Papel acoplado"],
   "Bacon em cubos": ["Bacon", "Bacon cubos"],
   "Costela Desfiada": ["Costela bovina desfiada", "Costela desfiada"],
   "Cheddar Polenghi profissional": ["Cheddar cremoso", "Cheddar Polengui profissional"],

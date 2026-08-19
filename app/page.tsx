@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
-import { Item, HistoricoEntry, Receita, Insumo, CompraRegistro, VendaFinanceira, DespesaFinanceira, FinanceConfig, MovimentacaoEstoque, defaultInsumos } from "@/lib/types"
+import { Item, HistoricoEntry, Receita, Insumo, CompraRegistro, VendaFinanceira, DespesaFinanceira, FinanceConfig, MovimentacaoEstoque, defaultInsumos, aliasesPorInsumo } from "@/lib/types"
 import {
   saveEstoque as saveEstoqueLocal,
   getEstoque as getEstoqueLocal,
@@ -24,6 +24,7 @@ import {
   saveInsumos,
   getFichasTecnicas,
   initializeFichasTecnicas,
+  migrarFichasTecnicasV2,
   saveFichasTecnicas,
   getComprasHistorico,
   saveComprasHistorico,
@@ -186,10 +187,16 @@ export default function Home() {
     try {
   const [insumosResult, historicoResult, fichasResult, movimentacoesResult] = await Promise.all([getInsumos(), getComprasHistorico(), getFichasTecnicas(), getMovimentacoesEstoque()])
   const carneOficial = defaultInsumos.find((item) => item.id === "carne-hamburguer-kg")!
-  const insumosOperacionais = insumosResult.length > 0 ? (insumosResult.some((item) => item.id === carneOficial.id || item.nome === carneOficial.nome) ? insumosResult : [...insumosResult, carneOficial]) : defaultInsumos
+  const insumosOperacionais = insumosResult.length > 0 ? [...insumosResult, ...defaultInsumos.filter((item) => !insumosResult.some((existente) => existente.id === item.id || existente.nome === item.nome))] : defaultInsumos
   if (insumosResult.length > 0) { setInsumos(insumosOperacionais); if (insumosOperacionais.length !== insumosResult.length && (userRole === "owner" || userRole === "admin")) saveInsumos(insumosOperacionais).catch((err) => console.error("[v0] Erro ao adicionar carne oficial:", err)) }
   if (historicoResult.length > 0) setComprasHistorico(historicoResult)
-  if (fichasResult.length > 0) { const migradas = migrarFichasParaCarneKg(fichasResult, insumosOperacionais); setFichasTecnicas(migradas); if (JSON.stringify(migradas) !== JSON.stringify(fichasResult) && (userRole === "owner" || userRole === "admin")) saveFichasTecnicas(migradas).catch((err) => console.error("[v0] Erro ao migrar fichas:", err)) }
+  const migradas = migrarFichasParaCarneKg(fichasResult, insumosOperacionais)
+  setFichasTecnicas(migradas)
+  if (userRole === "owner" || userRole === "admin") {
+    const migracao = await migrarFichasTecnicasV2(seedFichas, insumosOperacionais, aliasesPorInsumo)
+    setFichasTecnicas(migracao.data)
+    if (migracao.errors.length > 0) console.error("[v0] Migração V2 bloqueada:", migracao.errors)
+  }
   if (movimentacoesResult.length > 0) setMovimentacoes(movimentacoesResult)
     } catch (err) {
       console.error("[v0] Erro ao carregar dados financeiros do estoque:", err)
