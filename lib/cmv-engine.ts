@@ -97,10 +97,37 @@ export function calcularCustoCombo(combo: import("./types").Combo, fichas: Ficha
   return { cmv, margem, margemPercentual: combo.precoVenda > 0 ? margem / combo.precoVenda * 100 : null, markup: cmv > 0 ? combo.precoVenda / cmv : null, pendentes: detalhes.filter((detalhe) => detalhe.pendente).map((detalhe) => detalhe.item.nome), detalhes }
 }
 
+const produto = (referenciaId: string, nome: string, quantidade = 1): import("./types").ComboItem => ({ tipo: "produto", referenciaId, nome, quantidade })
+const insumo = (referenciaId: string, nome: string, quantidade: number, unidade: import("./types").UnidadeInsumo = "un"): import("./types").ComboItem => ({ tipo: "insumo", referenciaId, nome, quantidade, unidade })
+const bebida = (referenciaId: string, nome: string) => insumo(referenciaId, nome, 1)
+const batata = () => insumo("batata-frita", "Batata frita", 400, "g")
+
 export const seedCombos: import("./types").Combo[] = [
-  { id: "combo-casal", nome: "Combo Casal", precoVenda: 69.9, ativo: true, itens: [{ tipo: "produto", referenciaId: "super-bacon-bbq", nome: "Super Bacon BBQ", quantidade: 1 }, { tipo: "produto", referenciaId: "dom-supreme", nome: "Dom Supreme", quantidade: 1 }, { tipo: "insumo", referenciaId: "coca-cola-1-5l", nome: "Coca-Cola 1,5L", quantidade: 1, unidade: "un" }] },
-  { id: "combo-familia", nome: "Combo Família", precoVenda: 99.9, ativo: true, itens: [{ tipo: "produto", referenciaId: "super-bacon-bbq", nome: "Super Bacon BBQ", quantidade: 2 }, { tipo: "produto", referenciaId: "batata-dom-costelo", nome: "Batata Dom Costelo", quantidade: 1 }, { tipo: "insumo", referenciaId: "coca-cola-1-5l", nome: "Coca-Cola 1,5L", quantidade: 1, unidade: "un" }] },
-]
+  ["Costeloburguer + Batata 400g", 45.99, [produto("costeloburguer", "Costeloburguer"), batata()]],
+  ["Trio Costeloburguer + Batata + Coca 350ml", 49.99, [produto("costeloburguer", "Costeloburguer"), batata(), bebida("coca-cola-350ml", "Coca-Cola 350ml")]],
+  ["Donzão + Batata 400g", 45.99, [produto("donzao", "Donzão"), batata()]],
+  ["Trio Donzão + Batata + Coca 350ml", 49.99, [produto("donzao", "Donzão"), batata(), bebida("coca-cola-350ml", "Coca-Cola 350ml")]],
+  ["Dom Supreme + Batata 400g", 45.99, [produto("dom-supreme", "Dom Supreme"), batata()]],
+  ["Trio Dom Supreme + Batata + Coca 350ml", 49.99, [produto("dom-supreme", "Dom Supreme"), batata(), bebida("coca-cola-350ml", "Coca-Cola 350ml")]],
+  ["Dom Cheddar + Batata 400g", 43.99, [produto("dom-cheddar", "Dom Cheddar"), batata()]],
+  ["Trio Dom Cheddar + Batata + Coca 350ml", 48.99, [produto("dom-cheddar", "Dom Cheddar"), batata(), bebida("coca-cola-350ml", "Coca-Cola 350ml")]],
+  ["Super Bacon BBQ + Batata 400g", 40, [produto("super-bacon-bbq", "Super Bacon BBQ"), batata()]],
+  ["Super Bacon BBQ + Batata + Coca 350ml", 45, [produto("super-bacon-bbq", "Super Bacon BBQ"), batata(), bebida("coca-cola-350ml", "Coca-Cola 350ml")]],
+  ["2 Costeloburguer + 2 Coca-Cola 350ml", 95, [produto("costeloburguer", "Costeloburguer", 2), bebida("coca-cola-350ml", "Coca-Cola 350ml"), bebida("coca-cola-350ml", "Coca-Cola 350ml")]],
+  ["2 Dom Cheddar + Batata Supreme + Guaraná 1L", 99.99, [produto("dom-cheddar", "Dom Cheddar", 2), produto("batata-supreme", "Batata Supreme"), bebida("guarana-1l", "Guaraná 1L")]],
+  ["Costela do Dom + Batata 400g", 74.99, [produto("costela-do-dom", "Costela do Dom"), batata()]],
+  ["Costela do Dom + Onion Rings 160g", 74.99, [produto("costela-do-dom", "Costela do Dom"), insumo("onion-rings", "Onion Rings", 160, "g")]],
+  ["Costela + Batata + Guaraná 1L", 79.99, [produto("costela-do-dom", "Costela do Dom"), batata(), bebida("guarana-1l", "Guaraná 1L")]],
+  ["Costela + Batata + Del Valle 1,5L", 84.99, [produto("costela-do-dom", "Costela do Dom"), batata(), bebida("del-valle-1-5l", "Del Valle 1,5L")]],
+  ["Costela + Batata + Coca-Cola 1,5L", 84.99, [produto("costela-do-dom", "Costela do Dom"), batata(), bebida("coca-cola-1-5l", "Coca-Cola 1,5L")]],
+  ["Costela + Onion Rings + Coca-Cola 1,5L", 84.99, [produto("costela-do-dom", "Costela do Dom"), insumo("onion-rings", "Onion Rings", 160, "g"), bebida("coca-cola-1-5l", "Coca-Cola 1,5L")]],
+  ["Costela completa + Guaraná 1L", 89.99, [produto("costela-do-dom", "Costela do Dom"), batata(), insumo("arroz", "Arroz", 300, "g"), insumo("farofa", "Farofa", 50, "g"), bebida("guarana-1l", "Guaraná 1L")]],
+  ["Costela completa + Del Valle 1,5L", 94.99, [produto("costela-do-dom", "Costela do Dom"), batata(), insumo("arroz", "Arroz", 300, "g"), insumo("farofa", "Farofa", 50, "g"), bebida("del-valle-1-5l", "Del Valle 1,5L")]],
+  ["Costela completa + Coca-Cola 1,5L", 94.99, [produto("costela-do-dom", "Costela do Dom"), batata(), insumo("arroz", "Arroz", 300, "g"), insumo("farofa", "Farofa", 50, "g"), bebida("coca-cola-1-5l", "Coca-Cola 1,5L")]],
+  ["Costela de Queijo", 85, [produto("costela-de-queijo", "Costela de Queijo")]],
+  ["Costela de Queijo + Batata 400g", 105, [produto("costela-de-queijo", "Costela de Queijo"), batata()]],
+  ["Costela de Queijo + Batata + Coca-Cola 1,5L", 115, [produto("costela-de-queijo", "Costela de Queijo"), batata(), bebida("coca-cola-1-5l", "Coca-Cola 1,5L")]],
+].map(([nome, precoVenda, itens]) => ({ id: String(nome).toLowerCase().normalize("NFD").replace(/[\\u0300-\\u036f]/g, "").replace(/[^a-z0-9]+/g, "-"), nome: String(nome), precoVenda: Number(precoVenda), ativo: true, itens: itens as import("./types").ComboItem[] }))
 
 
 export function calcularConsumoComboVenda(venda: { id: string; produtoNome: string; quantidade: number }, combo: import("./types").Combo | undefined, fichas: FichaTecnica[], insumos: Insumo[], estoque: Item[] = []) {

@@ -277,12 +277,14 @@ export async function migrarCombosV1(seed: Combo[]) {
   const settingsRef = doc(db, "settings", "system")
   const settingsSnap = await getDoc(settingsRef)
   const existing = await getCombos()
-  if (settingsSnap.data()?.combosDomCosteloV1Aplicada === true) return { applied: false, skipped: true, data: existing.length ? existing : seed }
-  const porId = new Map(existing.map((combo) => [combo.id, combo]))
-  for (const combo of seed) porId.set(combo.id, existing.find((atual) => atual.id === combo.id) ?? combo)
+  const versaoAtual = settingsSnap.data()?.combosDomCosteloV2Aplicada === true
+  if (versaoAtual) return { applied: false, skipped: true, data: existing.length ? existing : seed }
+  const idsLegados = new Set(["combo-casal", "combo-familia"])
+  const porId = new Map(existing.filter((combo) => !idsLegados.has(combo.id)).map((combo) => [combo.id, combo]))
+  for (const combo of seed) porId.set(combo.id, combo)
   const data = [...porId.values()]
   await saveCombos(data)
-  await setDoc(settingsRef, { combosDomCosteloV1Aplicada: true, combosDomCosteloV1AplicadaEm: Timestamp.now(), combosDomCosteloV1Count: seed.length }, { merge: true })
+  await setDoc(settingsRef, { combosDomCosteloV2Aplicada: true, combosDomCosteloV2AplicadaEm: Timestamp.now(), combosDomCosteloV2Count: seed.length }, { merge: true })
   return { applied: true, skipped: false, data }
 }
 
