@@ -128,6 +128,7 @@ export interface MovimentacaoEstoque {
   unidadeSnapshot: UnidadeInsumo
   quantidadeBase: number
   unidadeBase: UnidadeInsumo
+  quantidadeBaixadaEstoque?: number
   precoUnitarioSnapshot: number
   valorTotal: number
   fornecedor?: string

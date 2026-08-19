@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { calcularFicha, calcularConsumoVenda, custoIngrediente, custoPorUnidade } from "./cmv-engine"
+import { calcularFicha, calcularConsumoVenda, converterQuantidadeFichaParaEstoque, custoIngrediente, custoPorUnidade } from "./cmv-engine"
 import type { FichaTecnica, Insumo } from "./types"
 
 const mussarela: Insumo = {
@@ -37,7 +37,7 @@ describe("CMV", () => {
 
   it("calcula consumo agregado por venda e converte unidade", () => {
     const ficha: FichaTecnica = { id: "hamb", nome: "Hambúrguer", precoVenda: 20, ingredientes: [{ insumoId: "mussarela", insumoNome: "Mussarela", quantidade: 25, unidade: "g" }] }
-    const result = calcularConsumoVenda({ id: "v1", produtoNome: "Hambúrguer", quantidade: 4, fichaTecnicaId: "hamb" }, ficha, [mussarela])
+    const result = calcularConsumoVenda({ id: "v1", produtoNome: "Hambúrguer", quantidade: 4, fichaTecnicaId: "hamb" }, ficha, [mussarela], [{ id: "mussarela", insumoId: "mussarela", nome: "Mussarela", atual: 3, min: 0, categoria: "Queijos", unidadeEstoque: "kg" }])
     expect(result.ok).toBe(true)
     if (result.ok) expect(result.consumos[0].quantidadeBase).toBeCloseTo(0.1)
   })
@@ -45,6 +45,24 @@ describe("CMV", () => {
   it("bloqueia ficha ausente ou insumo não vinculado", () => {
     expect(calcularConsumoVenda({ id: "v1", produtoNome: "X", quantidade: 1 }, undefined, []).ok).toBe(false)
     expect(calcularConsumoVenda({ id: "v1", produtoNome: "X", quantidade: 1 }, { id: "x", nome: "X", precoVenda: 1, ingredientes: [{ insumoId: "missing", insumoNome: "Não existe", quantidade: 1, unidade: "g" }] }, []).ok).toBe(false)
+  })
+
+  it("converte g para a unidade física real kg", () => {
+    const itemEstoque = { id: "bacon", insumoId: "bacon", nome: "Bacon", atual: 2, min: 0, categoria: "Carnes", unidadeEstoque: "kg" as const }
+    expect(converterQuantidadeFichaParaEstoque({ quantidadeFicha: 40, unidadeFicha: "g", insumo: { ...mussarela, id: "bacon", nome: "Bacon" }, itemEstoque })).toEqual({ quantidadeEstoque: 0.04, unidadeEstoque: "kg" })
+  })
+
+  it("converte g para pacote usando conteúdo da embalagem", () => {
+    const itemEstoque = { id: "cream", insumoId: "cream", nome: "Cream Cheese", atual: 4, min: 0, categoria: "Laticínios", unidadeEstoque: "pacote" as const }
+    const insumo = { ...mussarela, id: "cream", nome: "Cream Cheese", quantidadeConteudo: 1500, unidadeConteudo: "g" as const, unidadeEmbalagem: "pacote" as const }
+    expect(converterQuantidadeFichaParaEstoque({ quantidadeFicha: 30, unidadeFicha: "g", insumo, itemEstoque }).quantidadeEstoque).toBeCloseTo(0.02)
+  })
+
+  it("preserva unidade física un e bloqueia pacote sem conteúdo", () => {
+    const blend = { ...mussarela, id: "blend", nome: "Blend", unidade: "un" as const, unidadeEmbalagem: "un" as const }
+    const unit = { id: "blend", insumoId: "blend", nome: "Blend", atual: 20, min: 0, categoria: "Carnes", unidadeEstoque: "un" as const }
+    expect(converterQuantidadeFichaParaEstoque({ quantidadeFicha: 3, unidadeFicha: "un", insumo: blend, itemEstoque: unit })).toEqual({ quantidadeEstoque: 3, unidadeEstoque: "un" })
+    expect(() => converterQuantidadeFichaParaEstoque({ quantidadeFicha: 30, unidadeFicha: "g", insumo: blend, itemEstoque: { ...unit, unidadeEstoque: "pacote" } })).toThrow("UNIDADE_INCOMPATIVEL")
   })
 
   it("não cria percentuais para preço ou CMV inválidos", () => {

@@ -220,7 +220,13 @@ export default function Home() {
     const currentUser = auth.currentUser
     if (!currentUser) throw new Error("Usuário autenticado não encontrado.")
     const ficha = fichasTecnicas.find((item) => item.id === venda.fichaTecnicaId || item.id === venda.produtoId || item.nome.toLowerCase() === venda.produtoNome.toLowerCase())
-    const consumo = calcularConsumoVenda(venda, ficha, insumos)
+    const combo = venda.produtoId?.toLowerCase().includes("combo") || venda.produtoNome.toLowerCase().includes("combo")
+    if (combo && !ficha?.ingredientes?.length) {
+      await registrarBaixaBloqueada({ venda, codigo: "COMBO_SEM_COMPOSICAO", mensagem: "Combo sem composição cadastrada para baixa automática.", userId: currentUser.uid })
+      setVendasFinanceiras((rows) => rows.map((row) => row.id === venda.id ? { ...row, statusBaixa: "bloqueada", estoqueStatus: "bloqueada", motivoBloqueio: "COMBO_SEM_COMPOSICAO: Combo sem composição cadastrada para baixa automática." } : row))
+      throw new Error("COMBO_SEM_COMPOSICAO: Combo sem composição cadastrada para baixa automática.")
+    }
+    const consumo = calcularConsumoVenda(venda, ficha, insumos, itens)
     if (!consumo.ok) {
       const codigo = consumo.codigo ?? (!ficha ? "PRODUTO_SEM_FICHA" : "ERRO_PROCESSAMENTO")
       await registrarBaixaBloqueada({ venda, codigo, mensagem: consumo.motivo, userId: currentUser.uid })
@@ -231,7 +237,7 @@ export default function Home() {
     if (venda.statusBaixa === "baixada") return
     if (userRole !== "owner" && userRole !== "admin" && userRole !== "operador") throw new Error("Papel sem permissão para baixa automática derivada de venda.")
     const agora = new Date().toISOString()
-    const result = await registrarBaixaVendaAtomica({ venda, consumos: consumo.consumos.map((item) => ({ insumoId: item.insumo.id, insumoNomeSnapshot: item.insumo.nome, quantidadeBase: item.quantidadeBase, unidadeBase: item.unidadeBase })), userId: currentUser.uid, agora, canalVenda: venda.canalNaVenda })
+    const result = await registrarBaixaVendaAtomica({ venda, consumos: consumo.consumos.map((item) => ({ insumoId: item.insumo.id, insumoNomeSnapshot: item.insumo.nome, quantidadeBase: item.quantidadeBase, unidadeBase: item.unidadeEstoque, quantidadeFicha: item.quantidade, unidadeFicha: item.unidadeBase })), userId: currentUser.uid, agora, canalVenda: venda.canalNaVenda })
     setItens(result.itens)
     setVendasFinanceiras((rows) => rows.map((row) => row.id === venda.id ? { ...row, statusBaixa: "baixada", estoqueStatus: "baixada", baixaId: result.baixaId } : row))
     setMovimentacoes(await getMovimentacoesEstoque())
