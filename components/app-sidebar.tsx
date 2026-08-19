@@ -13,9 +13,10 @@ import {
   X,
   ShoppingCart,
   Settings,
+  Calculator,
 } from "lucide-react"
 
-type Tab = "estoque" | "entrada" | "financeiro" | "dashboard" | "lista-compras" | "admin"
+type Tab = "estoque" | "entrada" | "financeiro" | "dashboard" | "lista-compras" | "cmv" | "admin"
 
 interface AppSidebarProps {
   activeTab: Tab
@@ -34,6 +35,7 @@ const menuItems = [
   { id: "financeiro" as Tab, label: "Financeiro", icon: DollarSign },
   { id: "dashboard" as Tab, label: "Dashboard", icon: BarChart3 },
   { id: "lista-compras" as Tab, label: "Lista de Compras", icon: ShoppingCart },
+  { id: "cmv" as Tab, label: "Ficha Técnica e CMV", icon: Calculator },
   { id: "admin" as Tab, label: "Administração", icon: Settings },
 ]
 

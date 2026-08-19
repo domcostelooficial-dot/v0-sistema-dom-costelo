@@ -25,6 +25,8 @@ import {
   subscribeToReceitas,
   getInsumos,
   saveInsumos,
+  getFichasTecnicas,
+  saveFichasTecnicas,
   getComprasHistorico,
   saveComprasHistorico,
 } from "@/lib/firebase-db"
@@ -36,10 +38,12 @@ import { FinanceiroView } from "@/components/financeiro-view"
 import { DashboardView } from "@/components/dashboard-view"
 import { ListaComprasView } from "@/components/lista-compras-view"
 import { AdminView } from "@/components/admin-view"
+import { CmvView } from "@/components/cmv-view"
+import { seedFichas } from "@/lib/cmv-engine"
 import { Menu, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 
-type Tab = "estoque" | "entrada" | "financeiro" | "dashboard" | "lista-compras" | "admin"
+type Tab = "estoque" | "entrada" | "financeiro" | "dashboard" | "lista-compras" | "cmv" | "admin"
 
 const ITENS_REMOVIDOS = new Set(["Costela Crua", "Contra filé", "Manteiga de Garrafa", "Limoneto"])
 
@@ -146,12 +150,15 @@ export default function Home() {
   const [receitas, setReceitas] = useState<Receita[]>([])
   const [insumos, setInsumos] = useState<Insumo[]>(defaultInsumos)
   const [comprasHistorico, setComprasHistorico] = useState<CompraRegistro[]>([])
+  const [fichasTecnicas, setFichasTecnicas] = useState(seedFichas)
+  const persistirFichas = (data: typeof seedFichas) => { setFichasTecnicas(data); saveFichasTecnicas(data).catch((err) => console.error("[v0] Erro ao salvar fichas:", err)) }
 
   const getComprasHybrid = async () => {
     try {
-      const [insumosResult, historicoResult] = await Promise.all([getInsumos(), getComprasHistorico()])
-      if (insumosResult.length > 0) setInsumos(insumosResult)
-      if (historicoResult.length > 0) setComprasHistorico(historicoResult)
+  const [insumosResult, historicoResult, fichasResult] = await Promise.all([getInsumos(), getComprasHistorico(), getFichasTecnicas()])
+  if (insumosResult.length > 0) setInsumos(insumosResult)
+  if (historicoResult.length > 0) setComprasHistorico(historicoResult)
+  if (fichasResult.length > 0) setFichasTecnicas(fichasResult)
     } catch (err) {
       console.error("[v0] Erro ao carregar dados financeiros do estoque:", err)
     }
@@ -414,8 +421,9 @@ export default function Home() {
               {activeTab === "entrada" && "Entrada de Mercadoria"}
               {activeTab === "financeiro" && "Financeiro"}
               {activeTab === "dashboard" && "Dashboard"}
-              {activeTab === "lista-compras" && "Lista de Compras"}
-              {activeTab === "admin" && "Administração"}
+ {activeTab === "lista-compras" && "Lista de Compras"}
+ {activeTab === "cmv" && "Ficha Técnica e CMV"}
+ {activeTab === "admin" && "Administração"}
             </h1>
             <p className="text-muted-foreground">
               {activeTab === "estoque" &&
@@ -426,9 +434,10 @@ export default function Home() {
                 "Acompanhe seus gastos e histórico"}
               {activeTab === "dashboard" &&
                 "Visualize as métricas do seu negócio"}
-              {activeTab === "lista-compras" &&
-                "Itens com estoque baixo, quantidades e valor total da compra"}
-              {activeTab === "admin" &&
+ {activeTab === "lista-compras" &&
+  "Itens com estoque baixo, quantidades e valor total da compra"}
+ {activeTab === "cmv" && "Custos centralizados, fichas técnicas e margens"}
+ {activeTab === "admin" &&
                 "Gerenciamento de usuários, permissões e configurações"}
             </p>
           </div>
@@ -467,9 +476,12 @@ export default function Home() {
               }}
             />
           )}
-          {activeTab === "admin" && userRole === "admin" && (
-            <AdminView currentUser={user} onPasswordChange={handlePasswordChange} />
-          )}
+  {activeTab === "cmv" && (
+  <CmvView insumos={insumos} fichas={fichasTecnicas} onSaveInsumos={persistirInsumos} onSaveFichas={persistirFichas} />
+  )}
+  {activeTab === "admin" && userRole === "admin" && (
+  <AdminView currentUser={user} onPasswordChange={handlePasswordChange} />
+  )}
         </div>
       </main>
     </div>

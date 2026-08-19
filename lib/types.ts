@@ -105,7 +105,7 @@ export interface Usuario {
 
 export type UserRole = "admin" | "operador"
 
-export type TabPermissao = "estoque" | "entrada" | "financeiro" | "dashboard" | "lista-compras" | "admin"
+export type TabPermissao = "estoque" | "entrada" | "financeiro" | "dashboard" | "lista-compras" | "cmv" | "admin"
 
 export type UserStatus = "pendente" | "aprovado" | "rejeitado"
 
