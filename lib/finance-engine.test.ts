@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { calcularTaxa, calcularVenda, pontoEquilibrio, resumoFinanceiro, filtrarPeriodo, contarDiasAbertos, totalCustosFixos, totalCustosFixosAtivos } from "./finance-engine"
+import { calcularTaxa, calcularVenda, pontoEquilibrio, resumoFinanceiro, filtrarPeriodo, contarDiasAbertos, totalCustosFixos, totalCustosFixosAtivos, criarAuditoriaFinanceira, compararAuditoriaComEsperado, fluxoCaixaPago } from "./finance-engine"
 import { defaultFinanceConfig } from "./finance-engine"
 
 describe("motor financeiro", () => {
@@ -87,5 +87,21 @@ describe("motor financeiro", () => {
     const config = { ...defaultFinanceConfig, despesasFixas: defaultFinanceConfig.despesasFixas.map(item => ({ ...item, ativo: false })) }
     expect(totalCustosFixosAtivos(config)).toBe(0)
     expect(pontoEquilibrio(0, 0).faturamento).toBe(0)
+  })
+
+  it("homologa julho sem inventar vendas", () => {
+    const venda = calcularVenda({ id: "julho", data: "2026-07-15", canal: "salao", formaPagamento: "pix", produtoId: "p", produtoNome: "Produto", quantidade: 1, precoUnitario: 100, cmvUnitario: 40 }, defaultFinanceConfig)
+    const audit = criarAuditoriaFinanceira([venda], [], defaultFinanceConfig, "2026-07")
+    expect(audit.totalVendas).toBe(1)
+    expect(audit.faturamentoBruto).toBe(100)
+    expect(compararAuditoriaComEsperado(audit, { faturamentoBruto: 100 }).faturamentoBruto).toBe(true)
+    expect(fluxoCaixaPago([{ id: "d", descricao: "Conta", categoria: "Utilidades", valor: 50, tipo: "fixa", dataPagamento: "2026-08-01", competencia: "2026-07", recorrente: false, createdAt: "2026-08-01" }], "2026-07-01", "2026-07-31")).toBe(0)
+  })
+
+  it("homologação vazia não cria dados", () => {
+    const audit = criarAuditoriaFinanceira([], [], defaultFinanceConfig, "2026-07")
+    expect(audit.totalVendas).toBe(0)
+    expect(audit.fonte).toBe("sem-dados")
+    expect(audit.observacao).toContain("nenhuma venda foi inventada")
   })
 })

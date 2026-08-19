@@ -33,7 +33,10 @@ import {
   saveVendasFinanceiras,
   getDespesasFinanceiras,
   saveDespesasFinanceiras,
+  getFinanceAuditSnapshots,
+  saveFinanceAuditSnapshot,
 } from "@/lib/firebase-db"
+import type { FinanceAuditSnapshot } from "@/lib/finance-engine"
 import { FirebaseLoginForm } from "@/components/firebase-login-form"
 import { AppSidebar } from "@/components/app-sidebar"
 import { EstoqueView } from "@/components/estoque-view"
@@ -161,6 +164,7 @@ export default function Home() {
   const [financeConfig, setFinanceConfig] = useState<FinanceConfig | undefined>(undefined)
   const [vendasFinanceiras, setVendasFinanceiras] = useState<VendaFinanceira[]>([])
   const [despesasFinanceiras, setDespesasFinanceiras] = useState<DespesaFinanceira[]>([])
+ const [auditoriaJulho, setAuditoriaJulho] = useState<FinanceAuditSnapshot | undefined>(undefined)
   const persistirFichas = (data: typeof seedFichas) => { setFichasTecnicas(data); saveFichasTecnicas(data).catch((err) => console.error("[v0] Erro ao salvar fichas:", err)) }
 
   const getComprasHybrid = async () => {
@@ -237,8 +241,9 @@ export default function Home() {
       const historico = await getHistoricoHybrid(username)
       const receitas = await getReceitasHybrid(username)
       const fichas = await initializeFichasTecnicas(seedFichas)
-      const [config, vendas, despesas] = await Promise.all([getFinanceConfig(), getVendasFinanceiras(), getDespesasFinanceiras()])
+      const [config, vendas, despesas, auditorias] = await Promise.all([getFinanceConfig(), getVendasFinanceiras(), getDespesasFinanceiras(), getFinanceAuditSnapshots()])
       setFinanceConfig(config)
+      setAuditoriaJulho(auditorias.find(item => item.competencia === "2026-07"))
       setVendasFinanceiras(vendas)
       setDespesasFinanceiras(despesas)
       setFichasTecnicas(fichas.data)
@@ -479,6 +484,8 @@ export default function Home() {
               onSaveConfig={(nextConfig) => { setFinanceConfig(nextConfig); saveFinanceConfig(nextConfig).catch((error) => console.error("[v0] Erro ao salvar configuração financeira:", error)) }}
               onAddVenda={(venda) => { const next = [...vendasFinanceiras, venda]; setVendasFinanceiras(next); saveVendasFinanceiras(next).catch((error) => console.error("[v0] Erro ao salvar venda:", error)) }}
               onAddDespesa={(despesa) => { const next = [...despesasFinanceiras, despesa]; setDespesasFinanceiras(next); saveDespesasFinanceiras(next).catch((error) => console.error("[v0] Erro ao salvar despesa:", error)) }}
+  auditoriaJulho={auditoriaJulho}
+  onSaveAuditoria={(snapshot) => { setAuditoriaJulho(snapshot); saveFinanceAuditSnapshot(snapshot).catch((error) => console.error("[v0] Erro ao salvar auditoria financeira:", error)) }}
             />
           )}
           {activeTab === "dashboard" && (

@@ -164,3 +164,36 @@ export function totalCustosFixos(config: FinanceConfig, despesas: DespesaFinance
 }
 
 export function percentualCmv(resumo: ReturnType<typeof resumoFinanceiro>) { return resumo.faturamentoBruto > 0 ? resumo.cmv / resumo.faturamentoBruto * 100 : 0 }
+
+export interface FinanceAuditSnapshot {
+  competencia: string
+  fonte: "vendas-importadas" | "vendas-registradas" | "sem-dados"
+  totalVendas: number
+  faturamentoBruto: number
+  descontos: number
+  taxas: number
+  receitaLiquida: number
+  cmv: number
+  custosFixos: number
+  resultadoOperacional: number
+  observacao?: string
+}
+
+export function criarAuditoriaFinanceira(vendas: VendaFinanceira[], despesas: DespesaFinanceira[], config: FinanceConfig, competencia: string): FinanceAuditSnapshot {
+  const inicio = `${competencia}-01`
+  const fimDate = new Date(Number(competencia.slice(0, 4)), Number(competencia.slice(5, 7)), 0)
+  const fim = `${competencia}-${String(fimDate.getDate()).padStart(2, "0")}`
+  const filtrado = filtrarPeriodo(vendas, despesas, inicio, fim)
+  const fonte = filtrado.vendas.length > 0 ? "vendas-registradas" : "sem-dados"
+  const resumo = resumoFinanceiro(filtrado.vendas, filtrado.despesas, totalCustosFixosAtivos(config))
+  return { competencia, fonte, totalVendas: resumo.numeroVendas, faturamentoBruto: resumo.faturamentoBruto, descontos: resumo.descontos, taxas: resumo.taxas, receitaLiquida: resumo.receitaLiquida, cmv: resumo.cmv, custosFixos: resumo.custosFixos, resultadoOperacional: resumo.lucroOperacional, observacao: fonte === "sem-dados" ? "Sem vendas registradas; nenhuma venda foi inventada." : undefined }
+}
+
+export function compararAuditoriaComEsperado(realizado: FinanceAuditSnapshot, esperado: Partial<FinanceAuditSnapshot>, tolerancia = 0.01) {
+  const campos = ["faturamentoBruto", "descontos", "taxas", "receitaLiquida", "cmv", "custosFixos", "resultadoOperacional"] as const
+  return campos.reduce((resultado, campo) => ({ ...resultado, [campo]: Math.abs(realizado[campo] - (esperado[campo] ?? realizado[campo])) <= tolerancia }), {} as Record<(typeof campos)[number], boolean>)
+}
+
+export function fluxoCaixaPago(despesas: DespesaFinanceira[], inicio: string, fim: string) {
+  return despesas.filter((despesa) => despesa.dataPagamento.slice(0, 10) >= inicio && despesa.dataPagamento.slice(0, 10) <= fim).reduce((total, despesa) => total + n(despesa.valor), 0)
+}

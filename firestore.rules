@@ -54,6 +54,10 @@ service cloud.firestore {
       allow read: if isOperatorOrHigher();
       allow create, update, delete: if isAdminOrOwner();
     }
+    match /compras/finance-auditoria {
+      allow read: if isOperatorOrHigher();
+      allow create, update, delete: if isAdminOrOwner();
+    }
     match /compras/{docId} {
       allow read: if isOperatorOrHigher();
       allow create, update: if isOperatorOrHigher();

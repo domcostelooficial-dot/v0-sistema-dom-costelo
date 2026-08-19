@@ -15,6 +15,7 @@ import {
 } from "firebase/firestore"
 import { db } from "./firebase"
 import type { Item, HistoricoEntry, Receita, UsuarioSistema, Insumo, FichaTecnica, VendaProduto, CompraRegistro, FinanceConfig, VendaFinanceira, DespesaFinanceira } from "./types"
+import type { FinanceAuditSnapshot } from "./finance-engine"
 
 // Collections - dados globais compartilhados
 const USUARIOS_COLLECTION = "usuarios"
@@ -274,6 +275,8 @@ export async function getVendasFinanceiras() { return getComprasData<VendaFinanc
 export async function saveVendasFinanceiras(data: VendaFinanceira[]) { return saveComprasData("finance-vendas", data) }
 export async function getDespesasFinanceiras() { return getComprasData<DespesaFinanceira>("finance-despesas") }
 export async function saveDespesasFinanceiras(data: DespesaFinanceira[]) { return saveComprasData("finance-despesas", data) }
+export async function getFinanceAuditSnapshots() { return getComprasData<FinanceAuditSnapshot>("finance-auditoria") }
+export async function saveFinanceAuditSnapshot(data: FinanceAuditSnapshot) { const existentes = await getFinanceAuditSnapshots(); return saveComprasData("finance-auditoria", [...existentes.filter(item => item.competencia !== data.competencia), data]) }
 
 export async function initializeFichasTecnicas(seed: FichaTecnica[], seedVersion = 1) {
   const existing = await getFichasTecnicas()
