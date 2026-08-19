@@ -165,7 +165,7 @@ export default function Home() {
   const [vendasFinanceiras, setVendasFinanceiras] = useState<VendaFinanceira[]>([])
   const [despesasFinanceiras, setDespesasFinanceiras] = useState<DespesaFinanceira[]>([])
  const [auditoriaJulho, setAuditoriaJulho] = useState<FinanceAuditSnapshot | undefined>(undefined)
-  const persistirFichas = (data: typeof seedFichas) => { setFichasTecnicas(data); saveFichasTecnicas(data).catch((err) => console.error("[v0] Erro ao salvar fichas:", err)) }
+  const persistirFichas = (data: typeof seedFichas) => { if (userRole !== "owner" && userRole !== "admin") return false; setFichasTecnicas(data); saveFichasTecnicas(data).catch((err) => console.error("[v0] Erro ao salvar fichas:", err)); return true }
 
   const getComprasHybrid = async () => {
     try {
@@ -506,7 +506,7 @@ export default function Home() {
             />
           )}
   {activeTab === "cmv" && (
-  <CmvView insumos={insumos} fichas={fichasTecnicas} onSaveInsumos={persistirInsumos} onSaveFichas={persistirFichas} />
+  <CmvView insumos={insumos} fichas={fichasTecnicas} userRole={userRole} onSaveInsumos={persistirInsumos} onSaveFichas={persistirFichas} />
   )}
   {activeTab === "admin" && userRole === "admin" && (
   <AdminView currentUser={user} onPasswordChange={handlePasswordChange} />
