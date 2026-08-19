@@ -132,6 +132,14 @@ export interface MovimentacaoEstoque {
   valorTotal: number
   fornecedor?: string
   observacao?: string
+  produtoId?: string
+  quantidadeVendida?: number
+  quantidadeFicha?: number
+  unidadeFicha?: UnidadeInsumo
+  unidadeEstoque?: UnidadeInsumo
+  canalVenda?: string
+  baixaId?: string
+  estoquePosterior?: number
   vendaId?: string
   produtoNomeSnapshot?: string
   saldoAnterior?: number
@@ -140,7 +148,7 @@ export interface MovimentacaoEstoque {
   estoqueAnterior?: number
   estoqueContado?: number
   diferenca?: number
-  origem: "compras" | "estoque"
+  origem: "compras" | "estoque" | "venda_automatica"
   movimentacaoOrigemId?: string
   movimentacaoOriginalId?: string
   status: "efetivada" | "estornada" | "ativa"

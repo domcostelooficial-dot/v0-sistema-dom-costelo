@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
-import { Item, HistoricoEntry, Receita, Insumo, CompraRegistro, VendaFinanceira, DespesaFinanceira, FinanceConfig, MovimentacaoEstoque, VendaProduto, defaultInsumos } from "@/lib/types"
+import { Item, HistoricoEntry, Receita, Insumo, CompraRegistro, VendaFinanceira, DespesaFinanceira, FinanceConfig, MovimentacaoEstoque, defaultInsumos } from "@/lib/types"
 import {
   saveEstoque as saveEstoqueLocal,
   getEstoque as getEstoqueLocal,
@@ -42,7 +42,6 @@ import {
   ajustarEstoqueAtomico,
   ajustarInventarioAtomico,
   registrarBaixaVendaAtomica,
-  getVendasProdutos,
   estornarMovimentacaoAtomica,
 } from "@/lib/firebase-db"
 import { criarEntrada, criarSaida } from "@/lib/estoque-movements"
@@ -178,7 +177,6 @@ export default function Home() {
   const [fichasLoading, setFichasLoading] = useState(true)
   const [financeConfig, setFinanceConfig] = useState<FinanceConfig | undefined>(undefined)
   const [vendasFinanceiras, setVendasFinanceiras] = useState<VendaFinanceira[]>([])
-  const [vendasProdutos, setVendasProdutos] = useState<VendaProduto[]>([])
   const [despesasFinanceiras, setDespesasFinanceiras] = useState<DespesaFinanceira[]>([])
  const [auditoriaJulho, setAuditoriaJulho] = useState<FinanceAuditSnapshot | undefined>(undefined)
   const persistirFichas = (data: typeof seedFichas) => { if (userRole !== "owner" && userRole !== "admin") return false; setFichasTecnicas(data); saveFichasTecnicas(data).catch((err) => console.error("[v0] Erro ao salvar fichas:", err)); return true }
@@ -217,17 +215,17 @@ export default function Home() {
     setItens(atualizados); setMovimentacoes(await getMovimentacoesEstoque()); toast.success("Entrada registrada com sucesso.")
   }
 
-  const processarBaixaVenda = async (venda: VendaProduto) => {
+  const processarBaixaVenda = async (venda: VendaFinanceira) => {
     if (userRole !== "owner" && userRole !== "admin") throw new Error("Somente owner/admin podem processar baixas de venda.")
-    const ficha = fichasTecnicas.find((item) => item.id === venda.fichaTecnicaId || item.nome.toLowerCase() === venda.produtoNome.toLowerCase())
+    const ficha = fichasTecnicas.find((item) => item.id === venda.fichaTecnicaId || item.id === venda.produtoId || item.nome.toLowerCase() === venda.produtoNome.toLowerCase())
     const consumo = calcularConsumoVenda(venda, ficha, insumos)
     if (!consumo.ok) throw new Error(consumo.motivo)
     const currentUser = auth.currentUser
     if (!currentUser || !ficha) throw new Error("Venda sem usuário ou ficha técnica válida")
     const agora = new Date().toISOString()
-    const result = await registrarBaixaVendaAtomica({ venda, consumos: consumo.consumos.map((item) => ({ insumoId: item.insumo.id, insumoNomeSnapshot: item.insumo.nome, quantidadeBase: item.quantidadeBase, unidadeBase: item.unidadeBase })), userId: currentUser.uid, agora })
+    const result = await registrarBaixaVendaAtomica({ venda, consumos: consumo.consumos.map((item) => ({ insumoId: item.insumo.id, insumoNomeSnapshot: item.insumo.nome, quantidadeBase: item.quantidadeBase, unidadeBase: item.unidadeBase })), userId: currentUser.uid, agora, canalVenda: venda.canalNaVenda })
     setItens(result.itens)
-    setVendasProdutos((rows) => rows.map((row) => row.id === venda.id ? { ...row, statusBaixa: "baixada", baixaId: result.baixaId } : row))
+    setVendasFinanceiras((rows) => rows.map((row) => row.id === venda.id ? { ...row, statusBaixa: "baixada", estoqueStatus: "baixada", baixaId: result.baixaId } : row))
     setMovimentacoes(await getMovimentacoesEstoque())
     toast.success(result.idempotente ? "Venda já estava baixada." : "Baixa de venda registrada.")
   }
@@ -293,12 +291,11 @@ export default function Home() {
       const historico = await getHistoricoHybrid(username)
       const receitas = await getReceitasHybrid(username)
       const fichas = await initializeFichasTecnicas(seedFichas)
-      const [config, vendas, despesas, auditorias, vendasProdutosResult] = await Promise.all([getFinanceConfig(), getVendasFinanceiras(), getDespesasFinanceiras(), getFinanceAuditSnapshots(), getVendasProdutos()])
+      const [config, vendas, despesas, auditorias] = await Promise.all([getFinanceConfig(), getVendasFinanceiras(), getDespesasFinanceiras(), getFinanceAuditSnapshots()])
       setFinanceConfig(config)
       setAuditoriaJulho(auditorias.find(item => item.competencia === "2026-07"))
       setVendasFinanceiras(vendas)
       setDespesasFinanceiras(despesas)
-      setVendasProdutos(vendasProdutosResult)
       setFichasTecnicas(fichas.data)
       setFichasLoading(false)
       await getComprasHybrid()
@@ -525,7 +522,7 @@ export default function Home() {
               userRole={userRole as "admin" | "operador" | "owner"}
               movimentacoes={movimentacoes}
               onEstornarMovimentacao={estornarMovimentacao}
-            /><BaixasPendentesView vendas={vendasProdutos} onProcessar={async (venda) => { try { await processarBaixaVenda(venda) } catch (error) { toast.error(error instanceof Error ? error.message : "Não foi possível processar a baixa.") } }} /></div>}
+            /><BaixasPendentesView vendas={vendasFinanceiras} onProcessar={async (venda) => { try { await processarBaixaVenda(venda) } catch (error) { toast.error(error instanceof Error ? error.message : "Não foi possível processar a baixa.") } }} /></div>}
           {activeTab === "entrada" && (
             <EntradaView itens={itens} onEntrada={handleEntrada} canRegister={userPermissoes.includes("entrada") || userRole === "owner" || userRole === "admin"} />
           )}
@@ -540,7 +537,7 @@ export default function Home() {
               config={financeConfig}
               userRole={userRole}
               onSaveConfig={(nextConfig) => { setFinanceConfig(nextConfig); saveFinanceConfig(nextConfig).catch((error) => console.error("[v0] Erro ao salvar configuração financeira:", error)) }}
-              onAddVenda={(venda) => { const next = [...vendasFinanceiras, venda]; setVendasFinanceiras(next); saveVendasFinanceiras(next).catch((error) => console.error("[v0] Erro ao salvar venda:", error)) }}
+              onAddVenda={(venda) => { const vendaEfetivada = { ...venda, fichaTecnicaId: venda.fichaTecnicaId ?? venda.produtoId, statusBaixa: "pendente" as const, estoqueStatus: "pendente" as const }; const next = [...vendasFinanceiras, vendaEfetivada]; setVendasFinanceiras(next); saveVendasFinanceiras(next).then(() => processarBaixaVenda(vendaEfetivada)).catch((error) => console.error("[v0] Erro ao salvar/processar venda:", error)) }}
               onAddDespesa={(despesa) => { const next = [...despesasFinanceiras, despesa]; setDespesasFinanceiras(next); saveDespesasFinanceiras(next).catch((error) => console.error("[v0] Erro ao salvar despesa:", error)) }}
   auditoriaJulho={auditoriaJulho}
   onSaveAuditoria={(snapshot) => { setAuditoriaJulho(snapshot); saveFinanceAuditSnapshot(snapshot).catch((error) => console.error("[v0] Erro ao salvar auditoria financeira:", error)) }}
