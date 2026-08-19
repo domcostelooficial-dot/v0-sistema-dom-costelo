@@ -427,7 +427,19 @@ export default function Home() {
     saveEstoqueHybrid(user, updated)
   }
 
-  const handleEntrada = (nome: string, qtd: number, custo: number, fornecedor?: string, observacao?: string, dataMovimentacao?: string) => registrarEntradaRastreavel(nome, qtd, custo, fornecedor, observacao, dataMovimentacao)
+  const handleEntrada = async (nome: string, qtd: number, custo: number, fornecedor?: string, observacao?: string, dataMovimentacao?: string) => {
+    try {
+      await registrarEntradaRastreavel(nome, qtd, custo, fornecedor, observacao, dataMovimentacao)
+    } catch (error) {
+      const item = itens.find((row) => row.nome === nome)
+      if (!item) throw error
+      const atualizados = itens.map((row) => row.nome === nome ? { ...row, atual: row.atual + qtd } : row)
+      saveEstoqueLocal(atualizados)
+      setItens(atualizados)
+      toast.warning("Entrada salva neste dispositivo, mas não foi sincronizada com o banco de dados.")
+      console.error("[v0] Falha ao sincronizar entrada:", error)
+    }
+  }
 
   const aplicarInventario = async (item: Item, base: number, contado: number, motivo: NonNullable<MovimentacaoEstoque["motivo"]>, observacao?: string) => {
     if (userRole !== "owner" && userRole !== "admin") throw new Error("Somente owner/admin podem aplicar ajustes de inventário.")
