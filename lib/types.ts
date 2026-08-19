@@ -1,5 +1,5 @@
-export type UnidadeInsumo = "un" | "g" | "kg" | "ml" | "l" | "pacote" | "caixa" | "bobina" | "maço" | "pct" | "aplicação"
-export type CategoriaInsumo = "Carnes" | "Pães" | "Queijos" | "Molhos" | "Batatas/congelados" | "Bebidas" | "Embalagens" | "Mercearia"
+export type UnidadeInsumo = "un" | "g" | "kg" | "ml" | "l" | "m" | "pacote" | "caixa" | "bobina" | "maço" | "fardo" | "saco" | "garrafa" | "lata" | "pct" | "aplicação"
+export type CategoriaInsumo = "Carnes" | "Pães" | "Queijos" | "Molhos" | "Batatas/congelados" | "Bebidas" | "Embalagens" | "Mercearia" | "Laticínios" | "Padaria" | "Congelados" | "Temperos" | "Higiene/Limpeza" | "Outros"
 
 export interface Item {
   id?: string
@@ -20,6 +20,7 @@ export interface Item {
   precoReferencia?: number
   unidadeReferencia?: string
   ultimaAtualizacaoPreco?: string
+  ativo?: boolean
   ultimaAlteracao?: {
     usuario: string
     data: string

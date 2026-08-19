@@ -177,7 +177,7 @@ export default function Home() {
       console.error("[v0] Erro ao carregar dados financeiros do estoque:", err)
     }
   }
-  const persistirInsumos = (data: Insumo[]) => { setInsumos(data); saveInsumos(data).catch((err) => console.error("[v0] Erro ao salvar preços:", err)) }
+  const persistirInsumos = (data: Insumo[]) => { if (userRole !== "owner" && userRole !== "admin") return; setInsumos(data); saveInsumos(data).catch((err) => console.error("[v0] Erro ao salvar insumos:", err)) }
   const persistirCompras = (data: CompraRegistro[]) => { setComprasHistorico(data); saveComprasHistorico(data).catch((err) => console.error("[v0] Erro ao salvar compras:", err)) }
 
   // Load data on mount

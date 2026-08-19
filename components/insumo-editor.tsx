@@ -1,0 +1,43 @@
+"use client"
+
+import { useMemo, useState } from "react"
+import { Plus, Save, X } from "lucide-react"
+import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog"
+import type { CategoriaInsumo, Insumo, UnidadeInsumo } from "@/lib/types"
+
+const categorias: CategoriaInsumo[] = ["Carnes", "Pães", "Queijos", "Molhos", "Batatas/congelados", "Bebidas", "Embalagens", "Mercearia", "Laticínios", "Padaria", "Congelados", "Temperos", "Higiene/Limpeza", "Outros"]
+const compras: UnidadeInsumo[] = ["kg", "pacote", "un", "caixa", "maço", "litro" as UnidadeInsumo, "bobina", "fardo", "saco", "garrafa", "lata"]
+const conteudos: UnidadeInsumo[] = ["g", "kg", "ml", "l", "m", "un"]
+const normalizarNome = (value: string) => value.trim().toLowerCase().replace(/\s+/g, " ")
+const money = (value: number) => value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })
+
+export function InsumoEditor({ insumo, insumos, fichas, canManage, onSave, onClose }: { insumo: Insumo | null; insumos: Insumo[]; fichas: { ingredientes: { insumoId?: string }[] }[]; canManage: boolean; onSave: (data: Insumo) => void; onClose: () => void }) {
+  const [draft, setDraft] = useState<Insumo>(() => insumo ? structuredClone(insumo) : { id: crypto.randomUUID(), nome: "", categoria: "Outros", unidade: "kg", unidadeCompra: "kg", precoCompra: 0, quantidadeEmbalagem: 1, quantidadeConteudo: 1, unidadeEmbalagem: "kg", unidadeConteudo: "kg", custoUnitario: 0, min: 0, atual: 0, aliases: [], ativo: true })
+  const [original] = useState(() => insumo ? structuredClone(insumo) : null)
+  const [error, setError] = useState("")
+  const [discard, setDiscard] = useState(false)
+  const [alias, setAlias] = useState("")
+  const usedInFichas = fichas.some((ficha) => ficha.ingredientes.some((item) => item.insumoId === draft.id))
+  const equivalente = useMemo(() => { const qtd = Number(draft.quantidadeConteudo ?? draft.quantidadeEmbalagem); if (!draft.precoCompra || qtd <= 0) return null; const factor = draft.unidadeConteudo === "kg" || draft.unidadeConteudo === "l" ? 1000 : 1; return draft.precoCompra / (qtd * factor) }, [draft])
+  const alterado = JSON.stringify(draft) !== JSON.stringify(original)
+  const update = (patch: Partial<Insumo>) => setDraft((current) => ({ ...current, ...patch }))
+  const salvar = () => {
+    if (!canManage) return setError("Acesso negado.")
+    const nome = normalizarNome(draft.nome)
+    if (!nome) return setError("Informe o nome do insumo.")
+    if (draft.precoCompra < 0 || (draft.quantidadeConteudo ?? 0) <= 0) return setError("Preço e conteúdo precisam ser válidos e maiores que zero.")
+    const duplicate = insumos.some((item) => item.id !== draft.id && normalizarNome(item.nome) === nome)
+    if (duplicate) return setError("Já existe um insumo com este nome.")
+    const allNames = insumos.filter((item) => item.id !== draft.id).flatMap((item) => [item.nome, ...(item.aliases ?? [])]).map(normalizarNome)
+    const aliases = (draft.aliases ?? []).map(normalizarNome).filter(Boolean)
+    if (aliases.some((value, index) => aliases.indexOf(value) !== index || allNames.includes(value))) return setError("Este nome já está associado a outro insumo.")
+    onSave({ ...draft, nome: draft.nome.trim().replace(/\s+/g, " "), aliases, ativo: draft.ativo !== false, unidadeCompra: draft.unidadeCompra ?? draft.unidade, quantidadeEmbalagem: draft.quantidadeConteudo ?? draft.quantidadeEmbalagem, unidadeEmbalagem: draft.unidadeConteudo ?? draft.unidadeEmbalagem, custoUnitario: draft.precoCompra / Math.max(Number(draft.quantidadeConteudo ?? draft.quantidadeEmbalagem), 0.0001) })
+    onClose()
+  }
+  const cancelar = () => alterado ? setDiscard(true) : onClose()
+  return <Card className="border-primary/30"><CardHeader className="flex-row items-center justify-between"><div><p className="text-xs uppercase tracking-widest text-muted-foreground">Cadastro central</p><CardTitle>{insumo ? "Editar Insumo" : "Novo Insumo"}</CardTitle></div><Button variant="ghost" onClick={cancelar} aria-label="Fechar editor"><X data-icon="inline-start" />Cancelar</Button></CardHeader><CardContent className="flex flex-col gap-4"><div className="grid gap-4 md:grid-cols-3"><div><Label>Nome do insumo</Label><Input className="mt-1" value={draft.nome} onChange={(e) => update({ nome: e.target.value })} /></div><div><Label>Categoria</Label><select className="mt-1 flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm" value={draft.categoria} onChange={(e) => update({ categoria: e.target.value as CategoriaInsumo })}>{categorias.map((item) => <option key={item}>{item}</option>)}</select></div><div><Label>Fornecedor padrão</Label><Input className="mt-1" value={draft.fornecedor ?? ""} onChange={(e) => update({ fornecedor: e.target.value })} /></div></div><div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4"><div><Label>Unidade de compra</Label><select className="mt-1 flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm" value={draft.unidadeCompra ?? draft.unidade} onChange={(e) => update({ unidadeCompra: e.target.value as UnidadeInsumo })}>{compras.map((item) => <option key={item} value={item}>{item}</option>)}</select></div><div><Label>Preço de compra</Label><Input className="mt-1" type="number" min="0" step="0.01" value={draft.precoCompra || ""} onChange={(e) => update({ precoCompra: Number(e.target.value) || 0 })} /></div><div><Label>Quantidade do conteúdo</Label><Input className="mt-1" type="number" min="0.01" step="0.01" value={draft.quantidadeConteudo ?? draft.quantidadeEmbalagem} onChange={(e) => update({ quantidadeConteudo: Number(e.target.value) || 0 })} /></div><div><Label>Unidade do conteúdo</Label><select className="mt-1 flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm" value={draft.unidadeConteudo ?? draft.unidadeEmbalagem} onChange={(e) => update({ unidadeConteudo: e.target.value as UnidadeInsumo })}>{conteudos.map((item) => <option key={item} value={item}>{item}</option>)}</select></div></div><div><Label>Estoque mínimo</Label><Input className="mt-1 max-w-48" type="number" min="0" value={draft.min} onChange={(e) => update({ min: Number(e.target.value) || 0 })} /></div><div><Label>Aliases</Label><div className="mt-1 flex gap-2"><Input value={alias} onChange={(e) => setAlias(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter" && alias.trim()) { e.preventDefault(); update({ aliases: [...(draft.aliases ?? []), alias.trim()] }); setAlias("") } }} placeholder="Digite e pressione Enter" /><Button type="button" variant="outline" onClick={() => { if (alias.trim()) { update({ aliases: [...(draft.aliases ?? []), alias.trim()] }); setAlias("") } }}><Plus data-icon="inline-start" />Adicionar</Button></div><div className="mt-2 flex flex-wrap gap-2">{(draft.aliases ?? []).map((item, index) => <Button key={`${item}-${index}`} type="button" size="sm" variant="secondary" onClick={() => update({ aliases: draft.aliases?.filter((_, itemIndex) => itemIndex !== index) })}>{item} ×</Button>)}</div></div><div className="rounded-lg border bg-muted/30 p-4 text-sm"><p className="font-semibold">Resumo</p><p>{money(draft.precoCompra)} / {draft.unidadeCompra ?? draft.unidade}</p><p>{draft.quantidadeConteudo ?? draft.quantidadeEmbalagem} {draft.unidadeConteudo ?? draft.unidadeEmbalagem}</p><p className="font-medium">Equivalente: {equivalente ? `${money(equivalente)} / ${draft.unidadeConteudo === "kg" ? "g" : draft.unidadeConteudo}` : "pendente"}</p>{usedInFichas && <p className="mt-1 text-amber-600">Este insumo é utilizado em fichas técnicas ativas.</p>}</div>{error && <p className="text-sm text-destructive">{error}</p>}<div className="flex justify-end"><Button onClick={salvar} disabled={!canManage}><Save data-icon="inline-start" />Salvar Insumo</Button></div></CardContent><AlertDialog open={discard} onOpenChange={setDiscard}><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Descartar alterações?</AlertDialogTitle><AlertDialogDescription>Existem alterações neste insumo que ainda não foram salvas.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>Continuar editando</AlertDialogCancel><AlertDialogAction onClick={onClose}>Descartar alterações</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog></Card>
+}
