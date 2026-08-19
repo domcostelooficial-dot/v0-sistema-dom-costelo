@@ -10,9 +10,27 @@ export function custoPorUnidade(insumo: Insumo) {
 }
 
 export function converterQuantidade(quantidade: number, origem: string, destino: string) {
-  const origemFactor = unitFactor[origem] || 1
-  const destinoFactor = unitFactor[destino] || 1
+  const origemFactor = unitFactor[origem]
+  const destinoFactor = unitFactor[destino]
+  if (!origemFactor || !destinoFactor) throw new Error("UNIDADE_INCOMPATIVEL")
   return quantidade * origemFactor / destinoFactor
+}
+
+export function converterQuantidadeFichaParaEstoque({ quantidadeFicha, unidadeFicha, insumo, itemEstoque }: { quantidadeFicha: number; unidadeFicha: string; insumo: Insumo; itemEstoque: { unidadeEstoque?: string; unidade?: string; atual: number } }) {
+  const unidadeEstoque = itemEstoque.unidadeEstoque || insumo.unidadeBase || itemEstoque.unidade || insumo.unidadeBase || insumo.unidade
+  if (!Number.isFinite(quantidadeFicha) || quantidadeFicha < 0 || !unidadeEstoque) throw new Error("UNIDADE_INCOMPATIVEL")
+  const unidadeConteudo = insumo.unidadeConteudo || insumo.unidadeEmbalagem
+  const quantidadeConteudo = insumo.quantidadeConteudo
+  const embalagem = new Set(["pacote", "caixa", "bobina", "maço", "fardo", "saco", "garrafa", "lata", "pct"])
+  if (embalagem.has(unidadeEstoque)) {
+    if (!unidadeConteudo || !quantidadeConteudo || quantidadeConteudo <= 0) throw new Error("UNIDADE_INCOMPATIVEL")
+    return { quantidadeEstoque: converterQuantidade(quantidadeFicha, unidadeFicha, unidadeConteudo) / quantidadeConteudo, unidadeEstoque }
+  }
+  if (unidadeEstoque === "un" || unidadeEstoque === "unidade") {
+    if (unidadeFicha !== "un" && unidadeFicha !== "unidade") throw new Error("UNIDADE_INCOMPATIVEL")
+    return { quantidadeEstoque: quantidadeFicha, unidadeEstoque: "un" }
+  }
+  return { quantidadeEstoque: converterQuantidade(quantidadeFicha, unidadeFicha, unidadeEstoque), unidadeEstoque }
 }
 
 export function localizarInsumo(ingrediente: IngredienteFicha, insumos: Insumo[]) {
@@ -35,14 +53,19 @@ export function ingredientesPendentes(ficha: FichaTecnica, insumos: Insumo[]) {
 export function calcularConsumoVenda(venda: { id: string; produtoNome: string; quantidade: number; fichaTecnicaId?: string }, ficha: FichaTecnica | undefined, insumos: Insumo[]) {
   if (!ficha) return { ok: false as const, motivo: "Ficha técnica não encontrada", consumos: [] as Array<{ insumo: Insumo; ingrediente: IngredienteFicha; quantidade: number; quantidadeBase: number; unidadeBase: "g" | "kg" | "ml" | "l" | "un" }> }
   if (!Number.isFinite(venda.quantidade) || venda.quantidade <= 0) return { ok: false as const, motivo: "Quantidade vendida inválida", consumos: [] as Array<{ insumo: Insumo; ingrediente: IngredienteFicha; quantidade: number; quantidadeBase: number; unidadeBase: "g" | "kg" | "ml" | "l" | "un" }> }
-  const missing = ficha.ingredientes.filter((ingrediente) => !localizarInsumo(ingrediente, insumos)).map((ingrediente) => ingrediente.insumoNome)
-  if (missing.length > 0) return { ok: false as const, motivo: `Insumo não encontrado: ${missing.join(", ")}`, consumos: [] as Array<{ insumo: Insumo; ingrediente: IngredienteFicha; quantidade: number; quantidadeBase: number; unidadeBase: "g" | "kg" | "ml" | "l" | "un" }> }
-  const consumos = ficha.ingredientes.map((ingrediente) => {
-    const insumo = localizarInsumo(ingrediente, insumos)!
-    const unidadeBase = (insumo.unidadeBase || insumo.unidadeConteudo || insumo.unidade || "un") as "g" | "kg" | "ml" | "l" | "un"
-    const quantidade = ingrediente.quantidade * venda.quantidade
-    return { insumo, ingrediente, quantidade, quantidadeBase: converterQuantidade(quantidade, ingrediente.unidade, unidadeBase), unidadeBase }
-  })
+  const missing = ficha.ingredientes.filter((ingrediente) => !ingrediente.insumoId || !insumos.some((item) => item.id === ingrediente.insumoId)).map((ingrediente) => ingrediente.insumoNome)
+  if (missing.length > 0) return { ok: false as const, codigo: "INSUMO_SEM_VINCULO", motivo: `Insumo sem vínculo válido: ${missing.join(", ")}`, consumos: [] as Array<{ insumo: Insumo; ingrediente: IngredienteFicha; quantidade: number; quantidadeBase: number; unidadeBase: string; unidadeEstoque: string }> }
+  const consumos: Array<{ insumo: Insumo; ingrediente: IngredienteFicha; quantidade: number; quantidadeBase: number; unidadeBase: string; unidadeEstoque: string }> = []
+  for (const ingrediente of ficha.ingredientes) {
+    const insumo = insumos.find((item) => item.id === ingrediente.insumoId)!
+    try {
+      const quantidade = ingrediente.quantidade * venda.quantidade
+      const convertido = converterQuantidadeFichaParaEstoque({ quantidadeFicha: quantidade, unidadeFicha: ingrediente.unidade, insumo, itemEstoque: insumo })
+      consumos.push({ insumo, ingrediente, quantidade, quantidadeBase: convertido.quantidadeEstoque, unidadeBase: ingrediente.unidade, unidadeEstoque: convertido.unidadeEstoque })
+    } catch {
+      return { ok: false as const, codigo: "UNIDADE_INCOMPATIVEL", motivo: `Conversão incompatível para ${ingrediente.insumoNome}`, consumos: [] as typeof consumos }
+    }
+  }
   return { ok: true as const, consumos }
 }
 

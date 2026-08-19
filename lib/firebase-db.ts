@@ -306,6 +306,17 @@ export async function saveMovimentacoesEstoque(data: MovimentacaoEstoque[]) {
   }
 }
 
+export async function registrarBaixaBloqueada(params: { venda: VendaFinanceira; codigo: string; mensagem: string; userId: string }) {
+  const baixaRef = doc(db, "baixasVendas", params.venda.id)
+  const vendaRef = doc(db, "compras", "finance-vendas")
+  await setDoc(baixaRef, { vendaId: params.venda.id, produtoId: params.venda.produtoId, produtoNomeSnapshot: params.venda.produtoNome, quantidadeVendida: params.venda.quantidade, data: params.venda.data, codigo: params.codigo, motivo: params.mensagem, detalhes: params.mensagem, status: "bloqueada", atualizadoEm: Timestamp.now(), atualizadoPorUid: params.userId }, { merge: true })
+  const vendaSnap = await getDoc(vendaRef)
+  if (vendaSnap.exists()) {
+    const vendas = (vendaSnap.data().data ?? []) as VendaFinanceira[]
+    await setDoc(vendaRef, { data: vendas.map((venda) => venda.id === params.venda.id ? { ...venda, statusBaixa: "bloqueada", estoqueStatus: "bloqueada", motivoBloqueio: `${params.codigo}: ${params.mensagem}` } : venda), updatedAt: Timestamp.now() }, { merge: true })
+  }
+}
+
 export async function registrarBaixaVendaAtomica(params: { venda: VendaFinanceira; consumos: Array<{ insumoId?: string; insumoNomeSnapshot: string; quantidadeBase: number; unidadeBase: string; quantidadeFicha?: number; unidadeFicha?: string }>; userId: string; agora: string; canalVenda?: string }) {
   const estoqueRef = doc(db, "estoque", "global")
   const vendaRef = doc(db, "compras", "finance-vendas")
@@ -318,7 +329,13 @@ export async function registrarBaixaVendaAtomica(params: { venda: VendaFinanceir
     const itens = (estoqueSnap.exists() ? estoqueSnap.data().itens : []) as Item[]
     const atualizados = [...itens]
     const baixaId = crypto.randomUUID()
-    for (const consumo of params.consumos) {
+    const verificacoes = params.consumos.map((consumo) => {
+      const index = atualizados.findIndex((item) => (consumo.insumoId && item.insumoId === consumo.insumoId) || item.nome === consumo.insumoNomeSnapshot)
+      if (index < 0) throw new Error(`Insumo não encontrado no estoque: ${consumo.insumoNomeSnapshot}`)
+      if (atualizados[index].atual < consumo.quantidadeBase) throw new Error(`Estoque insuficiente: ${consumo.insumoNomeSnapshot}. Necessário: ${consumo.quantidadeBase} ${consumo.unidadeBase}. Disponível: ${atualizados[index].atual} ${atualizados[index].unidadeEstoque ?? atualizados[index].unidade ?? consumo.unidadeBase}.`)
+      return { consumo, index }
+    })
+    for (const { consumo, index } of verificacoes) {
       const index = atualizados.findIndex((item) => (consumo.insumoId && item.insumoId === consumo.insumoId) || item.nome === consumo.insumoNomeSnapshot)
       if (index < 0) throw new Error(`Insumo não encontrado no estoque: ${consumo.insumoNomeSnapshot}`)
       if (atualizados[index].atual < consumo.quantidadeBase) throw new Error(`Estoque insuficiente: ${consumo.insumoNomeSnapshot}`)
@@ -334,7 +351,7 @@ export async function registrarBaixaVendaAtomica(params: { venda: VendaFinanceir
     }
     return { idempotente: false, itens: atualizados, baixaId }
   }).catch(async (error) => {
-    const motivo = error instanceof Error && error.message.startsWith("Estoque insuficiente") ? "ESTOQUE_INSUFICIENTE" : error instanceof Error && error.message.startsWith("Insumo não encontrado") ? "INSUMO_SEM_VINCULO" : "ERRO_PROCESSAMENTO"
+    const motivo = error instanceof Error && error.message.startsWith("Estoque insuficiente") ? "ESTOQUE_INSUFICIENTE" : error instanceof Error && error.message.startsWith("Insumo não encontrado") ? "INSUMO_SEM_VINCULO" : error instanceof Error && error.message.includes("UNIDADE_INCOMPATIVEL") ? "UNIDADE_INCOMPATIVEL" : "ERRO_PROCESSAMENTO"
     await setDoc(baixaRef, { vendaId: params.venda.id, produtoId: params.venda.produtoId, produtoNomeSnapshot: params.venda.produtoNome, data: params.venda.data, motivo, detalhes: error instanceof Error ? error.message : "Erro desconhecido", status: "bloqueada", consumos: params.consumos, atualizadoEm: Timestamp.now(), atualizadoPorUid: params.userId }, { merge: true })
     const vendaSnap = await getDoc(vendaRef)
     if (vendaSnap.exists()) {

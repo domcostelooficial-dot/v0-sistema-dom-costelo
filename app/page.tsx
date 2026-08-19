@@ -42,6 +42,7 @@ import {
   ajustarEstoqueAtomico,
   ajustarInventarioAtomico,
   registrarBaixaVendaAtomica,
+  registrarBaixaBloqueada,
   estornarMovimentacaoAtomica,
 } from "@/lib/firebase-db"
 import { criarEntrada, criarSaida } from "@/lib/estoque-movements"
@@ -216,12 +217,19 @@ export default function Home() {
   }
 
   const processarBaixaVenda = async (venda: VendaFinanceira) => {
-    if (userRole !== "owner" && userRole !== "admin") throw new Error("Somente owner/admin podem processar baixas de venda.")
+    const currentUser = auth.currentUser
+    if (!currentUser) throw new Error("Usuário autenticado não encontrado.")
     const ficha = fichasTecnicas.find((item) => item.id === venda.fichaTecnicaId || item.id === venda.produtoId || item.nome.toLowerCase() === venda.produtoNome.toLowerCase())
     const consumo = calcularConsumoVenda(venda, ficha, insumos)
-    if (!consumo.ok) throw new Error(consumo.motivo)
-    const currentUser = auth.currentUser
-    if (!currentUser || !ficha) throw new Error("Venda sem usuário ou ficha técnica válida")
+    if (!consumo.ok) {
+      const codigo = consumo.codigo ?? (!ficha ? "PRODUTO_SEM_FICHA" : "ERRO_PROCESSAMENTO")
+      await registrarBaixaBloqueada({ venda, codigo, mensagem: consumo.motivo, userId: currentUser.uid })
+      setVendasFinanceiras((rows) => rows.map((row) => row.id === venda.id ? { ...row, statusBaixa: "bloqueada", estoqueStatus: "bloqueada", motivoBloqueio: `${codigo}: ${consumo.motivo}` } : row))
+      throw new Error(`${codigo}: ${consumo.motivo}`)
+    }
+    if (!ficha) throw new Error("PRODUTO_SEM_FICHA: Ficha técnica não encontrada")
+    if (venda.statusBaixa === "baixada") return
+    if (userRole !== "owner" && userRole !== "admin" && userRole !== "operador") throw new Error("Papel sem permissão para baixa automática derivada de venda.")
     const agora = new Date().toISOString()
     const result = await registrarBaixaVendaAtomica({ venda, consumos: consumo.consumos.map((item) => ({ insumoId: item.insumo.id, insumoNomeSnapshot: item.insumo.nome, quantidadeBase: item.quantidadeBase, unidadeBase: item.unidadeBase })), userId: currentUser.uid, agora, canalVenda: venda.canalNaVenda })
     setItens(result.itens)

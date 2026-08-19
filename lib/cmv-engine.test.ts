@@ -36,7 +36,7 @@ describe("CMV", () => {
   })
 
   it("calcula consumo agregado por venda e converte unidade", () => {
-    const ficha: FichaTecnica = { id: "hamb", nome: "Hambúrguer", precoVenda: 20, ingredientes: [{ insumoNome: "Mussarela", quantidade: 25, unidade: "g" }] }
+    const ficha: FichaTecnica = { id: "hamb", nome: "Hambúrguer", precoVenda: 20, ingredientes: [{ insumoId: "mussarela", insumoNome: "Mussarela", quantidade: 25, unidade: "g" }] }
     const result = calcularConsumoVenda({ id: "v1", produtoNome: "Hambúrguer", quantidade: 4, fichaTecnicaId: "hamb" }, ficha, [mussarela])
     expect(result.ok).toBe(true)
     if (result.ok) expect(result.consumos[0].quantidadeBase).toBeCloseTo(0.1)
@@ -44,7 +44,7 @@ describe("CMV", () => {
 
   it("bloqueia ficha ausente ou insumo não vinculado", () => {
     expect(calcularConsumoVenda({ id: "v1", produtoNome: "X", quantidade: 1 }, undefined, []).ok).toBe(false)
-    expect(calcularConsumoVenda({ id: "v1", produtoNome: "X", quantidade: 1 }, { id: "x", nome: "X", precoVenda: 1, ingredientes: [{ insumoNome: "Não existe", quantidade: 1, unidade: "g" }] }, []).ok).toBe(false)
+    expect(calcularConsumoVenda({ id: "v1", produtoNome: "X", quantidade: 1 }, { id: "x", nome: "X", precoVenda: 1, ingredientes: [{ insumoId: "missing", insumoNome: "Não existe", quantidade: 1, unidade: "g" }] }, []).ok).toBe(false)
   })
 
   it("não cria percentuais para preço ou CMV inválidos", () => {
