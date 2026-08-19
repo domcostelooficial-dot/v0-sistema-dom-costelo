@@ -27,6 +27,9 @@ import {
   initializeFichasTecnicas,
   migrarFichasTecnicasV2,
   saveFichasTecnicas,
+  getCombos,
+  saveCombos,
+  migrarCombosV1,
   getComprasHistorico,
   saveComprasHistorico,
   getFinanceConfig,
@@ -62,7 +65,7 @@ import { DashboardView } from "@/components/dashboard-view"
 import { ListaComprasView } from "@/components/lista-compras-view"
 import { AdminView } from "@/components/admin-view"
 import { CmvView } from "@/components/cmv-view"
-import { seedFichas, calcularConsumoVenda, migrarFichasParaCarneKg } from "@/lib/cmv-engine"
+import { seedFichas, calcularConsumoVenda, calcularConsumoComboVenda, migrarFichasParaCarneKg } from "@/lib/cmv-engine"
 import { Menu, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { signOut } from "firebase/auth"
@@ -177,6 +180,7 @@ export default function Home() {
   const [comprasHistorico, setComprasHistorico] = useState<CompraRegistro[]>([])
   const [movimentacoes, setMovimentacoes] = useState<MovimentacaoEstoque[]>([])
   const [fichasTecnicas, setFichasTecnicas] = useState<typeof seedFichas>([])
+  const [combos, setCombos] = useState<import("@/lib/types").Combo[]>([])
   const [fichasLoading, setFichasLoading] = useState(true)
   const [financeConfig, setFinanceConfig] = useState<FinanceConfig | undefined>(undefined)
   const [vendasFinanceiras, setVendasFinanceiras] = useState<VendaFinanceira[]>([])
@@ -187,7 +191,7 @@ export default function Home() {
   const getComprasHybrid = async (roleOverride?: string) => {
     const roleAtual = roleOverride ?? userRole
     try {
-  const [insumosResult, historicoResult, fichasResult, movimentacoesResult] = await Promise.all([getInsumos(), getComprasHistorico(), getFichasTecnicas(), getMovimentacoesEstoque()])
+  const [insumosResult, historicoResult, fichasResult, movimentacoesResult, combosResult] = await Promise.all([getInsumos(), getComprasHistorico(), getFichasTecnicas(), getMovimentacoesEstoque(), getCombos()])
   const custosMestres = roleAtual === "owner" || roleAtual === "admin" ? (await migrarCustosMestresDomCosteloV1(defaultInsumos)).data : insumosResult
   const carneOficial = defaultInsumos.find((item) => item.id === "carne-hamburguer-kg")!
   const insumosResultAtualizados = custosMestres.length > 0 ? custosMestres : insumosResult
@@ -203,6 +207,10 @@ export default function Home() {
   if (migracao.errors.length > 0) console.error("[v0] Migração V2 bloqueada:", migracao.errors)
   }
   if (movimentacoesResult.length > 0) setMovimentacoes(movimentacoesResult)
+  if (roleAtual === "owner" || roleAtual === "admin") {
+    const combosMigrados = await migrarCombosV1((await import("@/lib/cmv-engine")).seedCombos)
+    setCombos(combosMigrados.data)
+  } else if (combosResult.length > 0) setCombos(combosResult)
     } catch (err) {
       console.error("[v0] Erro ao carregar dados financeiros do estoque:", err)
     }
@@ -234,13 +242,14 @@ export default function Home() {
     const currentUser = auth.currentUser
     if (!currentUser) throw new Error("Usuário autenticado não encontrado.")
     const ficha = fichasTecnicas.find((item) => item.id === venda.fichaTecnicaId || item.id === venda.produtoId || item.nome.toLowerCase() === venda.produtoNome.toLowerCase())
-    const combo = venda.produtoId?.toLowerCase().includes("combo") || venda.produtoNome.toLowerCase().includes("combo")
-    if (combo && !ficha?.ingredientes?.length) {
+    const comboAtual = combos.find((item) => item.id === venda.produtoId || item.nome.toLowerCase() === venda.produtoNome.toLowerCase())
+    const combo = Boolean(comboAtual)
+    if (combo && !comboAtual?.itens.length) {
       await registrarBaixaBloqueada({ venda, codigo: "COMBO_SEM_COMPOSICAO", mensagem: "Combo sem composição cadastrada para baixa automática.", userId: currentUser.uid })
       setVendasFinanceiras((rows) => rows.map((row) => row.id === venda.id ? { ...row, statusBaixa: "bloqueada", estoqueStatus: "bloqueada", motivoBloqueio: "COMBO_SEM_COMPOSICAO: Combo sem composição cadastrada para baixa automática." } : row))
       throw new Error("COMBO_SEM_COMPOSICAO: Combo sem composição cadastrada para baixa automática.")
     }
-    const consumo = calcularConsumoVenda(venda, ficha, insumos, itens)
+    const consumo = comboAtual ? calcularConsumoComboVenda(venda, comboAtual, fichasTecnicas, insumos, itens) : calcularConsumoVenda(venda, ficha, insumos, itens)
     if (!consumo.ok) {
       const codigo = consumo.codigo ?? (!ficha ? "PRODUTO_SEM_FICHA" : "ERRO_PROCESSAMENTO")
       await registrarBaixaBloqueada({ venda, codigo, mensagem: consumo.motivo, userId: currentUser.uid })
@@ -596,7 +605,7 @@ export default function Home() {
             />
           )}
   {activeTab === "cmv" && (
-  <CmvView insumos={insumos} fichas={fichasTecnicas} userRole={userRole} onSaveInsumos={persistirInsumos} onSaveFichas={persistirFichas} />
+  <CmvView insumos={insumos} fichas={fichasTecnicas} combos={combos} userRole={userRole} onSaveInsumos={persistirInsumos} onSaveFichas={persistirFichas} onSaveCombos={(data) => { setCombos(data); saveCombos(data).catch((error) => console.error("[v0] Erro ao salvar combos:", error)) }} />
   )}
   {activeTab === "admin" && userRole === "admin" && (
   <AdminView currentUser={user} onPasswordChange={handlePasswordChange} />

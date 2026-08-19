@@ -15,7 +15,7 @@ import {
   runTransaction,
 } from "firebase/firestore"
 import { db } from "./firebase"
-import type { Item, HistoricoEntry, Receita, UsuarioSistema, Insumo, FichaTecnica, VendaProduto, CompraRegistro, FinanceConfig, VendaFinanceira, DespesaFinanceira, MovimentacaoEstoque } from "./types"
+import type { Item, HistoricoEntry, Receita, UsuarioSistema, Insumo, FichaTecnica, VendaProduto, CompraRegistro, FinanceConfig, VendaFinanceira, DespesaFinanceira, MovimentacaoEstoque, Combo } from "./types"
 import type { FinanceAuditSnapshot } from "./finance-engine"
 import { resolverIngredientesFicha, normalizarNomeInsumo } from "./cmv-engine"
 
@@ -270,6 +270,21 @@ export async function getInsumos() { return getComprasData<Insumo>("insumos") }
 export async function saveInsumos(data: Insumo[]) { return saveComprasData("insumos", data) }
 export async function getFichasTecnicas() { return getComprasData<FichaTecnica>("fichas-tecnicas") }
 export async function saveFichasTecnicas(data: FichaTecnica[]) { return saveComprasData("fichas-tecnicas", data) }
+export async function getCombos() { return getComprasData<Combo>("combos") }
+export async function saveCombos(data: Combo[]) { return saveComprasData("combos", data) }
+
+export async function migrarCombosV1(seed: Combo[]) {
+  const settingsRef = doc(db, "settings", "system")
+  const settingsSnap = await getDoc(settingsRef)
+  const existing = await getCombos()
+  if (settingsSnap.data()?.combosDomCosteloV1Aplicada === true) return { applied: false, skipped: true, data: existing.length ? existing : seed }
+  const porId = new Map(existing.map((combo) => [combo.id, combo]))
+  for (const combo of seed) porId.set(combo.id, existing.find((atual) => atual.id === combo.id) ?? combo)
+  const data = [...porId.values()]
+  await saveCombos(data)
+  await setDoc(settingsRef, { combosDomCosteloV1Aplicada: true, combosDomCosteloV1AplicadaEm: Timestamp.now(), combosDomCosteloV1Count: seed.length }, { merge: true })
+  return { applied: true, skipped: false, data }
+}
 
 export async function getFinanceConfig() { const rows = await getComprasData<FinanceConfig>("finance-config"); return rows[0] }
 export async function saveFinanceConfig(data: FinanceConfig) { return saveComprasData("finance-config", [data]) }

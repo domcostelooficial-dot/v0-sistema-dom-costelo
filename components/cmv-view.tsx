@@ -8,13 +8,13 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog"
-import type { FichaTecnica, Insumo } from "@/lib/types"
+import type { Combo, FichaTecnica, Insumo } from "@/lib/types"
 import { InsumoEditor } from "@/components/insumo-editor"
-import { alertaCmv, calcularFicha, custoIngrediente, custoPorUnidade, formatBRL, formatPercent, ingredientesPendentes } from "@/lib/cmv-engine"
+import { alertaCmv, calcularCustoCombo, calcularFicha, custoIngrediente, custoPorUnidade, formatBRL, formatPercent, ingredientesPendentes, seedCombos } from "@/lib/cmv-engine"
 
 type View = "dashboard" | "insumos" | "fichas" | "combos" | "calculadora" | "historico"
 
-export function CmvView({ insumos, fichas, userRole, onSaveInsumos, onSaveFichas }: { insumos: Insumo[]; fichas: FichaTecnica[]; userRole: string; onSaveInsumos: (data: Insumo[]) => void; onSaveFichas: (data: FichaTecnica[]) => boolean }) {
+export function CmvView({ insumos, fichas, combos = seedCombos, userRole, onSaveInsumos, onSaveFichas, onSaveCombos }: { insumos: Insumo[]; fichas: FichaTecnica[]; combos?: Combo[]; userRole: string; onSaveInsumos: (data: Insumo[]) => void; onSaveFichas: (data: FichaTecnica[]) => boolean; onSaveCombos?: (data: Combo[]) => void }) {
   const canManageFichas = userRole === "owner" || userRole === "admin"
   const [view, setView] = useState<View>("dashboard")
   const [search, setSearch] = useState("")
@@ -133,7 +133,7 @@ export function CmvView({ insumos, fichas, userRole, onSaveInsumos, onSaveFichas
 
     {view === "dashboard" && <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4"><Card><CardHeader className="pb-2"><CardTitle className="text-sm text-muted-foreground">CMV médio</CardTitle></CardHeader><CardContent className="text-2xl font-bold">{formatPercent(average)}</CardContent></Card><Card><CardHeader className="pb-2"><CardTitle className="text-sm text-muted-foreground">Menor CMV</CardTitle></CardHeader><CardContent className="text-lg font-bold">{fichas.length ? formatPercent(Math.min(...fichas.map((ficha) => calcularFicha(ficha, insumos).cmvPercentual ?? 0))) : "—"}</CardContent></Card><Card><CardHeader className="pb-2"><CardTitle className="text-sm text-muted-foreground">Maior CMV</CardTitle></CardHeader><CardContent className="text-lg font-bold">{fichas.length ? formatPercent(Math.max(...fichas.map((ficha) => calcularFicha(ficha, insumos).cmvPercentual ?? 0))) : "—"}</CardContent></Card><Card><CardHeader className="pb-2"><CardTitle className="text-sm text-muted-foreground">Acima de 40%</CardTitle></CardHeader><CardContent className="text-2xl font-bold">{fichas.filter((ficha) => (calcularFicha(ficha, insumos).cmvPercentual ?? 0) > 40).length}</CardContent></Card></div>}
 
-    {view === "combos" && <Card><CardHeader><CardTitle>Combos e composição de CMV</CardTitle></CardHeader><CardContent><div className="rounded-xl border p-5 text-sm text-muted-foreground">Os combos são calculados a partir das fichas técnicas e insumos centrais. Cadastre ou edite os componentes nas fichas para manter os custos sempre atualizados.</div></CardContent></Card>}
+    {view === "combos" && <div className="grid gap-4 lg:grid-cols-2">{combos.map((combo: Combo) => { const data = calcularCustoCombo(combo, fichas, insumos); const status = data.pendentes.length ? "Custo pendente" : data.margemPercentual !== null && data.margemPercentual >= 55 ? "Margem saudável" : "Revisar preço"; return <Card key={combo.id}><CardHeader className="flex-row items-start justify-between"><div><CardTitle>{combo.nome}</CardTitle><p className="text-sm text-muted-foreground">{combo.itens.map((item) => `${item.quantidade}× ${item.nome}`).join(" · ")}</p></div><Badge variant={data.pendentes.length ? "destructive" : data.margemPercentual !== null && data.margemPercentual >= 55 ? "default" : "outline"}>{status}</Badge></CardHeader><CardContent className="grid gap-4 sm:grid-cols-4"><Metric label="Preço" value={formatBRL(combo.precoVenda)} /><Metric label="CMV" value={formatBRL(data.cmv)} /><Metric label="Margem" value={formatBRL(data.margem)} /><Metric label="Margem %" value={formatPercent(data.margemPercentual)} />{data.pendentes.length > 0 && <p className="sm:col-span-4 text-xs text-destructive">Componentes sem cadastro: {data.pendentes.join(", ")}</p>}</CardContent></Card>})}</div>}
 
     {view === "historico" && <Card><CardHeader><CardTitle>Histórico de alterações de custos</CardTitle></CardHeader><CardContent><div className="rounded-xl border p-5 text-sm text-muted-foreground">As alterações de preço são aplicadas imediatamente às fichas técnicas e indicadores derivados.</div></CardContent></Card>}
 

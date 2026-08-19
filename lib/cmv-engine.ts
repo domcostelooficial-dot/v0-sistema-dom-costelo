@@ -78,7 +78,48 @@ export function calcularFicha(ficha: FichaTecnica, insumos: Insumo[]) {
   const embalagens = ficha.embalagem || 0
   const cmv = ingredientes + embalagens
   const margem = ficha.precoVenda - cmv
-  return { ingredientes, embalagens, cmv, pendentes, custoPendente: pendentes.length > 0, cmvPercentual: ficha.precoVenda > 0 ? cmv / ficha.precoVenda * 100 : null, margem, margemPercentual: ficha.precoVenda > 0 ? margem / ficha.precoVenda * 100 : null, markup: cmv > 0 && ficha.precoVenda > 0 ? ficha.precoVenda / cmv : null }
+  const cmvPercentual = ficha.precoVenda > 0 ? cmv / ficha.precoVenda * 100 : null
+  const margemPercentual = ficha.precoVenda > 0 ? margem / ficha.precoVenda * 100 : null
+  return { ingredientes, embalagens, cmv, pendentes, custoPendente: pendentes.length > 0, cmvPercentual, margem, margemPercentual, markup: cmv > 0 && ficha.precoVenda > 0 ? ficha.precoVenda / cmv : null, lucroBruto: margem, margemBruta: margemPercentual }
+}
+
+export function calcularCustoCombo(combo: import("./types").Combo, fichas: FichaTecnica[], insumos: Insumo[]) {
+  const detalhes = combo.itens.map((item) => {
+    if (item.tipo === "produto" || item.tipo === "composto") {
+      const ficha = fichas.find((fichaAtual) => fichaAtual.id === item.referenciaId)
+      return { item, custo: ficha ? calcularFicha(ficha, insumos).cmv * item.quantidade : 0, pendente: !ficha }
+    }
+    const insumo = insumos.find((insumoAtual) => insumoAtual.id === item.referenciaId)
+    return { item, custo: insumo ? custoIngrediente({ insumoId: insumo.id, insumoNome: insumo.nome, quantidade: item.quantidade, unidade: item.unidade ?? insumo.unidade }, insumos) : 0, pendente: !insumo }
+  })
+  const cmv = detalhes.reduce((total, detalhe) => total + detalhe.custo, 0)
+  const margem = combo.precoVenda - cmv
+  return { cmv, margem, margemPercentual: combo.precoVenda > 0 ? margem / combo.precoVenda * 100 : null, markup: cmv > 0 ? combo.precoVenda / cmv : null, pendentes: detalhes.filter((detalhe) => detalhe.pendente).map((detalhe) => detalhe.item.nome), detalhes }
+}
+
+export const seedCombos: import("./types").Combo[] = [
+  { id: "combo-casal", nome: "Combo Casal", precoVenda: 69.9, ativo: true, itens: [{ tipo: "produto", referenciaId: "super-bacon-bbq", nome: "Super Bacon BBQ", quantidade: 1 }, { tipo: "produto", referenciaId: "dom-supreme", nome: "Dom Supreme", quantidade: 1 }, { tipo: "insumo", referenciaId: "coca-cola-1-5l", nome: "Coca-Cola 1,5L", quantidade: 1, unidade: "un" }] },
+  { id: "combo-familia", nome: "Combo Família", precoVenda: 99.9, ativo: true, itens: [{ tipo: "produto", referenciaId: "super-bacon-bbq", nome: "Super Bacon BBQ", quantidade: 2 }, { tipo: "produto", referenciaId: "batata-dom-costelo", nome: "Batata Dom Costelo", quantidade: 1 }, { tipo: "insumo", referenciaId: "coca-cola-1-5l", nome: "Coca-Cola 1,5L", quantidade: 1, unidade: "un" }] },
+]
+
+
+export function calcularConsumoComboVenda(venda: { id: string; produtoNome: string; quantidade: number }, combo: import("./types").Combo | undefined, fichas: FichaTecnica[], insumos: Insumo[], estoque: Item[] = []) {
+  if (!combo) return { ok: false as const, codigo: "COMBO_SEM_COMPOSICAO", motivo: "Combo sem composição cadastrada.", consumos: [] as never[] }
+  const consumos: Array<{ insumo: Insumo; quantidadeBase: number; quantidade: number; unidadeBase: string; unidadeEstoque: string }> = []
+  for (const item of combo.itens) {
+    if (item.tipo === "insumo") {
+      const insumo = insumos.find((atual) => atual.id === item.referenciaId)
+      const itemEstoque = estoque.find((atual) => atual.insumoId === item.referenciaId || atual.id === item.referenciaId)
+      if (!insumo || !itemEstoque) return { ok: false as const, codigo: "INSUMO_SEM_VINCULO", motivo: `Componente sem estoque: ${item.nome}`, consumos: [] as typeof consumos }
+      try { const convertido = converterQuantidadeFichaParaEstoque({ quantidadeFicha: item.quantidade * venda.quantidade, unidadeFicha: item.unidade ?? insumo.unidade, insumo, itemEstoque }); consumos.push({ insumo, quantidadeBase: convertido.quantidadeEstoque, quantidade: item.quantidade * venda.quantidade, unidadeBase: item.unidade ?? insumo.unidade, unidadeEstoque: convertido.unidadeEstoque }) } catch { return { ok: false as const, codigo: "UNIDADE_INCOMPATIVEL", motivo: `Conversão incompatível para ${item.nome}`, consumos: [] as typeof consumos } }
+    } else {
+      const ficha = fichas.find((atual) => atual.id === item.referenciaId)
+      const resultado = calcularConsumoVenda({ ...venda, produtoNome: item.nome, fichaTecnicaId: item.referenciaId, quantidade: item.quantidade * venda.quantidade }, ficha, insumos, estoque)
+      if (!resultado.ok) return resultado
+      consumos.push(...resultado.consumos)
+    }
+  }
+  return { ok: true as const, consumos }
 }
 
 export function alertaCmv(percentual: number | null) {

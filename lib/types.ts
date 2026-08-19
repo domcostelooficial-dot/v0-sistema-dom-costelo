@@ -61,6 +61,9 @@ export interface FichaTecnica {
   categoria?: string
   ativo?: boolean
   metaCmv?: number
+  lucroBruto?: number
+  margemBruta?: number
+  markup?: number
 }
 
 export interface HistoricoPrecoInsumo {
@@ -73,7 +76,7 @@ export interface HistoricoPrecoInsumo {
 }
 
 export interface ComboItem {
-  tipo: "produto" | "insumo"
+  tipo: "produto" | "insumo" | "composto"
   referenciaId: string
   nome: string
   quantidade: number
