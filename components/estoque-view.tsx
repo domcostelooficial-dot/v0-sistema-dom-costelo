@@ -95,6 +95,7 @@ export function EstoqueView({ itens, onUpdateItem, onAddItem, onEditItem, onDele
     unidadeEstoque: "Unidade",
     quantidadePorEmbalagem: 1,
     unidadeConteudo: "un",
+    precoCompra: 0,
   })
 
   const filteredItens = useMemo(() => {
@@ -163,12 +164,13 @@ export function EstoqueView({ itens, onUpdateItem, onAddItem, onEditItem, onDele
       unidadeEstoque: formData.unidadeEstoque,
       quantidadePorEmbalagem: formData.quantidadePorEmbalagem,
       unidadeConteudo: formData.unidadeConteudo,
+      precoCompra: formData.precoCompra,
       ultimaAlteracao: undefined,
     }
 
     onAddItem(newItem)
     setIsAddDialogOpen(false)
-    setFormData({ nome: "", categoria: "Carnes", min: 1, atual: 0, unidadeEstoque: "Unidade", quantidadePorEmbalagem: 1, unidadeConteudo: "un" })
+    setFormData({ nome: "", categoria: "Carnes", min: 1, atual: 0, unidadeEstoque: "Unidade", quantidadePorEmbalagem: 1, unidadeConteudo: "un", precoCompra: 0 })
     toast.success(`Item "${newItem.nome}" adicionado com sucesso!`)
   }
 
@@ -179,7 +181,7 @@ export function EstoqueView({ itens, onUpdateItem, onAddItem, onEditItem, onDele
       toast.error("Digite um nome para o item")
       return
     }
-    if (formData.min < 0 || formData.atual < 0 || formData.quantidadePorEmbalagem < 0) {
+    if (formData.min < 0 || formData.atual < 0 || formData.quantidadePorEmbalagem < 0 || formData.precoCompra < 0) {
       toast.error("Os valores numéricos não podem ser negativos")
       return
     }
@@ -197,6 +199,7 @@ export function EstoqueView({ itens, onUpdateItem, onAddItem, onEditItem, onDele
       unidadeEstoque: formData.unidadeEstoque,
       quantidadePorEmbalagem: formData.quantidadePorEmbalagem,
       unidadeConteudo: formData.unidadeConteudo,
+      precoCompra: formData.precoCompra,
     }
 
     onEditItem(selectedItem.nome, updatedItem)
@@ -224,6 +227,7 @@ export function EstoqueView({ itens, onUpdateItem, onAddItem, onEditItem, onDele
       unidadeEstoque: item.unidadeEstoque ?? "Unidade",
       quantidadePorEmbalagem: item.quantidadePorEmbalagem ?? 1,
       unidadeConteudo: item.unidadeConteudo ?? "un",
+      precoCompra: item.precoCompra ?? 0,
     })
     setIsEditDialogOpen(true)
   }
@@ -356,6 +360,10 @@ export function EstoqueView({ itens, onUpdateItem, onAddItem, onEditItem, onDele
                       <Input id="add-unidade-conteudo" value={formData.unidadeConteudo} onChange={(e) => setFormData({ ...formData, unidadeConteudo: e.target.value })} placeholder="kg" />
                     </div>
                   </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="add-preco">Preço unitário</Label>
+                    <Input id="add-preco" type="number" min="0" step="0.01" value={formData.precoCompra} onChange={(e) => setFormData({ ...formData, precoCompra: Number(e.target.value) })} placeholder="0,00" />
+                  </div>
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label htmlFor="add-min">Estoque Mínimo</Label>
@@ -388,7 +396,7 @@ export function EstoqueView({ itens, onUpdateItem, onAddItem, onEditItem, onDele
                     variant="outline"
                     onClick={() => {
                       setIsAddDialogOpen(false)
-                      setFormData({ nome: "", categoria: "Carnes", min: 1, atual: 0, unidadeEstoque: "Unidade", quantidadePorEmbalagem: 1, unidadeConteudo: "un" })
+                      setFormData({ nome: "", categoria: "Carnes", min: 1, atual: 0, unidadeEstoque: "Unidade", quantidadePorEmbalagem: 1, unidadeConteudo: "un", precoCompra: 0 })
                     }}
                   >
                     Cancelar
@@ -436,6 +444,7 @@ export function EstoqueView({ itens, onUpdateItem, onAddItem, onEditItem, onDele
                   <TableHead className="text-muted-foreground">Embalagem</TableHead>
                   <TableHead className="text-muted-foreground text-center">Mínimo</TableHead>
                   <TableHead className="text-muted-foreground text-center">Atual</TableHead>
+                  <TableHead className="text-muted-foreground text-center">Preço un.</TableHead>
                   <TableHead className="text-muted-foreground text-center">Status</TableHead>
                   <TableHead className="text-muted-foreground hidden md:table-cell">Alterado por</TableHead>
                   <TableHead className="text-muted-foreground text-center">Ações</TableHead>
@@ -458,6 +467,9 @@ export function EstoqueView({ itens, onUpdateItem, onAddItem, onEditItem, onDele
                     </TableCell>
                     <TableCell className="text-center font-medium text-foreground">
                       {item.atual}
+                    </TableCell>
+                    <TableCell className="text-center text-muted-foreground">
+                      R$ {(item.precoCompra ?? 0).toFixed(2).replace(".", ",")}
                     </TableCell>
                     <TableCell className="text-center">
                       {getStatusBadge(item)}
@@ -560,6 +572,10 @@ export function EstoqueView({ itens, onUpdateItem, onAddItem, onEditItem, onDele
                 <Label htmlFor="edit-unidade-conteudo">Unidade conteúdo</Label>
                 <Input id="edit-unidade-conteudo" value={formData.unidadeConteudo} onChange={(e) => setFormData({ ...formData, unidadeConteudo: e.target.value })} />
               </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-preco">Preço unitário</Label>
+              <Input id="edit-preco" type="number" min="0" step="0.01" value={formData.precoCompra} onChange={(e) => setFormData({ ...formData, precoCompra: Number(e.target.value) })} placeholder="0,00" />
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
