@@ -56,10 +56,12 @@ export function calcularVenda(input: { id: string; data: string; canal: CanalVen
   const pagamentoPct = config.taxasPagamento[formaPagamento] || 0
   const legacyChannel = input.canal === "ifood" || input.canal === "balcao" || input.canal === "delivery" || input.canal === "whatsapp"
   const canal = legacyChannel ? { taxaPercentual: config.taxas?.[input.canal] || 0, taxaFixa: 0 } : (config.taxasCanal[canalNormalizado] || { taxaPercentual: 0, taxaFixa: 0 })
-  const taxaPagamentoValor = calcularTaxa(valorVenda, pagamentoPct), taxaCanalValor = calcularTaxa(valorVenda, canal.taxaPercentual, canal.taxaFixa)
+  const usaTaxaExclusivaDoCanal = canalNormalizado === "99food"
+  const taxaPagamentoAplicada = usaTaxaExclusivaDoCanal ? 0 : pagamentoPct
+  const taxaPagamentoValor = calcularTaxa(valorVenda, taxaPagamentoAplicada), taxaCanalValor = calcularTaxa(valorVenda, canal.taxaPercentual, canal.taxaFixa)
   const taxaTotalValor = taxaPagamentoValor + taxaCanalValor, cmvTotalNaVenda = Math.max(0, input.cmvUnitario) * quantidade
   const receitaLiquida = valorVenda - taxaTotalValor
-  return { id: input.id, data: input.data, status: "ativa", canalNaVenda: canalNormalizado, formaPagamentoNaVenda: formaPagamento, produtoId: input.produtoId, produtoNome: input.produtoNome, quantidade, precoUnitarioNaVenda: input.precoUnitario, desconto, valorBruto, valorVenda, taxaPagamentoPercentual: pagamentoPct, taxaPagamentoValor, taxaCanalPercentual: canal.taxaPercentual, taxaCanalValor, taxaPercentualNaVenda: pagamentoPct + canal.taxaPercentual, taxaFixaNaVenda: canal.taxaFixa, taxaValorNaVenda: taxaTotalValor, taxaTotalValor, receitaLiquida, cmvUnitarioNaVenda: input.cmvUnitario, cmvTotalNaVenda, margemContribuicao: receitaLiquida - cmvTotalNaVenda, createdAt: input.data, createdBy: input.createdBy, canal: input.canal, precoUnitario: input.precoUnitario, faturamentoBruto: valorBruto, taxaPercentual: pagamentoPct + canal.taxaPercentual, valorTaxa: taxaTotalValor, cmvUnitario: input.cmvUnitario, cmvTotal: cmvTotalNaVenda, faturamentoLiquido: receitaLiquida }
+  return { id: input.id, data: input.data, status: "ativa", canalNaVenda: canalNormalizado, formaPagamentoNaVenda: formaPagamento, produtoId: input.produtoId, produtoNome: input.produtoNome, quantidade, precoUnitarioNaVenda: input.precoUnitario, desconto, valorBruto, valorVenda, taxaPagamentoPercentual: taxaPagamentoAplicada, taxaPagamentoValor, taxaCanalPercentual: canal.taxaPercentual, taxaCanalValor, taxaPercentualNaVenda: taxaPagamentoAplicada + canal.taxaPercentual, taxaFixaNaVenda: canal.taxaFixa, taxaValorNaVenda: taxaTotalValor, taxaTotalValor, receitaLiquida, cmvUnitarioNaVenda: input.cmvUnitario, cmvTotalNaVenda, margemContribuicao: receitaLiquida - cmvTotalNaVenda, createdAt: input.data, createdBy: input.createdBy, canal: input.canal, precoUnitario: input.precoUnitario, faturamentoBruto: valorBruto, taxaPercentual: taxaPagamentoAplicada + canal.taxaPercentual, valorTaxa: taxaTotalValor, cmvUnitario: input.cmvUnitario, cmvTotal: cmvTotalNaVenda, faturamentoLiquido: receitaLiquida }
 }
 
 export function resumoFinanceiro(vendas: VendaFinanceira[], despesas: DespesaFinanceira[]) {
@@ -73,9 +75,15 @@ export function resumoFinanceiro(vendas: VendaFinanceira[], despesas: DespesaFin
   const lucroBruto = receitaLiquida - cmv, margemContribuicao = lucroBruto - variaveis, mcPercentual = faturamentoBruto > 0 ? margemContribuicao / faturamentoBruto * 100 : 0
   return { faturamentoBruto, descontos, taxas, receitaLiquida, cmv, lucroBruto, despesasVariaveis: variaveis, custosFixos: fixas, despesasExtraordinarias: extraordinarias, margemContribuicao, mcPercentual, lucroOperacional: margemContribuicao - fixas - extraordinarias, ticketMedio: ativas.length ? faturamentoBruto / ativas.length : 0, numeroVendas: ativas.length }
 }
-export function pontoEquilibrio(custosFixos: number, mcPercentual: number, ticketMedio = 0) { const faturamento = custosFixos > 0 && mcPercentual > 0 ? custosFixos / (mcPercentual / 100) : 0; return { faturamento, pedidos: ticketMedio > 0 ? Math.ceil(faturamento / ticketMedio) : 0 } }
+export function pontoEquilibrio(custosFixos: number, mcPercentual: number, ticketMedio = 0, diasAbertos = 0) { const faturamento = custosFixos > 0 && mcPercentual > 0 ? custosFixos / (mcPercentual / 100) : 0; return { faturamento, diario: diasAbertos > 0 ? faturamento / diasAbertos : 0, pedidos: ticketMedio > 0 ? Math.ceil(faturamento / ticketMedio) : 0 } }
 export function contarDiasAbertos(mes: Date, dias: Record<string, boolean>) { const total = new Date(mes.getFullYear(), mes.getMonth() + 1, 0).getDate(); const nomes = ["domingo", "segunda", "terca", "quarta", "quinta", "sexta", "sabado"]; return Array.from({ length: total }, (_, i) => nomes[new Date(mes.getFullYear(), mes.getMonth(), i + 1).getDay()]).filter(d => dias[d] !== false).length }
-export function filtrarPeriodo(vendas: VendaFinanceira[], despesas: DespesaFinanceira[], inicio: string, fim: string) { return { vendas: vendas.filter(v => v.status !== "cancelada" && v.data.slice(0, 10) >= inicio && v.data.slice(0, 10) <= fim), despesas: despesas.filter(d => d.competencia >= inicio.slice(0, 7) && d.competencia <= fim.slice(0, 7)) } }
+export function filtrarPeriodo(vendas: VendaFinanceira[], despesas: DespesaFinanceira[], inicio: string, fim: string) {
+  const inicioMes = inicio.slice(0, 7), fimMes = fim.slice(0, 7)
+  return {
+    vendas: vendas.filter(v => v.status !== "cancelada" && v.data.slice(0, 10) >= inicio && v.data.slice(0, 10) <= fim),
+    despesas: despesas.filter(d => (d.competencia || d.dataPagamento.slice(0, 7)) >= inicioMes && (d.competencia || d.dataPagamento.slice(0, 7)) <= fimMes),
+  }
+}
 export function projetarMeta(vendas: VendaFinanceira[], config: FinanceConfig, hoje = new Date()) { const totalDias = contarDiasAbertos(hoje, config.diasFuncionamento), realizados = Array.from({ length: hoje.getDate() }, (_, i) => new Date(hoje.getFullYear(), hoje.getMonth(), i + 1)).filter(d => config.diasFuncionamento[["domingo", "segunda", "terca", "quarta", "quinta", "sexta", "sabado"][d.getDay()]]).length; const bruto = resumoFinanceiro(vendas, []).faturamentoBruto; return { projetado: realizados ? bruto / realizados * totalDias : 0, diasAbertos: totalDias, realizados } }
 export function classificarCmv(percentual: number, meta = 40) { return percentual <= meta ? "dentro da meta" : percentual <= meta + 5 ? "atenção" : "crítico" }
 export { calcularFicha }

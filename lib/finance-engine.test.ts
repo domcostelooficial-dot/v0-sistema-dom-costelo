@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { calcularTaxa, calcularVenda, pontoEquilibrio, resumoFinanceiro } from "./finance-engine"
+import { calcularTaxa, calcularVenda, pontoEquilibrio, resumoFinanceiro, filtrarPeriodo, contarDiasAbertos } from "./finance-engine"
 import { defaultFinanceConfig } from "./finance-engine"
 
 describe("motor financeiro", () => {
@@ -18,11 +18,38 @@ describe("motor financeiro", () => {
   })
 
   it("calcula ponto de equilíbrio com entradas válidas", () => {
-    expect(pontoEquilibrio(5000, 50, 40)).toEqual({ faturamento: 10000, pedidos: 250 })
-    expect(pontoEquilibrio(0, 50, 40)).toEqual({ faturamento: 0, pedidos: 0 })
+    expect(pontoEquilibrio(5000, 50, 40)).toEqual({ faturamento: 10000, diario: 0, pedidos: 250 })
+    expect(pontoEquilibrio(0, 50, 40)).toEqual({ faturamento: 0, diario: 0, pedidos: 0 })
   })
 
   it("não gera taxa negativa", () => {
     expect(calcularTaxa(100, -10)).toBe(0)
+  })
+
+  it.each([["dinheiro", 0], ["pix", 0.99], ["debito", 1.66], ["credito", 3.56]] as const)("calcula taxa de salão: %s", (forma, taxa) => {
+    const venda = calcularVenda({ id: forma, data: "2026-08-19", canal: "salao", formaPagamento: forma, produtoId: "p", produtoNome: "Produto", quantidade: 1, precoUnitario: 100, cmvUnitario: 40 }, defaultFinanceConfig)
+    expect(venda.taxaTotalValor).toBe(taxa)
+    expect(venda.receitaLiquida).toBe(100 - taxa)
+  })
+
+  it("99Food não soma a taxa Pix", () => {
+    const venda = calcularVenda({ id: "99", data: "2026-08-19", canal: "99food", formaPagamento: "pix", produtoId: "p", produtoNome: "Produto", quantidade: 1, precoUnitario: 100, cmvUnitario: 40 }, defaultFinanceConfig)
+    expect(venda.taxaTotalValor).toBe(3.2)
+    expect(venda.receitaLiquida).toBe(96.8)
+    expect(venda.taxaPagamentoValor).toBe(0)
+  })
+
+  it("filtra julho e agosto e exclui cancelada", () => {
+    const base = { produtoId: "p", produtoNome: "Produto", quantidade: 1, precoUnitario: 100, cmvUnitario: 40 } as const
+    const julho = calcularVenda({ ...base, id: "j", data: "2026-07-31", canal: "salao" }, defaultFinanceConfig)
+    const agosto = calcularVenda({ ...base, id: "a", data: "2026-08-01", canal: "salao", precoUnitario: 200 }, defaultFinanceConfig)
+    const cancelada = { ...agosto, id: "c", status: "cancelada" as const }
+    const result = filtrarPeriodo([julho, agosto, cancelada], [], "2026-08-01", "2026-08-31")
+    expect(result.vendas.map(v => v.id)).toEqual(["a"])
+  })
+
+  it("calcula PE diário pelos dias abertos", () => {
+    expect(pontoEquilibrio(10000, 50, 0, 22).diario).toBeCloseTo(909.09, 2)
+    expect(contarDiasAbertos(new Date("2026-08-01T12:00:00"), { segunda: true, terca: true, quarta: false, quinta: false, sexta: true, sabado: true, domingo: true })).toBeGreaterThan(0)
   })
 })

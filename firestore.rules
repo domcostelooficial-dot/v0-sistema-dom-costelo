@@ -41,6 +41,19 @@ service cloud.firestore {
       allow create, update: if isAdminOrOwner();
       allow delete: if isOwner();
     }
+    match /compras/finance-config {
+      allow read: if isOperatorOrHigher();
+      allow write: if isAdminOrOwner();
+    }
+    match /compras/finance-vendas {
+      allow read: if isOperatorOrHigher();
+      allow create, update: if isOperatorOrHigher();
+      allow delete: if isAdminOrOwner();
+    }
+    match /compras/finance-despesas {
+      allow read: if isOperatorOrHigher();
+      allow create, update, delete: if isAdminOrOwner();
+    }
     match /compras/{docId} {
       allow read: if isOperatorOrHigher();
       allow create, update: if isOperatorOrHigher();
