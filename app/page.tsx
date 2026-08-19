@@ -97,8 +97,10 @@ async function saveEstoqueHybrid(user: string | null, itens: Item[]) {
 async function getEstoqueHybrid(user: string | null): Promise<Item[]> {
   if (user) {
     try {
-      const { data } = await getEstoqueFirebase(user)
-      if (data && data.length > 0) {
+      const result = await getEstoqueFirebase(user)
+      if (result.error) throw new Error(result.error)
+      const { data } = result
+      if (data !== null) {
         console.log("[v0] Estoque carregado do Firebase")
         return limparItensEstoque(data)
       }
@@ -110,22 +112,20 @@ async function getEstoqueHybrid(user: string | null): Promise<Item[]> {
 }
 
 async function saveHistoricoHybrid(user: string | null, historico: HistoricoEntry[]) {
-  saveHistoricoLocal(historico)
   if (user) {
-    try {
-      await saveHistoricoFirebase(user, historico)
-      console.log("[v0] Histórico salvo no Firebase")
-    } catch (err) {
-      console.error("[v0] Erro ao salvar histórico no Firebase:", err)
-    }
+    const result = await saveHistoricoFirebase(user, historico)
+    if (result?.error) throw new Error(result.error)
   }
+  saveHistoricoLocal(historico)
 }
 
 async function getHistoricoHybrid(user: string | null): Promise<HistoricoEntry[]> {
   if (user) {
     try {
-      const { data } = await getHistoricoFirebase(user)
-      if (data && data.length > 0) {
+      const result = await getHistoricoFirebase(user)
+      if (result.error) throw new Error(result.error)
+      const { data } = result
+      if (data !== null) {
         console.log("[v0] Histórico carregado do Firebase")
         return data
       }
@@ -137,22 +137,20 @@ async function getHistoricoHybrid(user: string | null): Promise<HistoricoEntry[]
 }
 
 async function saveReceitasHybrid(user: string | null, receitas: Receita[]) {
-  saveReceitasLocal(receitas)
   if (user) {
-    try {
-      await saveReceitasFirebase(user, receitas)
-      console.log("[v0] Receitas salvas no Firebase")
-    } catch (err) {
-      console.error("[v0] Erro ao salvar receitas no Firebase:", err)
-    }
+    const result = await saveReceitasFirebase(user, receitas)
+    if (result?.error) throw new Error(result.error)
   }
+  saveReceitasLocal(receitas)
 }
 
 async function getReceitasHybrid(user: string | null): Promise<Receita[]> {
   if (user) {
     try {
-      const { data } = await getReceitasFirebase(user)
-      if (data && data.length > 0) {
+      const result = await getReceitasFirebase(user)
+      if (result.error) throw new Error(result.error)
+      const { data } = result
+      if (data !== null) {
         console.log("[v0] Receitas carregadas do Firebase")
         return data
       }
@@ -212,8 +210,15 @@ export default function Home() {
       console.error("[v0] Erro ao carregar dados financeiros do estoque:", err)
     }
   }
-  const persistirInsumos = (data: Insumo[]) => { if (userRole !== "owner" && userRole !== "admin") return; setInsumos(data); saveInsumos(data).catch((err) => console.error("[v0] Erro ao salvar insumos:", err)) }
-  const persistirCompras = (data: CompraRegistro[]) => { setComprasHistorico(data); saveComprasHistorico(data).catch((err) => console.error("[v0] Erro ao salvar compras:", err)) }
+  const persistirInsumos = async (data: Insumo[]) => {
+    if (userRole !== "owner" && userRole !== "admin") return
+    try { await saveInsumos(data); setInsumos(data); toast.success("Produtos sincronizados na nuvem.") }
+    catch (error) { toast.error(error instanceof Error ? error.message : "Não foi possível sincronizar os produtos.") }
+  }
+  const persistirCompras = async (data: CompraRegistro[]) => {
+    try { await saveComprasHistorico(data); setComprasHistorico(data); toast.success("Compra sincronizada na nuvem.") }
+    catch (error) { toast.error(error instanceof Error ? error.message : "Não foi possível sincronizar a compra.") }
+  }
   const estornarMovimentacao = async (movimentacao: MovimentacaoEstoque) => {
     if (userRole !== "owner" && userRole !== "admin") { toast.error("Você não tem permissão para estornar entradas."); return }
     try {
