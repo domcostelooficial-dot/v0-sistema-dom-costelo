@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { calcularTaxa, calcularVenda, pontoEquilibrio, resumoFinanceiro, filtrarPeriodo, contarDiasAbertos } from "./finance-engine"
+import { calcularTaxa, calcularVenda, pontoEquilibrio, resumoFinanceiro, filtrarPeriodo, contarDiasAbertos, totalCustosFixos } from "./finance-engine"
 import { defaultFinanceConfig } from "./finance-engine"
 
 describe("motor financeiro", () => {
@@ -51,5 +51,16 @@ describe("motor financeiro", () => {
   it("calcula PE diário pelos dias abertos", () => {
     expect(pontoEquilibrio(10000, 50, 0, 22).diario).toBeCloseTo(909.09, 2)
     expect(contarDiasAbertos(new Date("2026-08-01T12:00:00"), { segunda: true, terca: true, quarta: false, quinta: false, sexta: true, sabado: true, domingo: true })).toBeGreaterThan(0)
+  })
+
+  it("usa custos fixos detalhados como fonte única", () => {
+    const config = { ...defaultFinanceConfig, despesasFixas: [{ id: "aluguel", descricao: "Aluguel", categoria: "Ocupação", valor: 2000 }] }
+    expect(totalCustosFixos(config, [{ id: "duplicada", descricao: "Aluguel antigo", categoria: "Ocupação", valor: 999, tipo: "fixa", dataPagamento: "2026-08-01", competencia: "2026-08", recorrente: true, createdAt: "2026-08-01" }])).toBe(2000)
+    const venda = calcularVenda({ id: "c", data: "2026-08-19", canal: "salao", formaPagamento: "pix", produtoId: "p", produtoNome: "Produto", quantidade: 1, precoUnitario: 100, cmvUnitario: 40 }, config)
+    expect(resumoFinanceiro([venda], [], totalCustosFixos(config)).custosFixos).toBe(2000)
+  })
+
+  it("não transforma dias fechados em abertos", () => {
+    expect(contarDiasAbertos(new Date("2026-08-01T12:00:00"), { segunda: true, terca: false, quarta: false, quinta: false, sexta: false, sabado: false, domingo: false })).toBe(5)
   })
 })

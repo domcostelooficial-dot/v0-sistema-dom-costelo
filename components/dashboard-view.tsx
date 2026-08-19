@@ -2,7 +2,7 @@
 
 import { useMemo } from "react"
 import { Item, HistoricoEntry } from "@/lib/types"
-import { VendaFinanceira, DespesaFinanceira, FinanceConfig, percentualCmv, resumoFinanceiro, totalCustosFixos, pontoEquilibrio, diferencaPontoEquilibrio, progressoPontoEquilibrio } from "@/lib/finance-engine"
+import { VendaFinanceira, DespesaFinanceira, FinanceConfig, percentualCmv, resumoFinanceiro, totalCustosFixos, pontoEquilibrio, diferencaPontoEquilibrio, progressoPontoEquilibrio, contarDiasAbertos } from "@/lib/finance-engine"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { BarChart3, PieChart, TrendingUp, Package } from "lucide-react"
 import {
@@ -35,10 +35,12 @@ const COLORS = [
 ]
 
 export function DashboardView({ itens, historico, vendasFinanceiras = [], despesasFinanceiras = [], financeConfig }: DashboardViewProps) {
-  const resumoFinanceiroAtual = useMemo(() => resumoFinanceiro(vendasFinanceiras, despesasFinanceiras), [vendasFinanceiras, despesasFinanceiras])
+  const custosFixos = financeConfig ? totalCustosFixos(financeConfig, despesasFinanceiras) : 0
+  const resumoFinanceiroAtual = useMemo(() => resumoFinanceiro(vendasFinanceiras, despesasFinanceiras, custosFixos), [vendasFinanceiras, despesasFinanceiras, custosFixos])
   const cmvPercentual = percentualCmv(resumoFinanceiroAtual)
-  const custosFixos = financeConfig ? totalCustosFixos(financeConfig, despesasFinanceiras) : resumoFinanceiroAtual.custosFixos
-  const equilibrio = pontoEquilibrio(custosFixos, resumoFinanceiroAtual.mcPercentual, resumoFinanceiroAtual.ticketMedio, financeConfig?.diasOperacaoMes ?? 0)
+  const hoje = new Date()
+  const diasAbertos = financeConfig ? contarDiasAbertos(hoje, financeConfig.diasFuncionamento) : 0
+  const equilibrio = pontoEquilibrio(custosFixos, resumoFinanceiroAtual.mcPercentual, resumoFinanceiroAtual.ticketMedio, diasAbertos)
   const gastosPorCategoria = useMemo(() => {
     const dados: Record<string, number> = {}
 
