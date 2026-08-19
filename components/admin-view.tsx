@@ -43,7 +43,6 @@ import {
 } from "@/components/ui/select"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Users, Shield, Key, PlusCircle, Edit, Trash2, Save, UserCheck, UserX, Clock, Eye, EyeOff, RefreshCw } from "lucide-react"
-import { getUsuarios, saveUsuarios } from "@/lib/store"
 import { 
   getAllUsuarios, 
   saveUsuariosFirebase, 
@@ -54,6 +53,8 @@ import {
 } from "@/lib/firebase-db"
 import type { UsuarioSistema, UserRole, TabPermissao, UserStatus } from "@/lib/types"
 import { toast } from "sonner"
+import { updatePassword } from "firebase/auth"
+import { auth } from "@/lib/firebase"
 
 interface AdminViewProps {
   currentUser: string
@@ -74,12 +75,10 @@ export function AdminView({ currentUser, onPasswordChange }: AdminViewProps) {
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
   const [selectedUser, setSelectedUser] = useState<UsuarioSistema | null>(null)
-  const [showFormPassword, setShowFormPassword] = useState(false)
   const [formData, setFormData] = useState({
     login: "",
     nome: "",
     email: "",
-    senha: "",
     role: "operador" as UserRole,
     permissoes: [] as TabPermissao[],
   })
@@ -91,16 +90,12 @@ export function AdminView({ currentUser, onPasswordChange }: AdminViewProps) {
     confirmarSenha: "",
   })
   useEffect(() => {
-    // Carregar usuários locais primeiro
-    setUsuarios(getUsuarios())
-    
     // Tentar carregar do Firebase e configurar listener em tempo real
     const loadFromFirebase = async () => {
       try {
         const { data, error } = await getAllUsuarios()
         if (!error && data && data.length > 0) {
           setUsuarios(data)
-          saveUsuarios(data) // Sincronizar com localStorage
         }
       } catch (err) {
         console.error("[Firebase] Erro ao carregar usuários:", err)
@@ -113,7 +108,6 @@ export function AdminView({ currentUser, onPasswordChange }: AdminViewProps) {
     const unsubscribe = subscribeToUsuarios((firebaseUsuarios) => {
       if (firebaseUsuarios.length > 0) {
         setUsuarios(firebaseUsuarios)
-        saveUsuarios(firebaseUsuarios)
       }
     })
     
@@ -121,13 +115,8 @@ export function AdminView({ currentUser, onPasswordChange }: AdminViewProps) {
   }, [])
 
   const handleAddUser = async () => {
-    if (!formData.nome.trim() || !formData.email.trim() || !formData.senha.trim()) {
-      toast.error("Preencha nome, email e senha")
-      return
-    }
-
-    if (formData.senha.length < 6) {
-      toast.error("A senha deve ter pelo menos 6 caracteres")
+    if (!formData.nome.trim() || !formData.email.trim()) {
+      toast.error("Preencha nome e email")
       return
     }
 
@@ -140,7 +129,6 @@ export function AdminView({ currentUser, onPasswordChange }: AdminViewProps) {
       login: formData.email.split("@")[0],
       nome: formData.nome.trim(),
       email: formData.email.trim().toLowerCase(),
-      senha: formData.senha,
       role: formData.role,
       permissoes: formData.permissoes,
       status: "aprovado",
@@ -156,7 +144,7 @@ export function AdminView({ currentUser, onPasswordChange }: AdminViewProps) {
     await createUsuarioProfile(login, userData)
     
     setIsAddDialogOpen(false)
-    setFormData({ login: "", nome: "", email: "", senha: "", role: "operador", permissoes: [] })
+    setFormData({ login: "", nome: "", email: "", role: "operador", permissoes: [] })
     toast.success(`Usuário "${newUser.nome}" criado e sincronizado na nuvem!`)
   }
 
@@ -168,18 +156,12 @@ export function AdminView({ currentUser, onPasswordChange }: AdminViewProps) {
       return
     }
 
-    if (formData.senha && formData.senha.length < 6) {
-      toast.error("A nova senha deve ter pelo menos 6 caracteres")
-      return
-    }
-
     const updatedUserData: Partial<UsuarioSistema> = {
       nome: formData.nome.trim(),
       email: formData.email.trim().toLowerCase(),
       role: formData.role,
       permissoes: formData.permissoes,
     }
-    if (formData.senha) updatedUserData.senha = formData.senha
 
     const updated = usuarios.map((u) =>
       u.login === selectedUser.login
@@ -227,7 +209,6 @@ export function AdminView({ currentUser, onPasswordChange }: AdminViewProps) {
       login: user.login,
       nome: user.nome || "",
       email: user.email || "",
-      senha: "",
       role: user.role,
       permissoes: user.permissoes ? [...user.permissoes] : [],
     })
@@ -288,34 +269,28 @@ export function AdminView({ currentUser, onPasswordChange }: AdminViewProps) {
       return
     }
 
-    const currentUserData = usuarios.find((u) => u.login === currentUser)
-    if (!currentUserData || currentUserData.senha !== senhaAtual) {
-      toast.error("Senha atual incorreta")
-      return
-    }
-
     if (novaSenha !== confirmarSenha) {
       toast.error("As senhas não coincidem")
       return
     }
 
-    if (novaSenha.length < 3) {
-      toast.error("A senha deve ter pelo menos 3 caracteres")
+    if (novaSenha.length < 6) {
+      toast.error("A senha deve ter pelo menos 6 caracteres")
       return
     }
 
-    const updated = usuarios.map((u) =>
-      u.login === currentUser ? { ...u, senha: novaSenha } : u
-    )
-
-    setUsuarios(updated)
-    saveUsuarios(updated)
-    
-    // Atualizar no Firebase
-    await updateUsuarioProfile(currentUser, { senha: novaSenha })
-    
+    if (!auth.currentUser) {
+      toast.error("Sessão Firebase não encontrada")
+      return
+    }
+    try {
+      await updatePassword(auth.currentUser, novaSenha)
+    } catch {
+      toast.error("O Firebase exige uma sessão recente. Faça login novamente e tente outra vez.")
+      return
+    }
     setPasswordForm({ senhaAtual: "", novaSenha: "", confirmarSenha: "" })
-    toast.success("Senha alterada e sincronizada na nuvem!")
+    toast.success("Senha alterada pelo Firebase Authentication!")
     
     // Notificar o componente pai para fazer logout ou atualizar
     onPasswordChange()
@@ -479,28 +454,6 @@ export function AdminView({ currentUser, onPasswordChange }: AdminViewProps) {
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="add-senha">Senha de acesso</Label>
-                      <div className="flex gap-2">
-                        <div className="relative flex-1">
-                          <Input
-                            id="add-senha"
-                            type={showFormPassword ? "text" : "password"}
-                            value={formData.senha}
-                            onChange={(e) => setFormData({ ...formData, senha: e.target.value })}
-                            placeholder="Digite ou gere uma senha"
-                            className="pr-10"
-                          />
-                          <button type="button" aria-label={showFormPassword ? "Ocultar senha" : "Mostrar senha"} onClick={() => setShowFormPassword((value) => !value)} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
-                            {showFormPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                          </button>
-                        </div>
-                        <Button type="button" variant="outline" size="icon" onClick={generatePassword} aria-label="Gerar senha">
-                          <RefreshCw className="h-4 w-4" />
-                        </Button>
-                      </div>
-                      <p className="text-xs text-muted-foreground">Mínimo de 6 caracteres. Você pode gerar uma senha segura.</p>
-                    </div>
-                    <div className="space-y-2">
                       <Label htmlFor="add-role">Perfil</Label>
                       <Select
                         value={formData.role}
@@ -539,7 +492,7 @@ export function AdminView({ currentUser, onPasswordChange }: AdminViewProps) {
                       variant="outline"
                       onClick={() => {
                         setIsAddDialogOpen(false)
-                        setFormData({ login: "", nome: "", email: "", senha: "", role: "operador", permissoes: [] })
+                        setFormData({ login: "", nome: "", email: "", role: "operador", permissoes: [] })
                       }}
                     >
                       Cancelar
@@ -799,28 +752,6 @@ export function AdminView({ currentUser, onPasswordChange }: AdminViewProps) {
                 }
                 placeholder="Digite o email"
               />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="edit-senha">Nova senha</Label>
-              <div className="flex gap-2">
-                <div className="relative flex-1">
-                  <Input
-                    id="edit-senha"
-                    type={showFormPassword ? "text" : "password"}
-                    value={formData.senha}
-                    onChange={(e) => setFormData({ ...formData, senha: e.target.value })}
-                    placeholder="Deixe vazio para manter a senha atual"
-                    className="pr-10"
-                  />
-                  <button type="button" aria-label={showFormPassword ? "Ocultar senha" : "Mostrar senha"} onClick={() => setShowFormPassword((value) => !value)} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
-                    {showFormPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                  </button>
-                </div>
-                <Button type="button" variant="outline" size="icon" onClick={generatePassword} aria-label="Gerar nova senha">
-                  <RefreshCw className="h-4 w-4" />
-                </Button>
-              </div>
-              <p className="text-xs text-muted-foreground">Deixe vazio para não alterar a senha atual.</p>
             </div>
             <div className="space-y-2">
               <Label htmlFor="edit-role">Perfil</Label>

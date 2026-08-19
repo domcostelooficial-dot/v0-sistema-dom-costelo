@@ -148,6 +148,7 @@ export interface UsuarioSistema {
   role: UserRole
   permissoes: TabPermissao[]
   status: UserStatus
+  ativo?: boolean
   dataCriacao?: string
 }
 

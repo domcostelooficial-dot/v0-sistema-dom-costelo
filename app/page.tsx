@@ -7,12 +7,8 @@ import {
   getEstoque as getEstoqueLocal,
   saveHistorico as saveHistoricoLocal,
   getHistorico as getHistoricoLocal,
-  getUser,
-  saveUser,
-  clearUser,
   getReceitas as getReceitasLocal,
   saveReceitas as saveReceitasLocal,
-  getUsuarios,
 } from "@/lib/store"
 import {
   saveEstoque as saveEstoqueFirebase,
@@ -43,6 +39,8 @@ import { CmvView } from "@/components/cmv-view"
 import { seedFichas } from "@/lib/cmv-engine"
 import { Menu, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { signOut } from "firebase/auth"
+import { auth } from "@/lib/firebase"
 
 type Tab = "estoque" | "entrada" | "financeiro" | "dashboard" | "lista-compras" | "cmv" | "admin"
 
@@ -170,20 +168,11 @@ export default function Home() {
   // Load data on mount
   useEffect(() => {
     const loadData = async () => {
-      const storedUser = getUser()
-      const storedUserData = storedUser ? getUsuarios().find((usuario) => usuario.login === storedUser || usuario.email === storedUser) : undefined
-      if (storedUserData) {
-        setUserRole(storedUserData.role)
-        setUserPermissoes(storedUserData.role === "admin" || storedUserData.permissoes.includes("cmv")
-          ? [...new Set([...storedUserData.permissoes, "cmv"])]
-          : storedUserData.permissoes)
-      }
-      const storedItens = await getEstoqueHybrid(storedUser)
-      const storedHistorico = await getHistoricoHybrid(storedUser)
-      const storedReceitas = await getReceitasHybrid(storedUser)
+      const storedItens = await getEstoqueHybrid(null)
+      const storedHistorico = await getHistoricoHybrid(null)
+      const storedReceitas = await getReceitasHybrid(null)
       await getComprasHybrid()
 
-      setUser(storedUser)
       setItens(storedItens)
       setHistorico(storedHistorico)
       setReceitas(storedReceitas)
@@ -229,7 +218,6 @@ export default function Home() {
   }, [user])
 
   const handleLogin = (username: string, role: string, permissoes: string[]) => {
-    saveUser(username)
     setUser(username)
     setUserRole(role)
     setUserPermissoes(permissoes)
@@ -252,8 +240,8 @@ export default function Home() {
     setActiveTab(firstAllowedTab || "estoque")
   }
 
-  const handleLogout = () => {
-    clearUser()
+  const handleLogout = async () => {
+    await signOut(auth)
     setUser(null)
     setUserRole("")
     setUserPermissoes([])
