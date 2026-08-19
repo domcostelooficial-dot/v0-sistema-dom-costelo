@@ -54,6 +54,9 @@ export function AppSidebar({
     if (item.id === "admin") {
       return userRole === "admin"
     }
+    if (item.id === "cmv") {
+      return true
+    }
     return userPermissoes && userPermissoes.includes(item.id)
   })
   return (
