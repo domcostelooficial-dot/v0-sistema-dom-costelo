@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
-import { Item, HistoricoEntry, Receita, Insumo, CompraRegistro, defaultInsumos } from "@/lib/types"
+import { Item, HistoricoEntry, Receita, Insumo, CompraRegistro, VendaFinanceira, DespesaFinanceira, FinanceConfig, defaultInsumos } from "@/lib/types"
 import {
   saveEstoque as saveEstoqueLocal,
   getEstoque as getEstoqueLocal,
@@ -27,12 +27,18 @@ import {
   saveFichasTecnicas,
   getComprasHistorico,
   saveComprasHistorico,
+  getFinanceConfig,
+  saveFinanceConfig,
+  getVendasFinanceiras,
+  saveVendasFinanceiras,
+  getDespesasFinanceiras,
+  saveDespesasFinanceiras,
 } from "@/lib/firebase-db"
 import { FirebaseLoginForm } from "@/components/firebase-login-form"
 import { AppSidebar } from "@/components/app-sidebar"
 import { EstoqueView } from "@/components/estoque-view"
 import { EntradaView } from "@/components/entrada-view"
-import { FinanceiroView } from "@/components/financeiro-view"
+import { FinanceiroCentral } from "@/components/financeiro-central"
 import { DashboardView } from "@/components/dashboard-view"
 import { ListaComprasView } from "@/components/lista-compras-view"
 import { AdminView } from "@/components/admin-view"
@@ -152,6 +158,9 @@ export default function Home() {
   const [comprasHistorico, setComprasHistorico] = useState<CompraRegistro[]>([])
   const [fichasTecnicas, setFichasTecnicas] = useState<typeof seedFichas>([])
   const [fichasLoading, setFichasLoading] = useState(true)
+  const [financeConfig, setFinanceConfig] = useState<FinanceConfig | undefined>(undefined)
+  const [vendasFinanceiras, setVendasFinanceiras] = useState<VendaFinanceira[]>([])
+  const [despesasFinanceiras, setDespesasFinanceiras] = useState<DespesaFinanceira[]>([])
   const persistirFichas = (data: typeof seedFichas) => { setFichasTecnicas(data); saveFichasTecnicas(data).catch((err) => console.error("[v0] Erro ao salvar fichas:", err)) }
 
   const getComprasHybrid = async () => {
@@ -228,6 +237,10 @@ export default function Home() {
       const historico = await getHistoricoHybrid(username)
       const receitas = await getReceitasHybrid(username)
       const fichas = await initializeFichasTecnicas(seedFichas)
+      const [config, vendas, despesas] = await Promise.all([getFinanceConfig(), getVendasFinanceiras(), getDespesasFinanceiras()])
+      setFinanceConfig(config)
+      setVendasFinanceiras(vendas)
+      setDespesasFinanceiras(despesas)
       setFichasTecnicas(fichas.data)
       setFichasLoading(false)
       await getComprasHybrid()
@@ -456,7 +469,15 @@ export default function Home() {
             <EntradaView itens={itens} onEntrada={handleEntrada} />
           )}
           {activeTab === "financeiro" && (
-            <FinanceiroView historico={historico} />
+            <FinanceiroCentral
+              fichas={fichasTecnicas}
+              insumos={insumos}
+              vendas={vendasFinanceiras}
+              despesas={despesasFinanceiras}
+              config={financeConfig}
+              onAddVenda={(venda) => { const next = [...vendasFinanceiras, venda]; setVendasFinanceiras(next); saveVendasFinanceiras(next).catch((error) => console.error("[v0] Erro ao salvar venda:", error)) }}
+              onAddDespesa={(despesa) => { const next = [...despesasFinanceiras, despesa]; setDespesasFinanceiras(next); saveDespesasFinanceiras(next).catch((error) => console.error("[v0] Erro ao salvar despesa:", error)) }}
+            />
           )}
           {activeTab === "dashboard" && (
             <DashboardView itens={itens} historico={historico} />

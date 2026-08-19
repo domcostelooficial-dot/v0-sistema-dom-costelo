@@ -155,6 +155,8 @@ export interface Receita {
   outputQtd: number
 }
 
+export type { CanalVenda, FinanceConfig, VendaFinanceira, DespesaFinanceira } from "./finance-engine"
+
 const defaultInsumoRows: Array<[string, UnidadeInsumo, number, number, UnidadeInsumo, CategoriaInsumo]> = [
   ["Pão brioche", "un", 2.07, 1, "un", "Pães"], ["Pão australiano", "un", 2.53, 1, "un", "Pães"], ["Blend bovino 180g", "un", 6.35, 1, "un", "Carnes"],
   ["Cheddar cremoso", "g", 50, 1500, "g", "Queijos"], ["Cream cheese", "g", 60, 1500, "g", "Queijos"], ["Bacon", "g", 32, 1000, "g", "Carnes"], ["Bacon Fatiado", "g", 32, 1000, "g", "Carnes"], ["Barbecue", "g", 40, 3500, "g", "Molhos"], ["Costela bovina desfiada", "g", 80, 1000, "g", "Carnes"], ["Mussarela", "g", 43, 1000, "g", "Queijos"], ["Batata frita", "g", 10, 1000, "g", "Batatas/congelados"], ["Anel de cebola", "g", 22, 1000, "g", "Batatas/congelados"], ["Farofa de bacon", "g", 55, 1000, "g", "Mercearia"], ["Cebolinha", "g", 30, 1000, "g", "Mercearia"], ["Embalagem H7", "un", 50, 100, "un", "Embalagens"], ["Saco Kraft", "un", 70, 100, "un", "Embalagens"], ["Papel acoplado", "un", 35, 200, "un", "Embalagens"], ["Sacola para Refrigerante", "un", 0, 1, "un", "Embalagens"]

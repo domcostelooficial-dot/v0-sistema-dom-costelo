@@ -14,7 +14,7 @@ import {
   onSnapshot,
 } from "firebase/firestore"
 import { db } from "./firebase"
-import type { Item, HistoricoEntry, Receita, UsuarioSistema, Insumo, FichaTecnica, VendaProduto, CompraRegistro } from "./types"
+import type { Item, HistoricoEntry, Receita, UsuarioSistema, Insumo, FichaTecnica, VendaProduto, CompraRegistro, FinanceConfig, VendaFinanceira, DespesaFinanceira } from "./types"
 
 // Collections - dados globais compartilhados
 const USUARIOS_COLLECTION = "usuarios"
@@ -267,6 +267,13 @@ export async function getInsumos() { return getComprasData<Insumo>("insumos") }
 export async function saveInsumos(data: Insumo[]) { return saveComprasData("insumos", data) }
 export async function getFichasTecnicas() { return getComprasData<FichaTecnica>("fichas-tecnicas") }
 export async function saveFichasTecnicas(data: FichaTecnica[]) { return saveComprasData("fichas-tecnicas", data) }
+
+export async function getFinanceConfig() { const rows = await getComprasData<FinanceConfig>("finance-config"); return rows[0] }
+export async function saveFinanceConfig(data: FinanceConfig) { return saveComprasData("finance-config", [data]) }
+export async function getVendasFinanceiras() { return getComprasData<VendaFinanceira>("finance-vendas") }
+export async function saveVendasFinanceiras(data: VendaFinanceira[]) { return saveComprasData("finance-vendas", data) }
+export async function getDespesasFinanceiras() { return getComprasData<DespesaFinanceira>("finance-despesas") }
+export async function saveDespesasFinanceiras(data: DespesaFinanceira[]) { return saveComprasData("finance-despesas", data) }
 
 export async function initializeFichasTecnicas(seed: FichaTecnica[], seedVersion = 1) {
   const existing = await getFichasTecnicas()
