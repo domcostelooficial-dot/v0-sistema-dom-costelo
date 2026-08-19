@@ -27,10 +27,14 @@ export async function createUsuarioProfile(
   data: Omit<UsuarioSistema, "login">
 ) {
   try {
+    const safeRole = data.role === "owner" || data.role === "admin" ? "operador" : data.role
     await setDoc(doc(db, USUARIOS_COLLECTION, userId), {
       ...data,
-      login: userId,
+      uid: userId,
+      role: safeRole,
+      login: data.email || userId,
       createdAt: Timestamp.now(),
+      updatedAt: Timestamp.now(),
     })
     return { error: null }
   } catch (error: any) {

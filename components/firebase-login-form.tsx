@@ -146,37 +146,8 @@ export function FirebaseLoginForm({ onLogin }: FirebaseLoginFormProps) {
         return
       }
 
-      // Verificar se é o administrador master (sempre tem acesso)
+      // O owner é reconhecido pelo Firebase Auth e pelo perfil UID; nunca por senha local.
       const emailAdmin = "admin@domcostelo.com"
-      
-      if (user!.email === emailAdmin) {
-        console.log("[v0] Admin master detectado - acesso garantido")
-        const usuarios = getUsuarios()
-        
-        // Garantir que admin existe no sistema local e Firebase
-        let adminLocal = usuarios.find(u => u.email === emailAdmin)
-        if (!adminLocal) {
-          adminLocal = {
-            login: "admin",
-            senha: "",
-            email: emailAdmin,
-            role: "admin",
-            permissoes: ["estoque", "entrada", "financeiro", "dashboard", "lista-compras", "admin"],
-            status: "aprovado",
-            dataCriacao: new Date().toLocaleString("pt-BR"),
-          }
-          usuarios.push(adminLocal)
-          saveUsuarios(usuarios)
-          
-          // Salvar no Firebase também
-          const { login, ...userData } = adminLocal
-          await createUsuarioProfile(login, userData)
-        }
-        
-        setLoading(false)
-        onLogin("admin", "admin", ["estoque", "entrada", "financeiro", "dashboard", "lista-compras", "admin"])
-        return
-      }
 
       // Verificar se usuario esta aprovado
       const usuarios = getUsuarios()
@@ -188,35 +159,8 @@ export function FirebaseLoginForm({ onLogin }: FirebaseLoginFormProps) {
         usuarioSistema = usuarios.find(u => u.login.toLowerCase() === displayName.toLowerCase())
       }
       
-      // Verificar se existe algum admin aprovado no sistema
-      const existeAdminAprovado = usuarios.some(u => u.role === "admin" && u.status === "aprovado")
-      
       if (!usuarioSistema) {
-        // Se nao existe nenhum admin aprovado, o primeiro usuario vira admin automaticamente
-        if (!existeAdminAprovado) {
-          console.log("[v0] Primeiro usuario - tornando admin")
-          const novoAdmin: UsuarioSistema = {
-            login: displayName,
-            senha: "",
-            email: user!.email || "",
-            role: "admin",
-            permissoes: ["estoque", "entrada", "financeiro", "dashboard", "lista-compras", "admin"],
-            status: "aprovado",
-            dataCriacao: new Date().toLocaleString("pt-BR"),
-          }
-          usuarios.push(novoAdmin)
-          saveUsuarios(usuarios)
-          
-          // Salvar no Firebase também
-          const { login, ...userData } = novoAdmin
-          await createUsuarioProfile(login, userData)
-          
-          setLoading(false)
-          onLogin(displayName, novoAdmin.role, novoAdmin.permissoes)
-          return
-        }
-        
-        // Usuario nao existe no sistema - criar como pendente
+        // Novos usuários nunca recebem elevação automática; o owner/admin deve aprovar.
         console.log("[v0] Novo usuario - criando como pendente")
         const novoUsuario: UsuarioSistema = {
           login: displayName,

@@ -1,7 +1,8 @@
-export type UnidadeInsumo = "un" | "g" | "kg" | "ml" | "l" | "pacote" | "caixa" | "bobina" | "maço" | "pct"
+export type UnidadeInsumo = "un" | "g" | "kg" | "ml" | "l" | "pacote" | "caixa" | "bobina" | "maço" | "pct" | "aplicação"
 export type CategoriaInsumo = "Carnes" | "Pães" | "Queijos" | "Molhos" | "Batatas/congelados" | "Bebidas" | "Embalagens" | "Mercearia"
 
 export interface Item {
+  id?: string
   nome: string
   min: number
   atual: number
@@ -35,6 +36,7 @@ export interface Insumo extends Item {
 }
 
 export interface IngredienteFicha {
+  insumoId?: string
   insumoNome: string
   quantidade: number
   unidade: UnidadeInsumo
@@ -131,13 +133,14 @@ export interface Usuario {
   pass: string
 }
 
-export type UserRole = "admin" | "operador"
+export type UserRole = "owner" | "admin" | "operador"
 
 export type TabPermissao = "estoque" | "entrada" | "financeiro" | "dashboard" | "lista-compras" | "cmv" | "admin"
 
 export type UserStatus = "pendente" | "aprovado" | "rejeitado"
 
 export interface UsuarioSistema {
+  uid?: string
   login: string
   senha?: string
   nome?: string
