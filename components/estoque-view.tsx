@@ -47,8 +47,6 @@ import {
   Package,
   Search,
   PlusCircle,
-  Plus,
-  Minus,
   Trash2,
 } from "lucide-react"
 import dynamic from "next/dynamic"
@@ -468,8 +466,7 @@ export function EstoqueView({ itens, onUpdateItem, onAddItem, onEditItem, onDele
                     </TableCell>
                     <TableCell className="text-center">
                       <div className="flex items-center justify-center gap-1">
-                        <Button variant="outline" size="icon" className="size-8" aria-label={`Diminuir ${item.nome}`} onClick={() => onUpdateItem(item.nome, Math.max(0, item.atual - 1))}><Minus /></Button>
-                        <Button variant="outline" size="icon" className="size-8" aria-label={`Adicionar ${item.nome}`} onClick={() => onUpdateItem(item.nome, item.atual + 1)}><Plus /></Button>
+                        <span className="text-xs text-muted-foreground">Use Entrada, Saída ou Inventário</span>
                         {isAdmin && (
                           <Button
                             variant="outline"

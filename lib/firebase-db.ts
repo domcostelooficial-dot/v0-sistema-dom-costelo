@@ -330,20 +330,6 @@ export async function migrarCustosMestresDomCosteloV1(master: Insumo[]) {
   return { applied: true, skipped: false, data, updated }
 }
 
-export async function migrarMinimosEstoqueV1(userId: string, seed: Item[]) {
-  const settingsRef = doc(db, "settings", "system")
-  const settingsSnap = await getDoc(settingsRef)
-  const estoqueResult = await getEstoque(userId)
-  const existing = estoqueResult.data ?? []
-  if (settingsSnap.data()?.minimosEstoqueV1Aplicados === true) return { applied: false, data: existing }
-  const normalizar = (value: string) => value.trim().toLocaleLowerCase("pt-BR").normalize("NFD").replace(/[\\u0300-\\u036f]/g, "").replace(/\\s+/g, " ")
-  const byName = new Map(existing.map((item) => [normalizar(item.nome), item]))
-  const data = seed.map((item) => { const atual = byName.get(normalizar(item.nome)); return atual ? { ...atual, min: item.min, categoria: atual.categoria ?? item.categoria } : item })
-  await saveEstoque(userId, data)
-  await setDoc(settingsRef, { minimosEstoqueV1Aplicados: true, minimosEstoqueV1AplicadosEm: Timestamp.now(), minimosEstoqueV1Count: data.length }, { merge: true })
-  return { applied: true, data }
-}
-
 export async function migrarFichasTecnicasV2(seed: FichaTecnica[], insumos: Insumo[], aliases: Record<string, string[]> = {}) {
   const settingsRef = doc(db, "settings", "system")
   const settingsSnap = await getDoc(settingsRef)
