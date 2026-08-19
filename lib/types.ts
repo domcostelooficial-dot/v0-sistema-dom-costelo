@@ -117,12 +117,19 @@ export interface MovimentacaoEstoque {
   observacao?: string
   origem: "compras" | "estoque"
   movimentacaoOrigemId?: string
-  status: "efetivada" | "estornada"
+  status: "efetivada" | "estornada" | "ativa"
   usuarioId: string
   usuarioEmail: string
   criadoEm: string
+  dataMovimentacao?: string
+  criadoPorUid?: string
+  criadoPorEmail?: string
+  criadoPorNome?: string
   estornadoEm?: string
   estornadoPor?: string
+  estornadaPorUid?: string
+  precoTotal?: number
+  unidade?: UnidadeInsumo
 }
 
 export interface CompraRegistro {

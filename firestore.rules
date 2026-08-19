@@ -63,6 +63,12 @@ service cloud.firestore {
       allow create, update: if isAdminOrOwner();
       allow delete: if isOwner();
     }
+    match /movimentacoesEstoque/{movimentacaoId} {
+      allow read: if isOperatorOrHigher();
+      allow create: if isOperatorOrHigher();
+      allow update: if isAdminOrOwner();
+      allow delete: if false;
+    }
     match /compras/movimentacoes-estoque {
       allow read: if isOperatorOrHigher();
       allow create, update: if isAdminOrOwner();

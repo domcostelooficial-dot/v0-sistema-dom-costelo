@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog"
 import { Item, HistoricoEntry } from "@/lib/types"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -17,15 +18,19 @@ import { Truck, Package, Plus } from "lucide-react"
 
 interface EntradaViewProps {
   itens: Item[]
-  onEntrada: (nome: string, qtd: number, custo: number, fornecedor?: string, observacao?: string) => void
+  onEntrada: (nome: string, qtd: number, custo: number, fornecedor?: string, observacao?: string, dataMovimentacao?: string) => Promise<void> | void
+  canRegister?: boolean
 }
 
-export function EntradaView({ itens, onEntrada }: EntradaViewProps) {
+export function EntradaView({ itens, onEntrada, canRegister = true }: EntradaViewProps) {
   const [selectedItem, setSelectedItem] = useState("")
   const [quantidade, setQuantidade] = useState("")
   const [precoUnitario, setPrecoUnitario] = useState("")
   const [fornecedor, setFornecedor] = useState("")
   const [observacao, setObservacao] = useState("")
+  const [dataMovimentacao, setDataMovimentacao] = useState(new Date().toISOString().slice(0, 10))
+  const [confirmOpen, setConfirmOpen] = useState(false)
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
@@ -35,10 +40,7 @@ export function EntradaView({ itens, onEntrada }: EntradaViewProps) {
     const preco = Number(precoUnitario) || 0
     const custo = qtd * preco
 
-    onEntrada(selectedItem, qtd, custo, fornecedor.trim() || undefined, observacao.trim() || undefined)
-    setSelectedItem("")
-    setQuantidade("")
-    setPrecoUnitario("")
+    setConfirmOpen(true)
   }
 
   const selectedItemData = itens.find((i) => i.nome === selectedItem)
@@ -69,7 +71,7 @@ export function EntradaView({ itens, onEntrada }: EntradaViewProps) {
                     <SelectValue placeholder="Selecione um item" />
                   </SelectTrigger>
                   <SelectContent>
-                    {itens.map((item) => (
+                    {itens.filter((item) => item.ativo !== false && item.naoVinculado !== true).map((item) => (
                       <SelectItem key={item.nome} value={item.nome}>
                         {item.nome} ({item.categoria})
                       </SelectItem>
@@ -95,7 +97,7 @@ export function EntradaView({ itens, onEntrada }: EntradaViewProps) {
                 </div>
               )}
 
-              <div className="grid gap-4 md:grid-cols-2"><Field><FieldLabel htmlFor="fornecedor">Fornecedor</FieldLabel><Input id="fornecedor" value={fornecedor} onChange={(e) => setFornecedor(e.target.value)} placeholder="Nome do fornecedor" /></Field><Field><FieldLabel htmlFor="observacao">Observação</FieldLabel><Input id="observacao" value={observacao} onChange={(e) => setObservacao(e.target.value)} placeholder="Nota opcional" /></Field></div>
+              <div className="grid gap-4 md:grid-cols-3"><Field><FieldLabel htmlFor="data-movimentacao">Data da compra</FieldLabel><Input id="data-movimentacao" type="date" value={dataMovimentacao} onChange={(e) => setDataMovimentacao(e.target.value)} /></Field><Field><FieldLabel htmlFor="fornecedor">Fornecedor</FieldLabel><Input id="fornecedor" value={fornecedor} onChange={(e) => setFornecedor(e.target.value)} placeholder="Nome do fornecedor" /></Field><Field><FieldLabel htmlFor="observacao">Observação</FieldLabel><Input id="observacao" value={observacao} onChange={(e) => setObservacao(e.target.value)} placeholder="Nota opcional" /></Field></div>
 
               <div className="grid gap-4 md:grid-cols-2">
                 <Field>
@@ -132,10 +134,11 @@ export function EntradaView({ itens, onEntrada }: EntradaViewProps) {
                 </div>
               )}
 
+              {!canRegister && <p className="text-sm text-destructive">Você não tem permissão para registrar entrada.</p>}
               <Button
                 type="submit"
                 className="w-full"
-                disabled={!selectedItem || !quantidade}
+                disabled={!canRegister || !selectedItem || !quantidade || isSubmitting}
               >
                 <Plus className="mr-2 h-4 w-4" />
                 Adicionar ao Estoque
@@ -144,6 +147,7 @@ export function EntradaView({ itens, onEntrada }: EntradaViewProps) {
           </form>
         </CardContent>
       </Card>
+      <AlertDialog open={confirmOpen} onOpenChange={(open) => !isSubmitting && setConfirmOpen(open)}><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Confirmar entrada?</AlertDialogTitle><AlertDialogDescription>{selectedItemData?.nome} · {quantidade} {selectedItemData?.unidadeEstoque ?? "unidade"} · R$ {(Number(quantidade) * Number(precoUnitario || 0)).toFixed(2)}. Estoque após entrada: {(selectedItemData?.atual ?? 0) + Number(quantidade || 0)}.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel disabled={isSubmitting}>Cancelar</AlertDialogCancel><AlertDialogAction disabled={isSubmitting} onClick={async (event) => { event.preventDefault(); if (isSubmitting) return; setIsSubmitting(true); try { await onEntrada(selectedItem, Number(quantidade), Number(quantidade) * Number(precoUnitario || 0), fornecedor.trim() || undefined, observacao.trim() || undefined, dataMovimentacao); setConfirmOpen(false); setSelectedItem(""); setQuantidade(""); setPrecoUnitario(""); setFornecedor(""); setObservacao("") } finally { setIsSubmitting(false) } }}>{isSubmitting ? "Registrando..." : "Confirmar entrada"}</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
     </div>
   )
 }

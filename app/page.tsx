@@ -37,8 +37,11 @@ import {
   saveFinanceAuditSnapshot,
   getMovimentacoesEstoque,
   saveMovimentacoesEstoque,
+  registrarEntradaAtomica,
+  estornarMovimentacaoAtomica,
 } from "@/lib/firebase-db"
 import { criarEntrada } from "@/lib/estoque-movements"
+import { toast } from "sonner"
 import type { FinanceAuditSnapshot } from "@/lib/finance-engine"
 import { FirebaseLoginForm } from "@/components/firebase-login-form"
 import { AppSidebar } from "@/components/app-sidebar"
@@ -184,23 +187,25 @@ export default function Home() {
   }
   const persistirInsumos = (data: Insumo[]) => { if (userRole !== "owner" && userRole !== "admin") return; setInsumos(data); saveInsumos(data).catch((err) => console.error("[v0] Erro ao salvar insumos:", err)) }
   const persistirCompras = (data: CompraRegistro[]) => { setComprasHistorico(data); saveComprasHistorico(data).catch((err) => console.error("[v0] Erro ao salvar compras:", err)) }
-  const estornarMovimentacao = (movimentacao: MovimentacaoEstoque) => {
-    if (userRole !== "owner" && userRole !== "admin") return
-    const item = itens.find((row) => row.insumoId === movimentacao.insumoId || row.nome === movimentacao.insumoNomeSnapshot)
-    if (!item || item.atual < movimentacao.quantidade) return
-    const atualizados = itens.map((row) => row.nome === item.nome ? { ...row, atual: row.atual - movimentacao.quantidade } : row)
-    const novos = movimentacoes.map((row) => row.id === movimentacao.id ? { ...row, status: "estornada" as const, estornadoEm: new Date().toISOString(), estornadoPor: user ?? "unknown" } : row)
-    setItens(atualizados); saveEstoqueFirebase(user ?? "unknown", atualizados); setMovimentacoes(novos); saveMovimentacoesEstoque(novos)
+  const estornarMovimentacao = async (movimentacao: MovimentacaoEstoque) => {
+    if (userRole !== "owner" && userRole !== "admin") { toast.error("Você não tem permissão para estornar entradas."); return }
+    try {
+      await estornarMovimentacaoAtomica({ movimentoId: movimentacao.id, usuario: { uid: auth.currentUser?.uid ?? "unknown", email: auth.currentUser?.email ?? undefined, nome: auth.currentUser?.displayName ?? undefined } })
+      const next = await getMovimentacoesEstoque(); setMovimentacoes(next); setItens(await getEstoqueHybrid(user)); toast.success("Entrada estornada com sucesso.")
+    } catch (error) { toast.error(error instanceof Error ? error.message : "Não foi possível estornar a entrada.") }
   }
 
-  const registrarEntradaRastreavel = (nome: string, qtd: number, custo: number, fornecedor?: string, observacao?: string) => {
+  const registrarEntradaRastreavel = async (nome: string, qtd: number, custo: number, fornecedor?: string, observacao?: string, dataMovimentacao?: string) => {
     const item = itens.find((row) => row.nome === nome)
     const insumo = insumos.find((row) => row.id === item?.insumoId || row.nome === nome)
-    if (!item || !insumo || userRole !== "owner" && userRole !== "admin") return
-    const movimento = criarEntrada({ insumo, quantidade: qtd, unidade: (insumo.unidadeCompra ?? insumo.unidade) as Insumo["unidade"], precoUnitario: qtd > 0 ? custo / qtd : 0, fornecedor, observacao, usuario: { id: user ?? "unknown", email: user ?? "unknown" } })
-    const atualizados = itens.map((row) => row.nome === nome ? { ...row, atual: row.atual + qtd } : row)
-    setItens(atualizados); saveEstoqueFirebase(user ?? "unknown", atualizados)
-    const novos = [...movimentacoes, movimento]; setMovimentacoes(novos); saveMovimentacoesEstoque(novos)
+    if (!userPermissoes.includes("entrada") && userRole !== "owner" && userRole !== "admin") throw new Error("Você não tem permissão para registrar entrada.")
+    if (!item || !insumo || item.ativo === false || item.naoVinculado === true) throw new Error("Este item não está disponível para entrada.")
+    const currentUser = auth.currentUser
+    if (!currentUser) throw new Error("Usuário autenticado não encontrado.")
+    const unidade = (item.unidadeEstoque === "Unidade" ? "un" : item.unidadeEstoque) as Insumo["unidade"]
+    const movimento = { ...criarEntrada({ insumo: { ...insumo, id: item.insumoId ?? insumo.id }, quantidade: qtd, unidade, precoUnitario: qtd > 0 ? custo / qtd : 0, fornecedor, observacao, dataMovimentacao, usuario: { id: currentUser.uid, email: currentUser.email ?? undefined, nome: currentUser.displayName ?? undefined } }), status: "ativa" as const }
+    const atualizados = await registrarEntradaAtomica({ movimento, itemNome: nome, userId: currentUser.uid })
+    setItens(atualizados); setMovimentacoes(await getMovimentacoesEstoque()); toast.success("Entrada registrada com sucesso.")
   }
 
   // Load data on mount
@@ -355,13 +360,7 @@ export default function Home() {
     saveEstoqueHybrid(user, updated)
   }
 
-  const handleEntrada = (nome: string, qtd: number, custo: number, fornecedor?: string, observacao?: string) => {
-    registrarEntradaRastreavel(nome, qtd, custo, fornecedor, observacao)
-    const entry: HistoricoEntry = { nome, qtd, custo, data: new Date().toLocaleDateString("pt-BR") }
-    const newHistorico = [...historico, entry]
-    setHistorico(newHistorico)
-    saveHistoricoHybrid(user, newHistorico)
-  }
+  const handleEntrada = (nome: string, qtd: number, custo: number, fornecedor?: string, observacao?: string, dataMovimentacao?: string) => registrarEntradaRastreavel(nome, qtd, custo, fornecedor, observacao, dataMovimentacao)
 
   const handleProduzir = (receita: Receita) => {
     const now = new Date()
@@ -472,7 +471,7 @@ export default function Home() {
             />
           )}
           {activeTab === "entrada" && (
-            <EntradaView itens={itens} onEntrada={handleEntrada} />
+            <EntradaView itens={itens} onEntrada={handleEntrada} canRegister={userPermissoes.includes("entrada") || userRole === "owner" || userRole === "admin"} />
           )}
           {activeTab === "financeiro" && (
             <FinanceiroCentral

@@ -12,6 +12,7 @@ import {
   where,
   Timestamp,
   onSnapshot,
+  runTransaction,
 } from "firebase/firestore"
 import { db } from "./firebase"
 import type { Item, HistoricoEntry, Receita, UsuarioSistema, Insumo, FichaTecnica, VendaProduto, CompraRegistro, FinanceConfig, VendaFinanceira, DespesaFinanceira, MovimentacaoEstoque } from "./types"
@@ -289,8 +290,56 @@ export async function getVendasProdutos() { return getComprasData<VendaProduto>(
 export async function saveVendasProdutos(data: VendaProduto[]) { return saveComprasData("vendas", data) }
 export async function getComprasHistorico() { return getComprasData<CompraRegistro>("historico") }
 export async function saveComprasHistorico(data: CompraRegistro[]) { return saveComprasData("historico", data) }
-export async function getMovimentacoesEstoque() { return getComprasData<MovimentacaoEstoque>("movimentacoes-estoque") }
-export async function saveMovimentacoesEstoque(data: MovimentacaoEstoque[]) { return saveComprasData("movimentacoes-estoque", data) }
+const MOVIMENTACOES_COLLECTION = "movimentacoesEstoque"
+
+export async function getMovimentacoesEstoque() {
+  const snapshot = await getDocs(collection(db, MOVIMENTACOES_COLLECTION))
+  const novas = snapshot.docs.map((item) => ({ id: item.id, ...item.data() }) as MovimentacaoEstoque)
+  const legado = await getComprasData<MovimentacaoEstoque>("movimentacoes-estoque")
+  return [...novas, ...legado.filter((item) => !novas.some((novo) => novo.id === item.id))]
+}
+
+export async function saveMovimentacoesEstoque(data: MovimentacaoEstoque[]) {
+  for (const item of data) await setDoc(doc(db, MOVIMENTACOES_COLLECTION, item.id || crypto.randomUUID()), { ...item, id: item.id || crypto.randomUUID() })
+}
+
+export async function registrarEntradaAtomica(params: { movimento: MovimentacaoEstoque; itemNome: string; userId: string }) {
+  const movimentoRef = doc(db, MOVIMENTACOES_COLLECTION, params.movimento.id)
+  const estoqueRef = doc(db, "estoque", "global")
+  return runTransaction(db, async (transaction) => {
+    const estoqueSnap = await transaction.get(estoqueRef)
+    const itens = (estoqueSnap.exists() ? estoqueSnap.data().itens : []) as Item[]
+    const index = itens.findIndex((item) => item.nome === params.itemNome || item.insumoId === params.movimento.insumoId)
+    if (index < 0) throw new Error("Insumo não encontrado no estoque")
+    const item = itens[index]
+    const quantidade = params.movimento.quantidade
+    if (!Number.isFinite(quantidade) || quantidade <= 0) throw new Error("A quantidade deve ser maior que zero")
+    const atualizados = itens.map((row, rowIndex) => rowIndex === index ? { ...row, atual: row.atual + quantidade } : row)
+    transaction.set(estoqueRef, { itens: atualizados, updatedAt: Timestamp.now(), lastModifiedBy: params.userId })
+    transaction.set(movimentoRef, params.movimento)
+    return atualizados
+  })
+}
+
+export async function estornarMovimentacaoAtomica(params: { movimentoId: string; usuario: { uid: string; email?: string; nome?: string } }) {
+  const movimentoRef = doc(db, MOVIMENTACOES_COLLECTION, params.movimentoId)
+  const estoqueRef = doc(db, "estoque", "global")
+  return runTransaction(db, async (transaction) => {
+    const [movimentoSnap, estoqueSnap] = await Promise.all([transaction.get(movimentoRef), transaction.get(estoqueRef)])
+    if (!movimentoSnap.exists()) throw new Error("Movimentação não encontrada")
+    const original = { id: movimentoSnap.id, ...movimentoSnap.data() } as MovimentacaoEstoque
+    if (original.tipo !== "entrada" || original.status === "estornada") throw new Error("Esta entrada já foi estornada.")
+    const itens = (estoqueSnap.exists() ? estoqueSnap.data().itens : []) as Item[]
+    const index = itens.findIndex((item) => item.insumoId === original.insumoId || item.nome === original.insumoNomeSnapshot)
+    if (index < 0 || itens[index].atual < original.quantidade) throw new Error("Não é possível estornar esta entrada porque o estoque atual é insuficiente.")
+    const agora = new Date().toISOString()
+    const inversa: MovimentacaoEstoque = { ...original, id: crypto.randomUUID(), tipo: "estorno_entrada", quantidade: -Math.abs(original.quantidade), quantidadeBase: -Math.abs(original.quantidadeBase), valorTotal: -Math.abs(original.valorTotal), precoTotal: -Math.abs(original.precoTotal ?? original.valorTotal), movimentacaoOrigemId: original.id, status: "ativa", usuarioId: params.usuario.uid, usuarioEmail: params.usuario.email ?? "", criadoPorUid: params.usuario.uid, criadoPorEmail: params.usuario.email, criadoPorNome: params.usuario.nome, criadoEm: agora, dataMovimentacao: agora }
+    transaction.update(movimentoRef, { status: "estornada", estornadoEm: agora, estornadoPor: params.usuario.uid, estornadaPorUid: params.usuario.uid })
+    transaction.update(estoqueRef, { itens: itens.map((item, itemIndex) => itemIndex === index ? { ...item, atual: item.atual - original.quantidade } : item), updatedAt: Timestamp.now(), lastModifiedBy: params.usuario.uid })
+    transaction.set(doc(db, MOVIMENTACOES_COLLECTION, inversa.id), inversa)
+    return inversa
+  })
+}
 
 export function subscribeToReceitas(callback: (receitas: Receita[]) => void) {
   return onSnapshot(
