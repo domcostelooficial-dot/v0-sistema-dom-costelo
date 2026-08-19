@@ -8,51 +8,6 @@ const USER_KEY = "dom-costelo-user"
 const RECEITAS_KEY = "dom-costelo-receitas"
 const USUARIOS_KEY = "dom-costelo-usuarios"
 
-const defaultUsuarios: UsuarioSistema[] = [
-  {
-    login: "thiago",
-    senha: "123",
-    email: "thiago@domcostelo.com",
-    role: "admin",
-    permissoes: ["estoque", "entrada", "financeiro", "dashboard", "lista-compras", "cmv", "admin"],
-    status: "aprovado",
-  },
-  {
-    login: "debora",
-    senha: "456",
-    email: "debora@domcostelo.com",
-    role: "operador",
-    permissoes: ["estoque", "entrada", "dashboard", "lista-compras", "cmv"],
-    status: "aprovado",
-  },
-  {
-    login: "marcos",
-    senha: "789",
-    email: "marcos@domcostelo.com",
-    role: "operador",
-    permissoes: ["estoque", "entrada", "dashboard", "lista-compras", "cmv"],
-    status: "aprovado",
-  },
-  {
-    login: "joseane@domcostelo.com",
-    senha: "dom123",
-    nome: "Joseane",
-    email: "joseane@domcostelo.com",
-    role: "operador",
-    permissoes: ["estoque", "entrada", "dashboard", "lista-compras", "cmv"],
-    status: "aprovado",
-  },
-  {
-    login: "samuel@domcostelo.com",
-    senha: "dom123",
-    nome: "Samuel",
-    email: "samuel@domcostelo.com",
-    role: "operador",
-    permissoes: ["estoque", "entrada", "dashboard", "lista-compras", "cmv"],
-    status: "aprovado",
-  },
-]
-
 function enriquecerItens(itens: Item[]) {
   return itens.map((item) => {
     const cadastro = catalogoEmbalagens.find(([nome]) => nome.toLowerCase() === item.nome.toLowerCase())
@@ -111,35 +66,19 @@ export function saveReceitas(receitas: Receita[]) {
 }
 
 export function getUsuarios(): UsuarioSistema[] {
-  if (typeof window === "undefined") return defaultUsuarios
+  if (typeof window === "undefined") return []
   const stored = localStorage.getItem(USUARIOS_KEY)
-  if (!stored) return defaultUsuarios
-  
-  // Migrar usuarios antigos que nao tem status
+  if (!stored) return []
+
   const usuarios = JSON.parse(stored) as UsuarioSistema[]
   let needsUpdate = false
-  
-  const migratedUsuarios = usuarios.map(u => {
-    if (!u.status) {
-      needsUpdate = true
-      return { ...u, status: "aprovado" as const }
-    }
-    return u
+  const migratedUsuarios = usuarios.map((usuario) => {
+    const { senha: _senha, ...semSenha } = usuario
+    if (usuario.senha !== undefined || !usuario.status) needsUpdate = true
+    return { ...semSenha, status: usuario.status || "aprovado" } as UsuarioSistema
   })
 
-  // Inclui novos usuários padrão sem sobrescrever cadastros existentes.
-  const novosUsuarios = defaultUsuarios.filter(
-    (padrao) => !migratedUsuarios.some((usuario) => usuario.login === padrao.login)
-  )
-  if (novosUsuarios.length > 0) {
-    needsUpdate = true
-    migratedUsuarios.push(...novosUsuarios)
-  }
-  
-  if (needsUpdate) {
-    localStorage.setItem(USUARIOS_KEY, JSON.stringify(migratedUsuarios))
-  }
-  
+  if (needsUpdate) localStorage.setItem(USUARIOS_KEY, JSON.stringify(migratedUsuarios))
   return migratedUsuarios
 }
 

@@ -227,7 +227,7 @@ export function AdminView({ currentUser, onPasswordChange }: AdminViewProps) {
       login: user.login,
       nome: user.nome || "",
       email: user.email || "",
-      senha: user.senha,
+      senha: "",
       role: user.role,
       permissoes: user.permissoes ? [...user.permissoes] : [],
     })
