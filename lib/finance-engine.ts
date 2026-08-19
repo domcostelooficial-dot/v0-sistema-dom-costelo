@@ -165,32 +165,37 @@ export function totalCustosFixos(config: FinanceConfig, despesas: DespesaFinance
 
 export function percentualCmv(resumo: ReturnType<typeof resumoFinanceiro>) { return resumo.faturamentoBruto > 0 ? resumo.cmv / resumo.faturamentoBruto * 100 : 0 }
 
+export type StatusHomologacao = "ok" | "divergente" | "sem-dados"
+
 export interface FinanceAuditSnapshot {
   competencia: string
   fonte: "vendas-importadas" | "vendas-registradas" | "sem-dados"
   versaoGabarito: "julho-2026-v1"
   verificadoEm: string
-  totalVendas: number
-  faturamentoBruto: number
-  descontos: number
-  taxas: number
-  receitaLiquida: number
-  cmv: number
-  custosFixos: number
-  resultadoOperacional: number
+  totalVendas: number | null
+  faturamentoBruto: number | null
+  descontos: number | null
+  receitaAposDescontos: number | null
+  taxas: number | null
+  receitaLiquida: number | null
+  cmv: number | null
+  cmvPercentual: number | null
+  margemContribuicao: number | null
+  mcPercentual: number | null
+  custosFixos: number | null
+  resultadoOperacional: number | null
+  margemOperacionalPercentual: number | null
+  ticketMedio: number | null
+  pontoEquilibrio: number | null
   observacao?: string
 }
 
 export const GABARITO_JULHO_2026 = {
-  competencia: "2026-07",
-  faturamentoBruto: 100000,
-  descontos: 0,
-  taxas: 0,
-  receitaLiquida: 100000,
-  cmv: 35000,
-  custosFixos: 10790,
-  resultadoOperacional: 54210,
-  totalVendas: 357,
+  competencia: "2026-07", faturamentoBruto: 26609.46, descontos: 184.73, receitaAposDescontos: 26424.73,
+  taxas: 2000.00, receitaLiquida: 24424.73, cmv: 11350.00, cmvPercentual: 42.65,
+  margemContribuicao: 13074.73, mcPercentual: 49.14, custosFixos: 11290.00,
+  resultadoOperacional: 1784.73, margemOperacionalPercentual: 6.71, totalVendas: 357,
+  ticketMedio: 74.54, pontoEquilibrio: 22970.00, origem: "homologacao_julho_2026", tipo: "gabarito_historico",
 } as const
 
 export function criarAuditoriaFinanceira(vendas: VendaFinanceira[], despesas: DespesaFinanceira[], config: FinanceConfig, competencia: string): FinanceAuditSnapshot {
@@ -199,17 +204,24 @@ export function criarAuditoriaFinanceira(vendas: VendaFinanceira[], despesas: De
   const fim = `${competencia}-${String(fimDate.getDate()).padStart(2, "0")}`
   const filtrado = filtrarPeriodo(vendas, despesas, inicio, fim)
   const fonte = filtrado.vendas.length > 0 ? "vendas-registradas" : "sem-dados"
+  if (fonte === "sem-dados") return { competencia, fonte, versaoGabarito: "julho-2026-v1", verificadoEm: new Date().toISOString(), totalVendas: null, faturamentoBruto: null, descontos: null, receitaAposDescontos: null, taxas: null, receitaLiquida: null, cmv: null, cmvPercentual: null, margemContribuicao: null, mcPercentual: null, custosFixos: null, resultadoOperacional: null, margemOperacionalPercentual: null, ticketMedio: null, pontoEquilibrio: null, observacao: "Sem vendas registradas; nenhuma venda foi inventada." }
   const resumo = resumoFinanceiro(filtrado.vendas, filtrado.despesas, totalCustosFixosAtivos(config))
-  return { competencia, fonte, versaoGabarito: "julho-2026-v1", verificadoEm: new Date().toISOString(), totalVendas: resumo.numeroVendas, faturamentoBruto: resumo.faturamentoBruto, descontos: resumo.descontos, taxas: resumo.taxas, receitaLiquida: resumo.receitaLiquida, cmv: resumo.cmv, custosFixos: resumo.custosFixos, resultadoOperacional: resumo.lucroOperacional, observacao: fonte === "sem-dados" ? "Sem vendas registradas; nenhuma venda foi inventada." : undefined }
+  const receitaAposDescontos = resumo.faturamentoBruto - resumo.descontos
+  const cmvPercentual = resumo.faturamentoBruto > 0 ? resumo.cmv / resumo.faturamentoBruto * 100 : null
+  const mcPercentual = resumo.faturamentoBruto > 0 ? resumo.margemContribuicao / resumo.faturamentoBruto * 100 : null
+  const margemOperacionalPercentual = resumo.faturamentoBruto > 0 ? resumo.lucroOperacional / resumo.faturamentoBruto * 100 : null
+  const pontoEquilibrioValor = resumo.mcPercentual > 0 ? resumo.custosFixos / (resumo.mcPercentual / 100) : null
+  return { competencia, fonte, versaoGabarito: "julho-2026-v1", verificadoEm: new Date().toISOString(), totalVendas: resumo.numeroVendas, faturamentoBruto: resumo.faturamentoBruto, descontos: resumo.descontos, receitaAposDescontos, taxas: resumo.taxas, receitaLiquida: resumo.receitaLiquida, cmv: resumo.cmv, cmvPercentual, margemContribuicao: resumo.margemContribuicao, mcPercentual, custosFixos: resumo.custosFixos, resultadoOperacional: resumo.lucroOperacional, margemOperacionalPercentual, ticketMedio: resumo.ticketMedio, pontoEquilibrio: pontoEquilibrioValor }
 }
 
-export const CAMPOS_GABARITO = ["totalVendas", "faturamentoBruto", "descontos", "taxas", "receitaLiquida", "cmv", "custosFixos", "resultadoOperacional"] as const
+export const CAMPOS_GABARITO = ["faturamentoBruto", "descontos", "receitaAposDescontos", "taxas", "receitaLiquida", "cmv", "cmvPercentual", "margemContribuicao", "mcPercentual", "custosFixos", "resultadoOperacional", "margemOperacionalPercentual", "totalVendas", "ticketMedio", "pontoEquilibrio"] as const
+export const CAMPOS_CRITICOS = ["faturamentoBruto", "taxas", "cmv", "custosFixos", "resultadoOperacional"] as const
 
 export function compararAuditoriaComEsperado(realizado: FinanceAuditSnapshot, esperado: Partial<FinanceAuditSnapshot>, tolerancia = 0.01) {
-  return CAMPOS_GABARITO.reduce((resultado, campo) => ({ ...resultado, [campo]: Math.abs(realizado[campo] - (esperado[campo] ?? realizado[campo])) <= (campo === "totalVendas" ? 0 : tolerancia) }), {} as Record<(typeof CAMPOS_GABARITO)[number], boolean>)
+  return CAMPOS_GABARITO.reduce((resultado, campo) => { const calculado = realizado[campo]; const valorEsperado = esperado[campo]; return { ...resultado, [campo]: calculado === null ? null : Math.abs(calculado - (valorEsperado ?? calculado)) <= (campo.includes("Percentual") || campo === "cmvPercentual" || campo === "mcPercentual" ? 0.01 : tolerancia) } }, {} as Record<(typeof CAMPOS_GABARITO)[number], boolean | null>)
 }
 
-export function statusAuditoria(comparacao: Record<string, boolean>) { return Object.values(comparacao).every(Boolean) ? "aprovado" : "divergente" }
+export function statusAuditoria(comparacao: Record<string, boolean | null>): StatusHomologacao { if (Object.values(comparacao).some(value => value === null)) return "sem-dados"; return Object.values(comparacao).every(Boolean) ? "ok" : "divergente" }
 
 export function fluxoCaixaPago(despesas: DespesaFinanceira[], inicio: string, fim: string) {
   return despesas.filter((despesa) => despesa.dataPagamento.slice(0, 10) >= inicio && despesa.dataPagamento.slice(0, 10) <= fim).reduce((total, despesa) => total + n(despesa.valor), 0)

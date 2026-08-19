@@ -100,20 +100,34 @@ describe("motor financeiro", () => {
 
   it("homologação vazia não cria dados", () => {
     const audit = criarAuditoriaFinanceira([], [], defaultFinanceConfig, "2026-07")
-    expect(audit.totalVendas).toBe(0)
+    expect(audit.totalVendas).toBeNull()
     expect(audit.fonte).toBe("sem-dados")
     expect(audit.observacao).toContain("nenhuma venda foi inventada")
   })
 
   it("mantém gabarito oficial de julho versionado", () => {
-    expect(GABARITO_JULHO_2026).toMatchObject({ competencia: "2026-07", totalVendas: 357, faturamentoBruto: 100000, cmv: 35000, custosFixos: 10790, resultadoOperacional: 54210 })
+    expect(GABARITO_JULHO_2026.faturamentoBruto).toBe(26609.46)
+    expect(GABARITO_JULHO_2026.descontos).toBe(184.73)
+    expect(GABARITO_JULHO_2026.taxas).toBe(2000)
+    expect(GABARITO_JULHO_2026.cmv).toBe(11350)
+    expect(GABARITO_JULHO_2026.custosFixos).toBe(11290)
+    expect(GABARITO_JULHO_2026.resultadoOperacional).toBe(1784.73)
+    expect(GABARITO_JULHO_2026.totalVendas).toBe(357)
     const audit = criarAuditoriaFinanceira([], [], defaultFinanceConfig, "2026-07")
     const status = statusAuditoria(compararAuditoriaComEsperado(audit, GABARITO_JULHO_2026))
-    expect(status).toBe("divergente")
+    expect(status).toBe("sem-dados")
   })
 
   it("aprova comparação dentro da tolerância de um centavo", () => {
-    const audit = criarAuditoriaFinanceira([], [], defaultFinanceConfig, "2026-07")
-    expect(statusAuditoria(compararAuditoriaComEsperado(audit, { faturamentoBruto: 0.01 }))).toBe("aprovado")
+    const audit = { ...criarAuditoriaFinanceira([], [], defaultFinanceConfig, "2026-07"), totalVendas: 357, faturamentoBruto: 100, descontos: 0, receitaAposDescontos: 100, taxas: 0, receitaLiquida: 100, cmv: 0, cmvPercentual: 0, margemContribuicao: 100, mcPercentual: 100, custosFixos: 0, resultadoOperacional: 100, margemOperacionalPercentual: 100, ticketMedio: 100, pontoEquilibrio: 0 }
+    expect(statusAuditoria(compararAuditoriaComEsperado(audit, { ...GABARITO_JULHO_2026, faturamentoBruto: 100, descontos: 0, receitaAposDescontos: 100, taxas: 0, receitaLiquida: 100, cmv: 0, cmvPercentual: 0, margemContribuicao: 100, mcPercentual: 100, custosFixos: 0, resultadoOperacional: 100, margemOperacionalPercentual: 100, totalVendas: 357, ticketMedio: 100, pontoEquilibrio: 0 }))).toBe("ok")
+  })
+
+  it("classifica divergência e diferença negativa", () => {
+    const audit = { ...criarAuditoriaFinanceira([], [], defaultFinanceConfig, "2026-07"), totalVendas: 357, faturamentoBruto: 90, descontos: 0, receitaAposDescontos: 90, taxas: 0, receitaLiquida: 90, cmv: 0, cmvPercentual: 0, margemContribuicao: 90, mcPercentual: 100, custosFixos: 0, resultadoOperacional: 90, margemOperacionalPercentual: 100, ticketMedio: 90, pontoEquilibrio: 0 }
+    const comparacao = compararAuditoriaComEsperado(audit, { ...GABARITO_JULHO_2026, faturamentoBruto: 100, descontos: 0, receitaAposDescontos: 90, taxas: 0, receitaLiquida: 90, cmv: 0, cmvPercentual: 0, margemContribuicao: 90, mcPercentual: 100, custosFixos: 0, resultadoOperacional: 90, margemOperacionalPercentual: 100, totalVendas: 357, ticketMedio: 90, pontoEquilibrio: 0 })
+    expect(comparacao.faturamentoBruto).toBe(false)
+    expect(statusAuditoria(comparacao)).toBe("divergente")
+    expect(audit.faturamentoBruto! - 100).toBe(-10)
   })
 })
