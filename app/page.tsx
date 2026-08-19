@@ -12,6 +12,7 @@ import {
   clearUser,
   getReceitas as getReceitasLocal,
   saveReceitas as saveReceitasLocal,
+  getUsuarios,
 } from "@/lib/store"
 import {
   saveEstoque as saveEstoqueFirebase,
@@ -170,6 +171,13 @@ export default function Home() {
   useEffect(() => {
     const loadData = async () => {
       const storedUser = getUser()
+      const storedUserData = storedUser ? getUsuarios().find((usuario) => usuario.login === storedUser || usuario.email === storedUser) : undefined
+      if (storedUserData) {
+        setUserRole(storedUserData.role)
+        setUserPermissoes(storedUserData.role === "admin" || storedUserData.permissoes.includes("cmv")
+          ? [...new Set([...storedUserData.permissoes, "cmv"])]
+          : storedUserData.permissoes)
+      }
       const storedItens = await getEstoqueHybrid(storedUser)
       const storedHistorico = await getHistoricoHybrid(storedUser)
       const storedReceitas = await getReceitasHybrid(storedUser)
