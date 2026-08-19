@@ -288,6 +288,31 @@ export async function initializeFichasTecnicas(seed: FichaTecnica[], seedVersion
   return { data: seed, seeded: true }
 }
 
+export async function migrarCustosMestresDomCosteloV1(master: Insumo[]) {
+  const settingsRef = doc(db, "settings", "system")
+  const settingsSnap = await getDoc(settingsRef)
+  if (settingsSnap.data()?.custosMestresDomCosteloV1Aplicados === true) return { applied: false, skipped: true, data: await getInsumos(), updated: 0 }
+  const existing = await getInsumos()
+  const byId = new Map(existing.map((item) => [item.id, item]))
+  const normalizar = (value: string) => value.trim().toLocaleLowerCase("pt-BR").normalize("NFD").replace(/[\\u0300-\\u036f]/g, "").replace(/\\s+/g, " ")
+  let updated = 0
+  for (const mestre of master) {
+    const aliases = mestre.aliases ?? []
+    const atual = byId.get(mestre.id) ?? [...byId.values()].find((item) => normalizar(item.nome) === normalizar(mestre.nome) || aliases.some((alias) => normalizar(alias) === normalizar(item.nome)))
+    if (atual) {
+      byId.set(atual.id, { ...atual, ...mestre, id: atual.id, atual: atual.atual, min: atual.min, categoria: atual.categoria ?? mestre.categoria })
+      updated += 1
+    } else {
+      byId.set(mestre.id, { ...mestre, atual: mestre.atual ?? 0 })
+      updated += 1
+    }
+  }
+  const data = [...byId.values()]
+  await saveInsumos(data)
+  await setDoc(settingsRef, { custosMestresDomCosteloV1Aplicados: true, custosMestresDomCosteloV1AplicadosEm: Timestamp.now(), custosMestresDomCosteloV1Count: updated }, { merge: true })
+  return { applied: true, skipped: false, data, updated }
+}
+
 export async function migrarFichasTecnicasV2(seed: FichaTecnica[], insumos: Insumo[], aliases: Record<string, string[]> = {}) {
   const settingsRef = doc(db, "settings", "system")
   const settingsSnap = await getDoc(settingsRef)

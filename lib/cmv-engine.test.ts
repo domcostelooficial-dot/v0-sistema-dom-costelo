@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest"
 import { calcularFicha, calcularConsumoVenda, converterQuantidadeFichaParaEstoque, custoIngrediente, custoPorUnidade, resolverIngredientesFicha } from "./cmv-engine"
-import type { FichaTecnica, Insumo } from "./types"
+import { defaultInsumos } from "./types"
+import type { FichaTecnica, IngredienteFicha, Insumo } from "./types"
 
 const mussarela: Insumo = {
   id: "mussarela",
@@ -17,6 +18,27 @@ describe("CMV", () => {
     const insumos = [{ ...mussarela, aliases: ["Queijo mussarela"] }]
     expect(resolverIngredientesFicha({ id: "f", nome: "Ficha", precoVenda: 0, ingredientes: [{ insumoNome: "Queijo mussarela", quantidade: 1, unidade: "g" }] }, insumos).ok).toBe(true)
     expect(resolverIngredientesFicha({ id: "f", nome: "Ficha", precoVenda: 0, ingredientes: [{ insumoNome: "Farofa de bacon", quantidade: 1, unidade: "g" }] }, insumos).ok).toBe(false)
+  })
+
+  it("audita os valores mestres e custos de porção", () => {
+    const custo = (nome: string, quantidade: number, unidade: string) => custoIngrediente({ insumoNome: nome, quantidade, unidade: unidade as IngredienteFicha["unidade"] }, defaultInsumos)
+    expect(custo("Carne de hambúrguer", 180, "g")).toBeCloseTo(6.66)
+    expect(custo("Costela suína", 1, "kg")).toBeCloseTo(25)
+    expect(custo("Costela bovina", 1, "kg")).toBeCloseTo(35)
+    expect(custo("Costela Desfiada", 40, "g")).toBeCloseTo(3.2)
+    expect(custo("Bacon fatiado", 40, "g")).toBeCloseTo(1.28)
+    expect(custo("Batata frita", 400, "g")).toBeCloseTo(4)
+    expect(custo("Mussarela", 200, "g")).toBeCloseTo(8.6)
+    expect(custo("Cream Cheese", 30, "g")).toBeCloseTo(1.2)
+    expect(custo("Farofa de bacon", 80, "g")).toBeCloseTo(4.4)
+    expect(custo("Farofa", 50, "g")).toBeCloseTo(1)
+    expect(custo("Arroz", 300, "g")).toBeCloseTo(1.2)
+    expect(custo("Sal de parrilla", 20, "g")).toBeCloseTo(0.5)
+    expect(custo("Pimenta Biquinho", 20, "g")).toBeCloseTo(1.2)
+    expect(custo("Onion Rings", 160, "g")).toBeCloseTo(3.52)
+    expect(custo("Embalagem H7", 1, "un")).toBeCloseTo(0.5)
+    expect(custo("Embalagem H2", 1, "un")).toBeCloseTo(0.39)
+    expect(custo("Tempero do Dom", 1, "aplicação")).toBeCloseTo(2)
   })
 
   it("calcula Carne de hambúrguer a R$37/kg com 180g por R$6,66", () => {

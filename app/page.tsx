@@ -21,6 +21,7 @@ import {
   subscribeToHistorico,
   subscribeToReceitas,
   getInsumos,
+  migrarCustosMestresDomCosteloV1,
   saveInsumos,
   getFichasTecnicas,
   initializeFichasTecnicas,
@@ -183,16 +184,19 @@ export default function Home() {
  const [auditoriaJulho, setAuditoriaJulho] = useState<FinanceAuditSnapshot | undefined>(undefined)
   const persistirFichas = (data: typeof seedFichas) => { if (userRole !== "owner" && userRole !== "admin") return false; setFichasTecnicas(data); saveFichasTecnicas(data).catch((err) => console.error("[v0] Erro ao salvar fichas:", err)); return true }
 
-  const getComprasHybrid = async () => {
+  const getComprasHybrid = async (roleOverride?: string) => {
+    const roleAtual = roleOverride ?? userRole
     try {
   const [insumosResult, historicoResult, fichasResult, movimentacoesResult] = await Promise.all([getInsumos(), getComprasHistorico(), getFichasTecnicas(), getMovimentacoesEstoque()])
+  const custosMestres = roleAtual === "owner" || roleAtual === "admin" ? (await migrarCustosMestresDomCosteloV1(defaultInsumos)).data : insumosResult
   const carneOficial = defaultInsumos.find((item) => item.id === "carne-hamburguer-kg")!
-  const insumosOperacionais = insumosResult.length > 0 ? [...insumosResult, ...defaultInsumos.filter((item) => !insumosResult.some((existente) => existente.id === item.id || existente.nome === item.nome))] : defaultInsumos
-  if (insumosResult.length > 0) { setInsumos(insumosOperacionais); if (insumosOperacionais.length !== insumosResult.length && (userRole === "owner" || userRole === "admin")) saveInsumos(insumosOperacionais).catch((err) => console.error("[v0] Erro ao adicionar carne oficial:", err)) }
+  const insumosResultAtualizados = custosMestres.length > 0 ? custosMestres : insumosResult
+  const insumosOperacionais = insumosResultAtualizados.length > 0 ? [...insumosResultAtualizados, ...defaultInsumos.filter((item) => !insumosResultAtualizados.some((existente) => existente.id === item.id || existente.nome === item.nome))] : defaultInsumos
+  if (insumosOperacionais.length > 0) setInsumos(insumosOperacionais)
   if (historicoResult.length > 0) setComprasHistorico(historicoResult)
   const migradas = migrarFichasParaCarneKg(fichasResult, insumosOperacionais)
   setFichasTecnicas(migradas)
-  if (userRole === "owner" || userRole === "admin") {
+  if (roleAtual === "owner" || roleAtual === "admin") {
     const migracao = await migrarFichasTecnicasV2(seedFichas, insumosOperacionais, aliasesPorInsumo)
     setFichasTecnicas(migracao.data)
     if (migracao.errors.length > 0) console.error("[v0] Migração V2 bloqueada:", migracao.errors)
@@ -321,7 +325,7 @@ export default function Home() {
       setDespesasFinanceiras(despesas)
       setFichasTecnicas(fichas.data)
       setFichasLoading(false)
-      await getComprasHybrid()
+      await getComprasHybrid(role)
       
       setItens(itens)
       setHistorico(historico)
