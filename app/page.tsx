@@ -181,7 +181,18 @@ export default function Home() {
   const [vendasFinanceiras, setVendasFinanceiras] = useState<VendaFinanceira[]>([])
   const [despesasFinanceiras, setDespesasFinanceiras] = useState<DespesaFinanceira[]>([])
  const [auditoriaJulho, setAuditoriaJulho] = useState<FinanceAuditSnapshot | undefined>(undefined)
-  const persistirFichas = (data: typeof seedFichas) => { if (userRole !== "owner" && userRole !== "admin") return false; setFichasTecnicas(data); saveFichasTecnicas(data).catch((err) => console.error("[v0] Erro ao salvar fichas:", err)); return true }
+  const persistirFichas = async (data: typeof seedFichas) => {
+    if (userRole !== "owner" && userRole !== "admin") return false
+    try {
+      await saveFichasTecnicas(data)
+      setFichasTecnicas(data)
+      toast.success("Ficha técnica sincronizada na nuvem.")
+      return true
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Não foi possível sincronizar a ficha técnica.")
+      return false
+    }
+  }
 
   const getComprasHybrid = async (roleOverride?: string) => {
     const roleAtual = roleOverride ?? userRole
@@ -213,11 +224,11 @@ export default function Home() {
   const persistirInsumos = async (data: Insumo[]) => {
     if (userRole !== "owner" && userRole !== "admin") return
     try { await saveInsumos(data); setInsumos(data); toast.success("Produtos sincronizados na nuvem.") }
-    catch (error) { toast.error(error instanceof Error ? error.message : "Não foi possível sincronizar os produtos.") }
+    catch (error) { toast.error(error instanceof Error ? error.message : "Não foi possível sincronizar os produtos."); throw error }
   }
   const persistirCompras = async (data: CompraRegistro[]) => {
     try { await saveComprasHistorico(data); setComprasHistorico(data); toast.success("Compra sincronizada na nuvem.") }
-    catch (error) { toast.error(error instanceof Error ? error.message : "Não foi possível sincronizar a compra.") }
+    catch (error) { toast.error(error instanceof Error ? error.message : "Não foi possível sincronizar a compra."); throw error }
   }
   const estornarMovimentacao = async (movimentacao: MovimentacaoEstoque) => {
     if (userRole !== "owner" && userRole !== "admin") { toast.error("Você não tem permissão para estornar entradas."); return }
@@ -290,7 +301,7 @@ export default function Home() {
     
     // Configurar listeners em tempo real para sincronização (apenas quando logado)
     const unsubscribeEstoque = subscribeToEstoque((firebaseItens) => {
-      if (firebaseItens && firebaseItens.length > 0) {
+      if (firebaseItens) {
         const itensLimpos = limparItensEstoque(firebaseItens)
         setItens(itensLimpos)
         saveEstoqueLocal(itensLimpos)
@@ -305,7 +316,7 @@ export default function Home() {
     })
     
     const unsubscribeReceitas = subscribeToReceitas((firebaseReceitas) => {
-      if (firebaseReceitas && firebaseReceitas.length > 0) {
+      if (firebaseReceitas) {
         setReceitas(firebaseReceitas)
         saveReceitasLocal(firebaseReceitas)
       }
@@ -392,7 +403,7 @@ export default function Home() {
     }
   }
 
-  const handleAddItem = (newItem: Item) => {
+  const handleAddItem = async (newItem: Item) => {
     const now = new Date()
     const dataHora = `${now.toLocaleDateString("pt-BR")} às ${now.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}`
     const itemWithTimestamp = {
@@ -403,8 +414,12 @@ export default function Home() {
       },
     }
     const updated = [...itens, itemWithTimestamp]
-    setItens(updated)
-    saveEstoqueHybrid(user, updated)
+    try {
+      await saveEstoqueHybrid(user, updated)
+      setItens(updated)
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Não foi possível salvar o novo item na nuvem.")
+    }
   }
 
   const handleEditItem = (oldNome: string, updatedItem: Item) => {

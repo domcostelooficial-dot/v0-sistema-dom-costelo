@@ -14,7 +14,7 @@ import { alertaCmv, calcularCustoCombo, calcularFicha, custoIngrediente, custoPo
 
 type View = "dashboard" | "insumos" | "fichas" | "combos" | "calculadora" | "historico"
 
-export function CmvView({ insumos, fichas, combos = seedCombos, userRole, onSaveInsumos, onSaveFichas, onSaveCombos }: { insumos: Insumo[]; fichas: FichaTecnica[]; combos?: Combo[]; userRole: string; onSaveInsumos: (data: Insumo[]) => void; onSaveFichas: (data: FichaTecnica[]) => boolean; onSaveCombos?: (data: Combo[]) => void }) {
+export function CmvView({ insumos, fichas, combos = seedCombos, userRole, onSaveInsumos, onSaveFichas, onSaveCombos }: { insumos: Insumo[]; fichas: FichaTecnica[]; combos?: Combo[]; userRole: string; onSaveInsumos: (data: Insumo[]) => void; onSaveFichas: (data: FichaTecnica[]) => boolean | Promise<boolean>; onSaveCombos?: (data: Combo[]) => void }) {
   const canManageFichas = userRole === "owner" || userRole === "admin"
   const [view, setView] = useState<View>("dashboard")
   const [search, setSearch] = useState("")
