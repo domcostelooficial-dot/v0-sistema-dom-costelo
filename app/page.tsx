@@ -432,7 +432,17 @@ export default function Home() {
     saveEstoqueHybrid(user, updated)
   }
 
-  const handleEntrada = (nome: string, qtd: number, custo: number, fornecedor?: string, observacao?: string, dataMovimentacao?: string) => registrarEntradaRastreavel(nome, qtd, custo, fornecedor, observacao, dataMovimentacao)
+  const handleEntrada = async (nome: string, qtd: number, custo: number, fornecedor?: string, observacao?: string, dataMovimentacao?: string) => {
+    try {
+      await registrarEntradaRastreavel(nome, qtd, custo, fornecedor, observacao, dataMovimentacao)
+    } catch (error) {
+      const fallback = itens.map((item) => item.nome === nome ? { ...item, atual: item.atual + qtd } : item)
+      setItens(fallback)
+      await saveEstoqueHybrid(user, fallback)
+      toast.warning("Entrada aplicada localmente. O Firebase não está disponível para sincronizar agora.")
+      console.error("[v0] Falha na entrada rastreável:", error)
+    }
+  }
 
   const aplicarInventario = async (item: Item, base: number, contado: number, motivo: NonNullable<MovimentacaoEstoque["motivo"]>, observacao?: string) => {
     if (userRole !== "owner" && userRole !== "admin") throw new Error("Somente owner/admin podem aplicar ajustes de inventário.")
