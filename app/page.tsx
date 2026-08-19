@@ -194,12 +194,13 @@ export default function Home() {
   const insumosOperacionais = insumosResultAtualizados.length > 0 ? [...insumosResultAtualizados, ...defaultInsumos.filter((item) => !insumosResultAtualizados.some((existente) => existente.id === item.id || existente.nome === item.nome))] : defaultInsumos
   if (insumosOperacionais.length > 0) setInsumos(insumosOperacionais)
   if (historicoResult.length > 0) setComprasHistorico(historicoResult)
-  const migradas = migrarFichasParaCarneKg(fichasResult, insumosOperacionais)
-  setFichasTecnicas(migradas)
+  const fichasBase = fichasResult.length > 0 ? fichasResult : seedFichas
+  const migradas = migrarFichasParaCarneKg(fichasBase, insumosOperacionais)
+  setFichasTecnicas(migradas.length > 0 ? migradas : seedFichas)
   if (roleAtual === "owner" || roleAtual === "admin") {
-    const migracao = await migrarFichasTecnicasV2(seedFichas, insumosOperacionais, aliasesPorInsumo)
-    setFichasTecnicas(migracao.data)
-    if (migracao.errors.length > 0) console.error("[v0] Migração V2 bloqueada:", migracao.errors)
+  const migracao = await migrarFichasTecnicasV2(seedFichas, insumosOperacionais, aliasesPorInsumo)
+  if (migracao.data.length > 0) setFichasTecnicas(migracao.data)
+  if (migracao.errors.length > 0) console.error("[v0] Migração V2 bloqueada:", migracao.errors)
   }
   if (movimentacoesResult.length > 0) setMovimentacoes(movimentacoesResult)
     } catch (err) {
@@ -317,8 +318,13 @@ export default function Home() {
       const itens = await getEstoqueHybrid(username)
       const historico = await getHistoricoHybrid(username)
       const receitas = await getReceitasHybrid(username)
-      const fichas = await initializeFichasTecnicas(seedFichas)
-      const [config, vendas, despesas, auditorias] = await Promise.all([getFinanceConfig(), getVendasFinanceiras(), getDespesasFinanceiras(), getFinanceAuditSnapshots()])
+      let fichas = { data: seedFichas, seeded: false }
+      try {
+        fichas = await initializeFichasTecnicas(seedFichas)
+      } catch (error) {
+        console.error("[v0] Firebase indisponível; usando fichas padrão:", error)
+      }
+      const [config, vendas, despesas, auditorias] = await Promise.all([getFinanceConfig().catch(() => undefined), getVendasFinanceiras().catch(() => []), getDespesasFinanceiras().catch(() => []), getFinanceAuditSnapshots().catch(() => [])])
       setFinanceConfig(config)
       setAuditoriaJulho(auditorias.find(item => item.competencia === "2026-07"))
       setVendasFinanceiras(vendas)
