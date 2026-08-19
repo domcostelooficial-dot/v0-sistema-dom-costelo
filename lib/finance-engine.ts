@@ -168,6 +168,8 @@ export function percentualCmv(resumo: ReturnType<typeof resumoFinanceiro>) { ret
 export interface FinanceAuditSnapshot {
   competencia: string
   fonte: "vendas-importadas" | "vendas-registradas" | "sem-dados"
+  versaoGabarito: "julho-2026-v1"
+  verificadoEm: string
   totalVendas: number
   faturamentoBruto: number
   descontos: number
@@ -179,6 +181,18 @@ export interface FinanceAuditSnapshot {
   observacao?: string
 }
 
+export const GABARITO_JULHO_2026 = {
+  competencia: "2026-07",
+  faturamentoBruto: 100000,
+  descontos: 0,
+  taxas: 0,
+  receitaLiquida: 100000,
+  cmv: 35000,
+  custosFixos: 10790,
+  resultadoOperacional: 54210,
+  totalVendas: 357,
+} as const
+
 export function criarAuditoriaFinanceira(vendas: VendaFinanceira[], despesas: DespesaFinanceira[], config: FinanceConfig, competencia: string): FinanceAuditSnapshot {
   const inicio = `${competencia}-01`
   const fimDate = new Date(Number(competencia.slice(0, 4)), Number(competencia.slice(5, 7)), 0)
@@ -186,13 +200,16 @@ export function criarAuditoriaFinanceira(vendas: VendaFinanceira[], despesas: De
   const filtrado = filtrarPeriodo(vendas, despesas, inicio, fim)
   const fonte = filtrado.vendas.length > 0 ? "vendas-registradas" : "sem-dados"
   const resumo = resumoFinanceiro(filtrado.vendas, filtrado.despesas, totalCustosFixosAtivos(config))
-  return { competencia, fonte, totalVendas: resumo.numeroVendas, faturamentoBruto: resumo.faturamentoBruto, descontos: resumo.descontos, taxas: resumo.taxas, receitaLiquida: resumo.receitaLiquida, cmv: resumo.cmv, custosFixos: resumo.custosFixos, resultadoOperacional: resumo.lucroOperacional, observacao: fonte === "sem-dados" ? "Sem vendas registradas; nenhuma venda foi inventada." : undefined }
+  return { competencia, fonte, versaoGabarito: "julho-2026-v1", verificadoEm: new Date().toISOString(), totalVendas: resumo.numeroVendas, faturamentoBruto: resumo.faturamentoBruto, descontos: resumo.descontos, taxas: resumo.taxas, receitaLiquida: resumo.receitaLiquida, cmv: resumo.cmv, custosFixos: resumo.custosFixos, resultadoOperacional: resumo.lucroOperacional, observacao: fonte === "sem-dados" ? "Sem vendas registradas; nenhuma venda foi inventada." : undefined }
 }
 
+export const CAMPOS_GABARITO = ["totalVendas", "faturamentoBruto", "descontos", "taxas", "receitaLiquida", "cmv", "custosFixos", "resultadoOperacional"] as const
+
 export function compararAuditoriaComEsperado(realizado: FinanceAuditSnapshot, esperado: Partial<FinanceAuditSnapshot>, tolerancia = 0.01) {
-  const campos = ["faturamentoBruto", "descontos", "taxas", "receitaLiquida", "cmv", "custosFixos", "resultadoOperacional"] as const
-  return campos.reduce((resultado, campo) => ({ ...resultado, [campo]: Math.abs(realizado[campo] - (esperado[campo] ?? realizado[campo])) <= tolerancia }), {} as Record<(typeof campos)[number], boolean>)
+  return CAMPOS_GABARITO.reduce((resultado, campo) => ({ ...resultado, [campo]: Math.abs(realizado[campo] - (esperado[campo] ?? realizado[campo])) <= (campo === "totalVendas" ? 0 : tolerancia) }), {} as Record<(typeof CAMPOS_GABARITO)[number], boolean>)
 }
+
+export function statusAuditoria(comparacao: Record<string, boolean>) { return Object.values(comparacao).every(Boolean) ? "aprovado" : "divergente" }
 
 export function fluxoCaixaPago(despesas: DespesaFinanceira[], inicio: string, fim: string) {
   return despesas.filter((despesa) => despesa.dataPagamento.slice(0, 10) >= inicio && despesa.dataPagamento.slice(0, 10) <= fim).reduce((total, despesa) => total + n(despesa.valor), 0)

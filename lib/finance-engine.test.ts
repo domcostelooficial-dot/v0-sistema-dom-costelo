@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { calcularTaxa, calcularVenda, pontoEquilibrio, resumoFinanceiro, filtrarPeriodo, contarDiasAbertos, totalCustosFixos, totalCustosFixosAtivos, criarAuditoriaFinanceira, compararAuditoriaComEsperado, fluxoCaixaPago } from "./finance-engine"
+import { calcularTaxa, calcularVenda, pontoEquilibrio, resumoFinanceiro, filtrarPeriodo, contarDiasAbertos, totalCustosFixos, totalCustosFixosAtivos, criarAuditoriaFinanceira, compararAuditoriaComEsperado, fluxoCaixaPago, GABARITO_JULHO_2026, statusAuditoria } from "./finance-engine"
 import { defaultFinanceConfig } from "./finance-engine"
 
 describe("motor financeiro", () => {
@@ -103,5 +103,17 @@ describe("motor financeiro", () => {
     expect(audit.totalVendas).toBe(0)
     expect(audit.fonte).toBe("sem-dados")
     expect(audit.observacao).toContain("nenhuma venda foi inventada")
+  })
+
+  it("mantém gabarito oficial de julho versionado", () => {
+    expect(GABARITO_JULHO_2026).toMatchObject({ competencia: "2026-07", totalVendas: 357, faturamentoBruto: 100000, cmv: 35000, custosFixos: 10790, resultadoOperacional: 54210 })
+    const audit = criarAuditoriaFinanceira([], [], defaultFinanceConfig, "2026-07")
+    const status = statusAuditoria(compararAuditoriaComEsperado(audit, GABARITO_JULHO_2026))
+    expect(status).toBe("divergente")
+  })
+
+  it("aprova comparação dentro da tolerância de um centavo", () => {
+    const audit = criarAuditoriaFinanceira([], [], defaultFinanceConfig, "2026-07")
+    expect(statusAuditoria(compararAuditoriaComEsperado(audit, { faturamentoBruto: 0.01 }))).toBe("aprovado")
   })
 })
