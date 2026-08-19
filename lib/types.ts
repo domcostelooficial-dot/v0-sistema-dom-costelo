@@ -100,7 +100,7 @@ export interface PrevisaoVenda {
   quantidade: number
 }
 
-export type TipoMovimentacaoEstoque = "entrada" | "estorno_entrada"
+export type TipoMovimentacaoEstoque = "entrada" | "estorno_entrada" | "saida" | "ajuste"
 
 export interface MovimentacaoEstoque {
   id: string
@@ -115,6 +115,7 @@ export interface MovimentacaoEstoque {
   valorTotal: number
   fornecedor?: string
   observacao?: string
+  motivo?: "consumo" | "perda" | "vencimento" | "ajuste_manual" | "outro"
   origem: "compras" | "estoque"
   movimentacaoOrigemId?: string
   movimentacaoOriginalId?: string

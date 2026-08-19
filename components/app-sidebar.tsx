@@ -16,7 +16,7 @@ import {
   Calculator,
 } from "lucide-react"
 
-type Tab = "estoque" | "entrada" | "financeiro" | "dashboard" | "lista-compras" | "cmv" | "admin"
+type Tab = "estoque" | "entrada" | "saida" | "financeiro" | "dashboard" | "lista-compras" | "cmv" | "admin"
 
 interface AppSidebarProps {
   activeTab: Tab
@@ -32,6 +32,7 @@ interface AppSidebarProps {
 const menuItems = [
   { id: "estoque" as Tab, label: "Estoque", icon: Package },
   { id: "entrada" as Tab, label: "Entrada", icon: Truck },
+  { id: "saida" as Tab, label: "Saída", icon: Package },
   { id: "financeiro" as Tab, label: "Financeiro", icon: DollarSign },
   { id: "dashboard" as Tab, label: "Dashboard", icon: BarChart3 },
   { id: "lista-compras" as Tab, label: "Lista de Compras", icon: ShoppingCart },

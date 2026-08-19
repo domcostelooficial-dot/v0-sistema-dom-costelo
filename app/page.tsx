@@ -38,9 +38,12 @@ import {
   getMovimentacoesEstoque,
   saveMovimentacoesEstoque,
   registrarEntradaAtomica,
+  registrarSaidaAtomica,
+  ajustarEstoqueAtomico,
   estornarMovimentacaoAtomica,
 } from "@/lib/firebase-db"
-import { criarEntrada } from "@/lib/estoque-movements"
+import { criarEntrada, criarSaida } from "@/lib/estoque-movements"
+import { SaidaEstoqueView } from "@/components/saida-estoque-view"
 import { toast } from "sonner"
 import type { FinanceAuditSnapshot } from "@/lib/finance-engine"
 import { FirebaseLoginForm } from "@/components/firebase-login-form"
@@ -58,7 +61,7 @@ import { Button } from "@/components/ui/button"
 import { signOut } from "firebase/auth"
 import { auth } from "@/lib/firebase"
 
-type Tab = "estoque" | "entrada" | "financeiro" | "dashboard" | "lista-compras" | "cmv" | "admin"
+type Tab = "estoque" | "entrada" | "saida" | "financeiro" | "dashboard" | "lista-compras" | "cmv" | "admin"
 
 const ITENS_REMOVIDOS = new Set(["Costela Crua", "Contra filé", "Manteiga de Garrafa", "Limoneto"])
 
@@ -362,6 +365,18 @@ export default function Home() {
 
   const handleEntrada = (nome: string, qtd: number, custo: number, fornecedor?: string, observacao?: string, dataMovimentacao?: string) => registrarEntradaRastreavel(nome, qtd, custo, fornecedor, observacao, dataMovimentacao)
 
+  const registrarSaida = async (nome: string, quantidade: number, motivo: NonNullable<MovimentacaoEstoque["motivo"]>, observacao?: string) => {
+    if (!userPermissoes.includes("saida") && userRole !== "owner" && userRole !== "admin") throw new Error("Você não tem permissão para registrar saídas.")
+    const item = itens.find((row) => row.nome === nome)
+    const insumo = insumos.find((row) => row.id === item?.insumoId || row.nome === nome)
+    const currentUser = auth.currentUser
+    if (!item || !insumo || !currentUser || item.ativo === false || item.naoVinculado === true) throw new Error("Este item não está disponível para saída.")
+    const unidade = (item.unidadeEstoque === "Unidade" ? "un" : item.unidadeEstoque) as Insumo["unidade"]
+    const movimento = criarSaida({ insumo: { ...insumo, id: item.insumoId ?? insumo.id }, quantidade, unidade, motivo, observacao, usuario: { id: currentUser.uid, email: currentUser.email ?? undefined, nome: currentUser.displayName ?? undefined } })
+    const atualizados = await registrarSaidaAtomica({ movimento, itemNome: nome, userId: currentUser.uid })
+    setItens(atualizados); setMovimentacoes(await getMovimentacoesEstoque()); toast.success("Saída registrada com sucesso.")
+  }
+
   const handleProduzir = (receita: Receita) => {
     const now = new Date()
     const dataHora = `${now.toLocaleDateString("pt-BR")} às ${now.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}`
@@ -434,6 +449,7 @@ export default function Home() {
             <h1 className="text-3xl font-bold tracking-tight text-foreground capitalize">
               {activeTab === "estoque" && "Controle de Estoque"}
               {activeTab === "entrada" && "Entrada de Mercadoria"}
+              {activeTab === "saida" && "Saída de Estoque"}
               {activeTab === "financeiro" && "Financeiro"}
               {activeTab === "dashboard" && "Dashboard"}
  {activeTab === "lista-compras" && "Lista de Compras"}
@@ -445,6 +461,7 @@ export default function Home() {
                 "Gerencie os itens do seu estoque"}
               {activeTab === "entrada" &&
                 "Registre novas entradas de mercadoria"}
+              {activeTab === "saida" && "Registre saídas, perdas e consumos do estoque"}
               {activeTab === "financeiro" &&
                 "Acompanhe seus gastos e histórico"}
               {activeTab === "dashboard" &&
@@ -473,6 +490,7 @@ export default function Home() {
           {activeTab === "entrada" && (
             <EntradaView itens={itens} onEntrada={handleEntrada} canRegister={userPermissoes.includes("entrada") || userRole === "owner" || userRole === "admin"} />
           )}
+          {activeTab === "saida" && <SaidaEstoqueView itens={itens} canRegister={userPermissoes.includes("saida") || userRole === "owner" || userRole === "admin"} onSaida={registrarSaida} />}
           {activeTab === "financeiro" && (
             <FinanceiroCentral
               fichas={fichasTecnicas}
