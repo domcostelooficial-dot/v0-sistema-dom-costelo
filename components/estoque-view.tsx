@@ -77,6 +77,7 @@ export function EstoqueView({ itens, onUpdateItem, onAddItem, onEditItem, onDele
   const [categoriaFilter, setCategoriaFilter] = useState<string>("todas")
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
+  const [confirmEdit, setConfirmEdit] = useState(false)
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
   const [selectedItem, setSelectedItem] = useState<Item | null>(null)
   const [movimentacaoParaEstorno, setMovimentacaoParaEstorno] = useState<MovimentacaoEstoque | null>(null)
@@ -614,10 +615,12 @@ export function EstoqueView({ itens, onUpdateItem, onAddItem, onEditItem, onDele
             >
               Cancelar
             </Button>
-            <Button onClick={handleEditItem}>Salvar Alterações</Button>
+            <Button onClick={() => setConfirmEdit(true)}>Confirmar alterações</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <AlertDialog open={confirmEdit} onOpenChange={setConfirmEdit}><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Confirmar alterações?</AlertDialogTitle><AlertDialogDescription>As alterações de {selectedItem?.nome || "este item"} serão salvas na nuvem.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>Cancelar</AlertDialogCancel><AlertDialogAction onClick={() => { setConfirmEdit(false); handleEditItem() }}>Confirmar e salvar</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
 
       {/* Delete Confirmation Dialog */}
       <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
