@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
-import { Item, HistoricoEntry, Receita, Insumo, CompraRegistro, VendaFinanceira, DespesaFinanceira, FinanceConfig, MovimentacaoEstoque, defaultInsumos } from "@/lib/types"
+import { Item, HistoricoEntry, Receita, Insumo, CompraRegistro, VendaFinanceira, DespesaFinanceira, FinanceConfig, MovimentacaoEstoque, defaultInsumos, defaultItens, aliasesPorInsumo } from "@/lib/types"
 import {
   saveEstoque as saveEstoqueLocal,
   getEstoque as getEstoqueLocal,
@@ -21,10 +21,16 @@ import {
   subscribeToHistorico,
   subscribeToReceitas,
   getInsumos,
+  migrarCustosMestresDomCosteloV1,
+  migrarMinimosEstoqueV1,
   saveInsumos,
   getFichasTecnicas,
   initializeFichasTecnicas,
+  migrarFichasTecnicasV2,
   saveFichasTecnicas,
+  getCombos,
+  saveCombos,
+  migrarCombosV1,
   getComprasHistorico,
   saveComprasHistorico,
   getFinanceConfig,
@@ -60,7 +66,7 @@ import { DashboardView } from "@/components/dashboard-view"
 import { ListaComprasView } from "@/components/lista-compras-view"
 import { AdminView } from "@/components/admin-view"
 import { CmvView } from "@/components/cmv-view"
-import { seedFichas, calcularConsumoVenda } from "@/lib/cmv-engine"
+import { seedFichas, calcularConsumoVenda, calcularConsumoComboVenda, migrarFichasParaCarneKg } from "@/lib/cmv-engine"
 import { Menu, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { signOut } from "firebase/auth"
@@ -175,6 +181,7 @@ export default function Home() {
   const [comprasHistorico, setComprasHistorico] = useState<CompraRegistro[]>([])
   const [movimentacoes, setMovimentacoes] = useState<MovimentacaoEstoque[]>([])
   const [fichasTecnicas, setFichasTecnicas] = useState<typeof seedFichas>([])
+  const [combos, setCombos] = useState<import("@/lib/types").Combo[]>([])
   const [fichasLoading, setFichasLoading] = useState(true)
   const [financeConfig, setFinanceConfig] = useState<FinanceConfig | undefined>(undefined)
   const [vendasFinanceiras, setVendasFinanceiras] = useState<VendaFinanceira[]>([])
@@ -182,13 +189,29 @@ export default function Home() {
  const [auditoriaJulho, setAuditoriaJulho] = useState<FinanceAuditSnapshot | undefined>(undefined)
   const persistirFichas = (data: typeof seedFichas) => { if (userRole !== "owner" && userRole !== "admin") return false; setFichasTecnicas(data); saveFichasTecnicas(data).catch((err) => console.error("[v0] Erro ao salvar fichas:", err)); return true }
 
-  const getComprasHybrid = async () => {
+  const getComprasHybrid = async (roleOverride?: string) => {
+    const roleAtual = roleOverride ?? userRole
     try {
-  const [insumosResult, historicoResult, fichasResult, movimentacoesResult] = await Promise.all([getInsumos(), getComprasHistorico(), getFichasTecnicas(), getMovimentacoesEstoque()])
-  if (insumosResult.length > 0) setInsumos(insumosResult)
+  const [insumosResult, historicoResult, fichasResult, movimentacoesResult, combosResult] = await Promise.all([getInsumos(), getComprasHistorico(), getFichasTecnicas(), getMovimentacoesEstoque(), getCombos()])
+  const custosMestres = roleAtual === "owner" || roleAtual === "admin" ? (await migrarCustosMestresDomCosteloV1(defaultInsumos)).data : insumosResult
+  const carneOficial = defaultInsumos.find((item) => item.id === "carne-hamburguer-kg")!
+  const insumosResultAtualizados = custosMestres.length > 0 ? custosMestres : insumosResult
+  const insumosOperacionais = insumosResultAtualizados.length > 0 ? [...insumosResultAtualizados, ...defaultInsumos.filter((item) => !insumosResultAtualizados.some((existente) => existente.id === item.id || existente.nome === item.nome))] : defaultInsumos
+  if (insumosOperacionais.length > 0) setInsumos(insumosOperacionais)
   if (historicoResult.length > 0) setComprasHistorico(historicoResult)
-  if (fichasResult.length > 0) setFichasTecnicas(fichasResult)
+  const fichasBase = fichasResult.length > 0 ? fichasResult : seedFichas
+  const migradas = migrarFichasParaCarneKg(fichasBase, insumosOperacionais)
+  setFichasTecnicas(migradas.length > 0 ? migradas : seedFichas)
+  if (roleAtual === "owner" || roleAtual === "admin") {
+  const migracao = await migrarFichasTecnicasV2(seedFichas, insumosOperacionais, aliasesPorInsumo)
+  if (migracao.data.length > 0) setFichasTecnicas(migracao.data)
+  if (migracao.errors.length > 0) console.error("[v0] Migração V2 bloqueada:", migracao.errors)
+  }
   if (movimentacoesResult.length > 0) setMovimentacoes(movimentacoesResult)
+  if (roleAtual === "owner" || roleAtual === "admin") {
+    const combosMigrados = await migrarCombosV1((await import("@/lib/cmv-engine")).seedCombos)
+    setCombos(combosMigrados.data)
+  } else if (combosResult.length > 0) setCombos(combosResult)
     } catch (err) {
       console.error("[v0] Erro ao carregar dados financeiros do estoque:", err)
     }
@@ -203,30 +226,39 @@ export default function Home() {
     } catch (error) { toast.error(error instanceof Error ? error.message : "Não foi possível estornar a entrada.") }
   }
 
-  const registrarEntradaRastreavel = async (nome: string, qtd: number, custo: number, fornecedor?: string, observacao?: string, dataMovimentacao?: string) => {
-    const item = itens.find((row) => row.nome === nome)
-    const insumo = insumos.find((row) => row.id === item?.insumoId || row.nome === nome)
+  const registrarEntradaRastreavel = async (nome: string, qtd: number, custo: number, fornecedor?: string, observacao?: string, dataMovimentacao?: string, insumoId?: string, unidadeInformada?: Insumo["unidade"]) => {
+    const item = itens.find((row) => (insumoId && row.insumoId === insumoId) || row.nome === nome)
+    const insumo = insumos.find((row) => row.id === insumoId || row.id === item?.insumoId || row.nome === nome)
     if (!userPermissoes.includes("entrada") && userRole !== "owner" && userRole !== "admin") throw new Error("Você não tem permissão para registrar entrada.")
     if (!item || !insumo || item.ativo === false || item.naoVinculado === true) throw new Error("Este item não está disponível para entrada.")
     const currentUser = auth.currentUser
     if (!currentUser) throw new Error("Usuário autenticado não encontrado.")
-    const unidade = (item.unidadeEstoque === "Unidade" ? "un" : item.unidadeEstoque) as Insumo["unidade"]
+    const unidade = unidadeInformada ?? ((item.unidadeEstoque === "Unidade" ? "un" : item.unidadeEstoque) as Insumo["unidade"])
     const movimento = { ...criarEntrada({ insumo: { ...insumo, id: item.insumoId ?? insumo.id }, quantidade: qtd, unidade, precoUnitario: qtd > 0 ? custo / qtd : 0, fornecedor, observacao, dataMovimentacao, usuario: { id: currentUser.uid, email: currentUser.email ?? undefined, nome: currentUser.displayName ?? undefined } }), status: "ativa" as const }
     const atualizados = await registrarEntradaAtomica({ movimento, itemNome: nome, userId: currentUser.uid })
-    setItens(atualizados); setMovimentacoes(await getMovimentacoesEstoque()); toast.success("Entrada registrada com sucesso.")
+    setItens(atualizados)
+    setMovimentacoes(await getMovimentacoesEstoque())
+    if (insumo && custo > 0) {
+      const precoAtualizado = { ...insumo, precoReferencia: custo / qtd, precoCompra: custo / qtd, ultimaAtualizacaoPreco: dataMovimentacao ?? new Date().toISOString().slice(0, 10) }
+      const novosInsumos = insumos.map((row) => row.id === precoAtualizado.id ? precoAtualizado : row)
+      setInsumos(novosInsumos)
+      await saveInsumos(novosInsumos)
+    }
+    toast.success("Entrada registrada com sucesso.")
   }
 
   const processarBaixaVenda = async (venda: VendaFinanceira) => {
     const currentUser = auth.currentUser
     if (!currentUser) throw new Error("Usuário autenticado não encontrado.")
     const ficha = fichasTecnicas.find((item) => item.id === venda.fichaTecnicaId || item.id === venda.produtoId || item.nome.toLowerCase() === venda.produtoNome.toLowerCase())
-    const combo = venda.produtoId?.toLowerCase().includes("combo") || venda.produtoNome.toLowerCase().includes("combo")
-    if (combo && !ficha?.ingredientes?.length) {
+    const comboAtual = combos.find((item) => item.id === venda.produtoId || item.nome.toLowerCase() === venda.produtoNome.toLowerCase())
+    const combo = Boolean(comboAtual)
+    if (combo && !comboAtual?.itens.length) {
       await registrarBaixaBloqueada({ venda, codigo: "COMBO_SEM_COMPOSICAO", mensagem: "Combo sem composição cadastrada para baixa automática.", userId: currentUser.uid })
       setVendasFinanceiras((rows) => rows.map((row) => row.id === venda.id ? { ...row, statusBaixa: "bloqueada", estoqueStatus: "bloqueada", motivoBloqueio: "COMBO_SEM_COMPOSICAO: Combo sem composição cadastrada para baixa automática." } : row))
       throw new Error("COMBO_SEM_COMPOSICAO: Combo sem composição cadastrada para baixa automática.")
     }
-    const consumo = calcularConsumoVenda(venda, ficha, insumos, itens)
+    const consumo = comboAtual ? calcularConsumoComboVenda(venda, comboAtual, fichasTecnicas, insumos, itens) : calcularConsumoVenda(venda, ficha, insumos, itens)
     if (!consumo.ok) {
       const codigo = consumo.codigo ?? (!ficha ? "PRODUTO_SEM_FICHA" : "ERRO_PROCESSAMENTO")
       await registrarBaixaBloqueada({ venda, codigo, mensagem: consumo.motivo, userId: currentUser.uid })
@@ -301,18 +333,26 @@ export default function Home() {
     
     // Recarregar dados do Firebase do novo usuario
     const loadUserData = async () => {
-      const itens = await getEstoqueHybrid(username)
-      const historico = await getHistoricoHybrid(username)
+  let itens = await getEstoqueHybrid(username)
+  if (role === "owner" || role === "admin") {
+    try { itens = (await migrarMinimosEstoqueV1(username, defaultItens)).data } catch (error) { console.error("[v0] Falha ao aplicar mínimos de estoque:", error) }
+  }
+  const historico = await getHistoricoHybrid(username)
       const receitas = await getReceitasHybrid(username)
-      const fichas = await initializeFichasTecnicas(seedFichas)
-      const [config, vendas, despesas, auditorias] = await Promise.all([getFinanceConfig(), getVendasFinanceiras(), getDespesasFinanceiras(), getFinanceAuditSnapshots()])
+      let fichas = { data: seedFichas, seeded: false }
+      try {
+        fichas = await initializeFichasTecnicas(seedFichas)
+      } catch (error) {
+        console.error("[v0] Firebase indisponível; usando fichas padrão:", error)
+      }
+      const [config, vendas, despesas, auditorias] = await Promise.all([getFinanceConfig().catch(() => undefined), getVendasFinanceiras().catch(() => []), getDespesasFinanceiras().catch(() => []), getFinanceAuditSnapshots().catch(() => [])])
       setFinanceConfig(config)
       setAuditoriaJulho(auditorias.find(item => item.competencia === "2026-07"))
       setVendasFinanceiras(vendas)
       setDespesasFinanceiras(despesas)
       setFichasTecnicas(fichas.data)
       setFichasLoading(false)
-      await getComprasHybrid()
+      await getComprasHybrid(role)
       
       setItens(itens)
       setHistorico(historico)
@@ -390,13 +430,23 @@ export default function Home() {
   }
 
   const handleDeleteItem = (nome: string) => {
-    if (userRole !== "admin") return
+    if (userRole !== "owner" && userRole !== "admin") return
     const updated = itens.filter((item) => item.nome !== nome)
     setItens(updated)
     saveEstoqueHybrid(user, updated)
   }
 
-  const handleEntrada = (nome: string, qtd: number, custo: number, fornecedor?: string, observacao?: string, dataMovimentacao?: string) => registrarEntradaRastreavel(nome, qtd, custo, fornecedor, observacao, dataMovimentacao)
+  const handleEntrada = async (nome: string, qtd: number, custo: number, fornecedor?: string, observacao?: string, dataMovimentacao?: string) => {
+    try {
+      await registrarEntradaRastreavel(nome, qtd, custo, fornecedor, observacao, dataMovimentacao)
+    } catch (error) {
+      const fallback = itens.map((item) => item.nome === nome ? { ...item, atual: item.atual + qtd } : item)
+      setItens(fallback)
+      await saveEstoqueHybrid(user, fallback)
+      toast.warning("Entrada aplicada localmente. O Firebase não está disponível para sincronizar agora.")
+      console.error("[v0] Falha na entrada rastreável:", error)
+    }
+  }
 
   const aplicarInventario = async (item: Item, base: number, contado: number, motivo: NonNullable<MovimentacaoEstoque["motivo"]>, observacao?: string) => {
     if (userRole !== "owner" && userRole !== "admin") throw new Error("Somente owner/admin podem aplicar ajustes de inventário.")
@@ -538,13 +588,14 @@ export default function Home() {
               onEstornarMovimentacao={estornarMovimentacao}
             /><BaixasPendentesView vendas={vendasFinanceiras} onProcessar={async (venda) => { try { await processarBaixaVenda(venda) } catch (error) { toast.error(error instanceof Error ? error.message : "Não foi possível processar a baixa.") } }} /></div>}
           {activeTab === "entrada" && (
-            <EntradaView itens={itens} onEntrada={handleEntrada} canRegister={userPermissoes.includes("entrada") || userRole === "owner" || userRole === "admin"} />
+            <EntradaView itens={itens} insumos={insumos} onEntrada={handleEntrada} canRegister={userPermissoes.includes("entrada") || userRole === "owner" || userRole === "admin"} />
           )}
           {activeTab === "inventario" && <InventarioView itens={itens} userRole={userRole} onAplicar={aplicarInventario} />}
           {activeTab === "saida" && <SaidaEstoqueView itens={itens} canRegister={userPermissoes.includes("saida") || userRole === "owner" || userRole === "admin"} onSaida={registrarSaida} />}
           {activeTab === "financeiro" && (
             <FinanceiroCentral
               fichas={fichasTecnicas}
+              combos={combos}
               insumos={insumos}
               vendas={vendasFinanceiras}
               despesas={despesasFinanceiras}
@@ -569,15 +620,14 @@ export default function Home() {
               insumos={insumos}
               historico={comprasHistorico}
               onSaveInsumos={persistirInsumos}
-              onSaveHistorico={persistirCompras}
-              onUpdateEstoque={(nome, qtd) => {
-                const item = itens.find((current) => current.nome === nome)
-                if (item) handleUpdateItem(nome, item.atual + qtd)
-              }}
+  onSaveHistorico={persistirCompras}
+  onRegistrarEntrada={async ({ item, quantidade, unidade, precoUnitario, fornecedor, data }) => {
+  await registrarEntradaRastreavel(item.nome, quantidade, quantidade * precoUnitario, fornecedor, "Compra efetivada", data, item.id, unidade)
+  }}
             />
           )}
   {activeTab === "cmv" && (
-  <CmvView insumos={insumos} fichas={fichasTecnicas} userRole={userRole} onSaveInsumos={persistirInsumos} onSaveFichas={persistirFichas} />
+  <CmvView insumos={insumos} fichas={fichasTecnicas} combos={combos} userRole={userRole} onSaveInsumos={persistirInsumos} onSaveFichas={persistirFichas} onSaveCombos={(data) => { setCombos(data); saveCombos(data).catch((error) => console.error("[v0] Erro ao salvar combos:", error)) }} />
   )}
   {activeTab === "admin" && userRole === "admin" && (
   <AdminView currentUser={user} onPasswordChange={handlePasswordChange} />

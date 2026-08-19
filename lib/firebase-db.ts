@@ -15,8 +15,9 @@ import {
   runTransaction,
 } from "firebase/firestore"
 import { db } from "./firebase"
-import type { Item, HistoricoEntry, Receita, UsuarioSistema, Insumo, FichaTecnica, VendaProduto, CompraRegistro, FinanceConfig, VendaFinanceira, DespesaFinanceira, MovimentacaoEstoque } from "./types"
+import type { Item, HistoricoEntry, Receita, UsuarioSistema, Insumo, FichaTecnica, VendaProduto, CompraRegistro, FinanceConfig, VendaFinanceira, DespesaFinanceira, MovimentacaoEstoque, Combo } from "./types"
 import type { FinanceAuditSnapshot } from "./finance-engine"
+import { resolverIngredientesFicha, normalizarNomeInsumo } from "./cmv-engine"
 
 // Collections - dados globais compartilhados
 const USUARIOS_COLLECTION = "usuarios"
@@ -269,6 +270,23 @@ export async function getInsumos() { return getComprasData<Insumo>("insumos") }
 export async function saveInsumos(data: Insumo[]) { return saveComprasData("insumos", data) }
 export async function getFichasTecnicas() { return getComprasData<FichaTecnica>("fichas-tecnicas") }
 export async function saveFichasTecnicas(data: FichaTecnica[]) { return saveComprasData("fichas-tecnicas", data) }
+export async function getCombos() { return getComprasData<Combo>("combos") }
+export async function saveCombos(data: Combo[]) { return saveComprasData("combos", data) }
+
+export async function migrarCombosV1(seed: Combo[]) {
+  const settingsRef = doc(db, "settings", "system")
+  const settingsSnap = await getDoc(settingsRef)
+  const existing = await getCombos()
+  const versaoAtual = settingsSnap.data()?.combosDomCosteloV2Aplicada === true
+  if (versaoAtual) return { applied: false, skipped: true, data: existing.length ? existing : seed }
+  const idsLegados = new Set(["combo-casal", "combo-familia"])
+  const porId = new Map(existing.filter((combo) => !idsLegados.has(combo.id)).map((combo) => [combo.id, combo]))
+  for (const combo of seed) porId.set(combo.id, combo)
+  const data = [...porId.values()]
+  await saveCombos(data)
+  await setDoc(settingsRef, { combosDomCosteloV2Aplicada: true, combosDomCosteloV2AplicadaEm: Timestamp.now(), combosDomCosteloV2Count: seed.length }, { merge: true })
+  return { applied: true, skipped: false, data }
+}
 
 export async function getFinanceConfig() { const rows = await getComprasData<FinanceConfig>("finance-config"); return rows[0] }
 export async function saveFinanceConfig(data: FinanceConfig) { return saveComprasData("finance-config", [data]) }
@@ -285,6 +303,76 @@ export async function initializeFichasTecnicas(seed: FichaTecnica[], seedVersion
   await saveFichasTecnicas(seed)
   await setDoc(doc(db, "settings", "system"), { seedVersion, updatedAt: Timestamp.now() }, { merge: true })
   return { data: seed, seeded: true }
+}
+
+export async function migrarCustosMestresDomCosteloV1(master: Insumo[]) {
+  const settingsRef = doc(db, "settings", "system")
+  const settingsSnap = await getDoc(settingsRef)
+  if (settingsSnap.data()?.custosMestresDomCosteloV1Aplicados === true) return { applied: false, skipped: true, data: await getInsumos(), updated: 0 }
+  const existing = await getInsumos()
+  const byId = new Map(existing.map((item) => [item.id, item]))
+  const normalizar = (value: string) => value.trim().toLocaleLowerCase("pt-BR").normalize("NFD").replace(/[\\u0300-\\u036f]/g, "").replace(/\\s+/g, " ")
+  let updated = 0
+  for (const mestre of master) {
+    const aliases = mestre.aliases ?? []
+    const atual = byId.get(mestre.id) ?? [...byId.values()].find((item) => normalizar(item.nome) === normalizar(mestre.nome) || aliases.some((alias) => normalizar(alias) === normalizar(item.nome)))
+    if (atual) {
+      byId.set(atual.id, { ...atual, ...mestre, id: atual.id, atual: atual.atual, min: atual.min, categoria: atual.categoria ?? mestre.categoria })
+      updated += 1
+    } else {
+      byId.set(mestre.id, { ...mestre, atual: mestre.atual ?? 0 })
+      updated += 1
+    }
+  }
+  const data = [...byId.values()]
+  await saveInsumos(data)
+  await setDoc(settingsRef, { custosMestresDomCosteloV1Aplicados: true, custosMestresDomCosteloV1AplicadosEm: Timestamp.now(), custosMestresDomCosteloV1Count: updated }, { merge: true })
+  return { applied: true, skipped: false, data, updated }
+}
+
+export async function migrarMinimosEstoqueV1(userId: string, seed: Item[]) {
+  const settingsRef = doc(db, "settings", "system")
+  const settingsSnap = await getDoc(settingsRef)
+  const estoqueResult = await getEstoque(userId)
+  const existing = estoqueResult.data ?? []
+  if (settingsSnap.data()?.minimosEstoqueV1Aplicados === true) return { applied: false, data: existing }
+  const normalizar = (value: string) => value.trim().toLocaleLowerCase("pt-BR").normalize("NFD").replace(/[\\u0300-\\u036f]/g, "").replace(/\\s+/g, " ")
+  const byName = new Map(existing.map((item) => [normalizar(item.nome), item]))
+  const data = seed.map((item) => { const atual = byName.get(normalizar(item.nome)); return atual ? { ...atual, min: item.min, categoria: atual.categoria ?? item.categoria } : item })
+  await saveEstoque(userId, data)
+  await setDoc(settingsRef, { minimosEstoqueV1Aplicados: true, minimosEstoqueV1AplicadosEm: Timestamp.now(), minimosEstoqueV1Count: data.length }, { merge: true })
+  return { applied: true, data }
+}
+
+export async function migrarFichasTecnicasV2(seed: FichaTecnica[], insumos: Insumo[], aliases: Record<string, string[]> = {}) {
+  const settingsRef = doc(db, "settings", "system")
+  const settingsSnap = await getDoc(settingsRef)
+  if (settingsSnap.data()?.fichasTecnicasDomCosteloV2Aplicada === true) {
+    const existing = await getFichasTecnicas()
+    const migrated = existing.map((ficha) => {
+      const seedFicha = seed.find((item) => item.id === ficha.id || normalizarNomeInsumo(item.nome) === normalizarNomeInsumo(ficha.nome))
+      return ficha.precoVenda > 0 || !seedFicha ? ficha : { ...ficha, precoVenda: seedFicha.precoVenda }
+    })
+    if (migrated.some((ficha, index) => ficha.precoVenda !== existing[index]?.precoVenda)) await saveFichasTecnicas(migrated)
+    return { applied: false, skipped: true, data: migrated, errors: [] as string[] }
+  }
+  const existing = await getFichasTecnicas()
+  const errors: string[] = []
+  const desired = seed.map((ficha) => ({ ...ficha, ingredientes: ficha.ingredientes.map((ingrediente) => ({ ...ingrediente, insumoId: ingrediente.insumoId, insumoNome: ingrediente.insumoNome })) }))
+  const resolved: FichaTecnica[] = []
+  for (const ficha of desired) {
+    const resultado = resolverIngredientesFicha(ficha, insumos.map((item) => ({ ...item, aliases: [...(item.aliases ?? []), ...(aliases[item.id ?? ""] ?? []), ...(aliases[item.nome] ?? [])] })))
+    if (!resultado.ok) { errors.push(`${resultado.codigo}:${resultado.ficha}:${resultado.ingrediente}`); continue }
+    const atual = existing.find((item) => item.id === ficha.id) ?? existing.find((item) => normalizarNomeInsumo(item.nome) === normalizarNomeInsumo(ficha.nome))
+    resolved.push({ ...resultado.ficha, precoVenda: atual?.precoVenda && atual.precoVenda > 0 ? atual.precoVenda : ficha.precoVenda, id: atual?.id ?? ficha.id })
+  }
+  if (errors.length > 0) return { applied: false, skipped: false, data: existing, errors }
+  const porId = new Map(existing.map((item) => [item.id, item]))
+  for (const ficha of resolved) porId.set(ficha.id, ficha)
+  const data = [...porId.values()]
+  await saveFichasTecnicas(data)
+  await setDoc(settingsRef, { fichasTecnicasDomCosteloV2Aplicada: true, fichasTecnicasDomCosteloV2AplicadaEm: Timestamp.now(), fichasTecnicasDomCosteloV2Count: resolved.length }, { merge: true })
+  return { applied: true, skipped: false, data, errors: [] as string[] }
 }
 export async function getVendasProdutos() { return getComprasData<VendaProduto>("vendas") }
 export async function saveVendasProdutos(data: VendaProduto[]) { return saveComprasData("vendas", data) }

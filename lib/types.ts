@@ -61,6 +61,9 @@ export interface FichaTecnica {
   categoria?: string
   ativo?: boolean
   metaCmv?: number
+  lucroBruto?: number
+  margemBruta?: number
+  markup?: number
 }
 
 export interface HistoricoPrecoInsumo {
@@ -73,7 +76,7 @@ export interface HistoricoPrecoInsumo {
 }
 
 export interface ComboItem {
-  tipo: "produto" | "insumo"
+  tipo: "produto" | "insumo" | "composto"
   referenciaId: string
   nome: string
   quantidade: number
@@ -207,7 +210,7 @@ export interface HistoricoEntry {
 
 export type UserRole = "owner" | "admin" | "operador"
 
-export type TabPermissao = "estoque" | "entrada" | "financeiro" | "dashboard" | "lista-compras" | "cmv" | "admin"
+export type TabPermissao = "estoque" | "entrada" | "saida" | "inventario" | "financeiro" | "dashboard" | "lista-compras" | "cmv" | "admin"
 
 export type UserStatus = "pendente" | "aprovado" | "rejeitado"
 
@@ -235,18 +238,24 @@ export interface Receita {
 export type { CanalVenda, FinanceConfig, VendaFinanceira, DespesaFinanceira } from "./finance-engine"
 
 const defaultInsumoRows: Array<[string, UnidadeInsumo, number, number, UnidadeInsumo, CategoriaInsumo]> = [
-  ["Pão brioche 4CT", "un", 2.07, 1, "un", "Pães"], ["Pão Australiano Aussie", "un", 2.53, 1, "un", "Pães"], ["Carne de hambúrguer / Blend 180g", "un", 6.35, 180, "g", "Carnes"],
-  ["Cheddar Polenghi profissional", "pacote", 60, 1.5, "kg", "Queijos"], ["Cream cheese", "pacote", 60, 1.5, "kg", "Queijos"], ["Bacon em cubos", "kg", 32, 1, "kg", "Carnes"], ["Bacon fatiado", "kg", 32, 1, "kg", "Carnes"], ["Barbecue", "kg", 40, 3.5, "kg", "Molhos"], ["Costela Desfiada", "kg", 80, 1, "kg", "Carnes"], ["Mussarela", "kg", 43, 1, "kg", "Queijos"], ["Batata frita", "pacote", 20, 2, "kg", "Batatas/congelados"], ["Anel de cebola", "kg", 22, 1, "kg", "Batatas/congelados"], ["Farofa", "kg", 55, 1, "kg", "Mercearia"], ["Cebolinha", "maço", 3, 100, "g", "Mercearia"], ["Embalagem H7", "un", 50, 100, "un", "Embalagens"], ["Saco Kraft", "un", 70, 100, "un", "Embalagens"], ["Papel acoplado", "un", 35, 200, "un", "Embalagens"], ["Sacola para Refrigerante", "un", 0, 1, "un", "Embalagens"]
+  ["Pão brioche 4CT", "un", 2.07, 1, "un", "Pães"], ["Pão Australiano Aussie", "un", 2.53, 1, "un", "Pães"], ["Carne de hambúrguer", "kg", 37, 1, "kg", "Carnes"],
+  ["Cheddar Polenghi profissional", "pacote", 50, 1.5, "kg", "Queijos"], ["Cream cheese", "pacote", 60, 1.5, "kg", "Queijos"], ["Bacon em cubos", "kg", 32, 1, "kg", "Carnes"], ["Bacon fatiado", "kg", 32, 1, "kg", "Carnes"], ["Barbecue", "kg", 40, 3.5, "kg", "Molhos"], ["Costela Desfiada", "kg", 80, 1, "kg", "Carnes"], ["Costela bovina", "kg", 35, 1, "kg", "Carnes"], ["Mussarela", "kg", 43, 1, "kg", "Queijos"], ["Batata frita", "pacote", 20, 2, "kg", "Batatas/congelados"], ["Anel de cebola", "kg", 22, 1, "kg", "Batatas/congelados"], ["Farofa", "kg", 20, 1, "kg", "Mercearia"], ["Farofa de bacon", "kg", 55, 1, "kg", "Mercearia"], ["Cebolinha", "maço", 3, 100, "g", "Mercearia"], ["Onion Rings", "kg", 22, 1, "kg", "Batatas/congelados"], ["Costela suína", "kg", 25, 1, "kg", "Carnes"], ["Tempero do Dom", "aplicação", 2, 1, "aplicação", "Temperos"], ["Alho torrado", "kg", 40, 1, "kg", "Temperos"], ["Pimenta Biquinho", "kg", 60, 1, "kg", "Temperos"], ["Sal de parrilla", "kg", 25, 1, "kg", "Temperos"], ["Embalagem H7", "un", 50, 100, "un", "Embalagens"], ["Embalagem H2", "un", 39, 100, "un", "Embalagens"], ["Saco Kraft G", "un", 70, 100, "un", "Embalagens"], ["Papel acoplado metalizado", "un", 35, 200, "un", "Embalagens"], ["Arroz", "kg", 4, 1, "kg", "Mercearia"], ["Coca-Cola 350ml", "un", 3.9, 1, "un", "Bebidas"], ["Coca-Cola 1,5L", "un", 8, 1, "un", "Bebidas"], ["Guaraná 1L", "un", 4, 1, "un", "Bebidas"], ["Del Valle 1,5L", "un", 6, 1, "un", "Bebidas"], ["Sacola para Refrigerante", "un", 0, 1, "un", "Embalagens"]
 ]
-const aliasesPorInsumo: Record<string, string[]> = {
-  "Carne de hambúrguer / Blend 180g": ["Carne de hambúrguer", "Blend bovino 180g", "Blend 180g"],
+export const aliasesPorInsumo: Record<string, string[]> = {
+  "Carne de hambúrguer": ["Carne de hamb��rguer / Blend 180g", "Blend bovino 180g", "Blend 180g"],
   "Pão Australiano Aussie": ["Pão australiano", "Pão de Australiano Aussie", "Pão Australiano"],
   "Pão brioche 4CT": ["Pão brioche", "Pão Brioche"],
+  "Cream cheese": ["Cream Cheese"],
+  "Onion Rings": ["Anel de cebola"],
+  "Saco Kraft G": ["Saco Kraft"],
+  "Papel acoplado metalizado": ["Papel acoplado"],
+  "Batata frita": ["Batata"],
+  "Farofa de bacon": ["Farofa bacon"],
   "Bacon em cubos": ["Bacon", "Bacon cubos"],
   "Costela Desfiada": ["Costela bovina desfiada", "Costela desfiada"],
   "Cheddar Polenghi profissional": ["Cheddar cremoso", "Cheddar Polengui profissional"],
 }
-export const defaultInsumos: Insumo[] = defaultInsumoRows.map(([nome, unidade, precoCompra, quantidadeEmbalagem, unidadeEmbalagem, categoria]) => ({ nome, unidade, unidadeCompra: unidade, precoCompra, quantidadeEmbalagem, quantidadeConteudo: quantidadeEmbalagem, unidadeEmbalagem, unidadeConteudo: unidadeEmbalagem, unidadeBase: ["kg", "g"].includes(unidadeEmbalagem) ? "g" : unidadeEmbalagem === "l" ? "ml" : "un", aliases: aliasesPorInsumo[nome], categoria, custoUnitario: precoCompra / quantidadeEmbalagem, min: 0, atual: 0 }))
+export const defaultInsumos: Insumo[] = defaultInsumoRows.map(([nome, unidade, precoCompra, quantidadeEmbalagem, unidadeEmbalagem, categoria]) => ({ id: nome === "Carne de hambúrguer" ? "carne-hamburguer-kg" : nome.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, ""), nome, unidade, unidadeCompra: unidade, precoCompra, quantidadeEmbalagem, quantidadeConteudo: quantidadeEmbalagem, unidadeEmbalagem, unidadeConteudo: unidadeEmbalagem, unidadeBase: ["kg", "g"].includes(unidadeEmbalagem) ? "g" : unidadeEmbalagem === "l" ? "ml" : "un", aliases: aliasesPorInsumo[nome], categoria, custoUnitario: precoCompra / quantidadeEmbalagem, min: 0, atual: 0 }))
 
 export const defaultReceitas: Receita[] = [
   {
@@ -273,40 +282,40 @@ export const categorias = [
 export type Categoria = (typeof categorias)[number]
 
 export const catalogoEmbalagens: Array<[string, string, number, string, string]> = [
-  ["Carne de hambúrguer", "Unidade", 180, "g", "Carnes"], ["Costela Pronta", "Unidade", 1, "kg", "Carnes"], ["Costela Desfiada", "Kg", 1, "kg", "Carnes"], ["Bacon em cubos", "Kg", 1, "kg", "Carnes"], ["Bacon Fatiado", "Kg", 1, "kg", "Carnes"], ["Pão Australiano Aussie", "Unidade", 1, "un", "Padaria"], ["Pão brioche 4CT", "Unidade", 1, "un", "Padaria"], ["Batata", "Pacote", 2, "kg", "Insumos"], ["Anel de cebola", "Pacote", 1, "kg", "Insumos"], ["Mussarela", "Kg", 1, "kg", "Insumos"], ["Cream cheese", "Pacote", 1.5, "kg", "Insumos"], ["Cheddar Polenghi profissional", "Pacote", 1.5, "kg", "Insumos"], ["Molho de Cheddar", "Pacote", 1.5, "kg", "Insumos"], ["Óleo", "Unidade", 800, "ml", "Insumos"], ["Sal", "Pacote", 1, "kg", "Insumos"], ["Barbecue", "Unidade", 3.5, "kg", "Insumos"], ["Alho torrado", "Pacote", 1, "kg", "Insumos"], ["Cebolinha", "Unidade/maço", 100, "g", "Insumos"], ["Temperos", "Pacote", 1.9, "kg", "Insumos"], ["Pimenta Biquinho", "Pacote", 2, "kg", "Insumos"],
+  ["Carne de hambúrguer", "Kg", 1, "kg", "Carnes"], ["Costela Pronta", "Unidade", 1, "kg", "Carnes"], ["Costela Desfiada", "Kg", 1, "kg", "Carnes"], ["Bacon em cubos", "Kg", 1, "kg", "Carnes"], ["Bacon Fatiado", "Kg", 1, "kg", "Carnes"], ["Pão Australiano Aussie", "Unidade", 1, "un", "Padaria"], ["Pão brioche 4CT", "Unidade", 1, "un", "Padaria"], ["Batata", "Pacote", 2, "kg", "Insumos"], ["Anel de cebola", "Pacote", 1, "kg", "Insumos"], ["Mussarela", "Kg", 1, "kg", "Insumos"], ["Cream cheese", "Pacote", 1.5, "kg", "Insumos"], ["Cheddar Polenghi profissional", "Pacote", 1.5, "kg", "Insumos"], ["Molho de Cheddar", "Pacote", 1.5, "kg", "Insumos"], ["Óleo", "Unidade", 800, "ml", "Insumos"], ["Sal", "Pacote", 1, "kg", "Insumos"], ["Barbecue", "Unidade", 3.5, "kg", "Insumos"], ["Alho torrado", "Pacote", 1, "kg", "Insumos"], ["Cebolinha", "Unidade/maço", 100, "g", "Insumos"], ["Temperos", "Pacote", 1.9, "kg", "Insumos"], ["Pimenta Biquinho", "Pacote", 2, "kg", "Insumos"],
   ["Embalagem H7", "Unidade", 1, "un", "Embalagens"], ["Embalagem H2", "Unidade", 1, "un", "Embalagens"], ["Embalagem de prato feito", "Unidade", 1, "un", "Embalagens"], ["Embalagem para talher", "Pacote", 100, "un", "Embalagens"], ["Embalagem de farofa", "Unidade", 1, "un", "Embalagens"], ["Lacre para delivery", "Bobina", 500, "un", "Embalagens"], ["Lacre para o forno", "Pacote", 100, "un", "Embalagens"], ["Guardanapo", "Pacote", 100, "un", "Embalagens"], ["Saco Kraft G", "Unidade", 1, "un", "Embalagens"], ["Saco Kraft GG (extra)", "Unidade", 1, "un", "Embalagens"], ["Papel acoplado metalizado", "Pacote", 200, "un", "Embalagens"], ["Papel acoplado (comum)", "Pacote", 200, "un", "Embalagens"], ["Palito para hambúrguer", "Pacote", 200, "un", "Embalagens"], ["Grampo da embalagem", "Pacote", 1000, "un", "Embalagens"], ["Copo descartável", "Pacote", 100, "un", "Embalagens"], ["Garfo descartável", "Pacote", 50, "un", "Embalagens"], ["Saco de embalar batata", "Bobina", 500, "un", "Embalagens"], ["Papel Celofane", "Bobina", 65, "metro", "Embalagens"], ["Sacola para Refrigerante", "Bobina", 100, "un", "Embalagens"],
   ["Água para consumo", "Unidade", 1.5, "L", "Bebidas"], ["Água com gás", "Unidade", 500, "ml", "Bebidas"], ["Água normal", "Unidade", 500, "ml", "Bebidas"], ["Coca Zero 1,5L", "Unidade", 1.5, "L", "Bebidas"], ["Coca-Cola 1,5L", "Unidade", 1.5, "L", "Bebidas"], ["Del Valle 1,5L", "Unidade", 1.5, "L", "Bebidas"], ["Guaraná 1L", "Unidade", 1, "L", "Bebidas"], ["Coca Lata 350ml", "Unidade", 350, "ml", "Bebidas"], ["Guaraná lata 350ml", "Unidade", 350, "ml", "Bebidas"], ["Arroz", "Pacote", 5, "kg", "Cozinha"], ["Farofa", "Pacote", 900, "g", "Cozinha"], ["Veja multiuso", "Unidade", 500, "ml", "Limpeza"], ["Perfex", "Pacote", 100, "un", "Limpeza"], ["Detergente", "Unidade", 5, "L", "Limpeza"], ["Esponja de louça", "Pacote", 4, "un", "Limpeza"], ["Saco de lixo 30L", "Bobina", 25, "sacos", "Limpeza"], ["Saco de lixo 100L", "Bobina", 25, "sacos", "Limpeza"], ["Desinfetante", "Unidade", 1, "L", "Limpeza"], ["Touca", "Pacote", 100, "un", "Operacional"], ["Gás 13kg", "Unidade", 13, "kg", "Operacional"], ["Gás de maçarico", "Unidade", 300, "g", "Operacional"], ["Bobina térmica 80mm", "Bobina", 30, "metro", "Operacional"],
 ]
 
 export const defaultItens: Item[] = [
-  { nome: "Carne de hambúrguer", min: 12, atual: 12, categoria: "Carnes" },
-  { nome: "Costela Pronta", min: 2, atual: 2, categoria: "Carnes" },
+  { id: "carne-hamburguer-kg", insumoId: "carne-hamburguer-kg", nome: "Carne de hambúrguer", min: 30, atual: 0, categoria: "Carnes", unidade: "kg", unidadeEstoque: "kg", precoCompra: 37, quantidadeEmbalagem: 1, unidadeEmbalagem: "kg", ativo: true },
+  { nome: "Costela Pronta", min: 18, atual: 2, categoria: "Carnes" },
   { nome: "Costela Desfiada", min: 2, atual: 2, categoria: "Carnes" },
   { nome: "Bacon em cubos", min: 2, atual: 2, categoria: "Carnes" },
   { nome: "Bacon Fatiado", min: 2, atual: 2, categoria: "Carnes" },
 
-  { nome: "Pão de Australiano Aussie", min: 12, atual: 12, categoria: "Padaria" },
-  { nome: "Pão brioche 4CT", min: 12, atual: 12, categoria: "Padaria" },
+  { nome: "Pão de Australiano Aussie", min: 30, atual: 12, categoria: "Padaria" },
+  { nome: "Pão brioche 4CT", min: 30, atual: 12, categoria: "Padaria" },
 
-  { nome: "Batata", min: 7, atual: 7, categoria: "Insumos" },
+  { nome: "Batata", min: 8, atual: 7, categoria: "Insumos" },
   { nome: "Anel de cebola", min: 2, atual: 2, categoria: "Insumos" },
-  { nome: "Mussarela", min: 1, atual: 1, categoria: "Insumos" },
-  { nome: "Cream cheese", min: 1, atual: 1, categoria: "Insumos" },
-  { nome: "Cheddar Polengui profissional", min: 1, atual: 1, categoria: "Insumos" },
-  { nome: "Molho de Cheddar", min: 1, atual: 1, categoria: "Insumos" },
-  { nome: "Óleo", min: 3, atual: 3, categoria: "Insumos" },
+  { nome: "Mussarela", min: 2, atual: 1, categoria: "Insumos" },
+  { nome: "Cream cheese", min: 2, atual: 1, categoria: "Insumos" },
+  { nome: "Cheddar Polengui profissional", min: 2, atual: 1, categoria: "Insumos" },
+  { nome: "Molho de Cheddar", min: 2, atual: 1, categoria: "Insumos" },
+  { nome: "Óleo", min: 6, atual: 3, categoria: "Insumos" },
   { nome: "Sal", min: 1, atual: 1, categoria: "Insumos" },
   { nome: "Barbecue", min: 2, atual: 2, categoria: "Insumos" },
   { nome: "Alho torrado", min: 1, atual: 1, categoria: "Insumos" },
-  { nome: "Cebolinha", min: 1, atual: 1, categoria: "Insumos" },
+  { nome: "Cebolinha", min: 2, atual: 1, categoria: "Insumos" },
   { nome: "Temperos", min: 1, atual: 1, categoria: "Insumos" },
-  { nome: "Pimenta Biquinho", min: 1, atual: 1, categoria: "Insumos" },
+  { nome: "Pimenta Biquinho", min: 2, atual: 1, categoria: "Insumos" },
 
   { nome: "Embalagem H7", min: 50, atual: 50, categoria: "Embalagens" },
-  { nome: "Embalagem H2", min: 50, atual: 50, categoria: "Embalagens" },
-  { nome: "Embalagem de prato feito", min: 20, atual: 20, categoria: "Embalagens" },
-  { nome: "Embalagem para talher", min: 1, atual: 1, categoria: "Embalagens" },
-  { nome: "Embalagem de farofa", min: 10, atual: 10, categoria: "Embalagens" },
+  { nome: "Embalagem H2", min: 60, atual: 50, categoria: "Embalagens" },
+  { nome: "Embalagem de prato feito", min: 30, atual: 20, categoria: "Embalagens" },
+  { nome: "Embalagem para talher", min: 2, atual: 1, categoria: "Embalagens" },
+  { nome: "Embalagem de farofa", min: 24, atual: 10, categoria: "Embalagens" },
   { nome: "Lacre para delivery", min: 1, atual: 1, categoria: "Embalagens" },
   { nome: "Lacre para o forno", min: 1, atual: 1, categoria: "Embalagens" },
   { nome: "Guardanapo", min: 1, atual: 1, categoria: "Embalagens" },
@@ -323,14 +332,14 @@ export const defaultItens: Item[] = [
   { nome: "Sacola para Refrigerante", min: 1, atual: 1, categoria: "Embalagens" },
 
   { nome: "Água para consumo", min: 2, atual: 2, categoria: "Bebidas" },
-  { nome: "Água com gás", min: 6, atual: 6, categoria: "Bebidas" },
-  { nome: "Água normal", min: 6, atual: 6, categoria: "Bebidas" },
-  { nome: "Coca zero 1,5L", min: 10, atual: 10, categoria: "Bebidas" },
-  { nome: "Coca cola 1,5L", min: 10, atual: 10, categoria: "Bebidas" },
-  { nome: "Dell vale 1,5L", min: 6, atual: 6, categoria: "Bebidas" },
+  { nome: "Água com gás", min: 15, atual: 6, categoria: "Bebidas" },
+  { nome: "Água normal", min: 15, atual: 6, categoria: "Bebidas" },
+  { nome: "Coca zero 1,5L", min: 8, atual: 10, categoria: "Bebidas" },
+  { nome: "Coca cola 1,5L", min: 8, atual: 10, categoria: "Bebidas" },
+  { nome: "Dell vale 1,5L", min: 9, atual: 6, categoria: "Bebidas" },
   { nome: "Guaraná 1L", min: 10, atual: 10, categoria: "Bebidas" },
-  { nome: "Coca Lata 350ml", min: 12, atual: 12, categoria: "Bebidas" },
-  { nome: "Guaraná lata 350ml", min: 12, atual: 12, categoria: "Bebidas" },
+  { nome: "Coca Lata 350ml", min: 24, atual: 12, categoria: "Bebidas" },
+  { nome: "Guaraná lata 350ml", min: 29, atual: 12, categoria: "Bebidas" },
 
   { nome: "Arroz", min: 1, atual: 1, categoria: "Cozinha" },
   { nome: "Farofa", min: 1, atual: 1, categoria: "Cozinha" },

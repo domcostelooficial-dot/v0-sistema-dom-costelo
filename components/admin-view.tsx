@@ -63,9 +63,12 @@ interface AdminViewProps {
 const allPermissoes: { id: TabPermissao; label: string }[] = [
   { id: "estoque", label: "Estoque" },
   { id: "entrada", label: "Entrada" },
+  { id: "saida", label: "Saída" },
+  { id: "inventario", label: "Inventário" },
   { id: "financeiro", label: "Financeiro" },
   { id: "dashboard", label: "Dashboard" },
   { id: "lista-compras", label: "Lista de Compras" },
+  { id: "cmv", label: "Ficha Técnica e CMV" },
 ]
 
 export function AdminView({ currentUser, onPasswordChange }: AdminViewProps) {
@@ -351,8 +354,9 @@ export function AdminView({ currentUser, onPasswordChange }: AdminViewProps) {
                               className="gap-1 bg-success hover:bg-success/90"
                               onClick={async () => {
                                 const newData = { 
-                                  status: "aprovado" as UserStatus, 
-                                  permissoes: ["estoque", "entrada", "dashboard", "lista-compras"] as TabPermissao[] 
+                                  status: "aprovado" as UserStatus,
+                                  ativo: true,
+                                  permissoes: ["estoque", "entrada", "saida", "dashboard", "lista-compras"] as TabPermissao[]
                                 }
                                 const updated = usuarios.map(u => 
                                   u.login === user.login ? { ...u, ...newData } : u
@@ -403,12 +407,10 @@ export function AdminView({ currentUser, onPasswordChange }: AdminViewProps) {
                   Crie, edite e remova usuários do sistema
                 </CardDescription>
               </div>
-              <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+              <div className="text-sm text-muted-foreground">Novos acessos devem ser solicitados pelo próprio usuário e aprovados nesta tela.</div>
+              <Dialog open={false} onOpenChange={setIsAddDialogOpen}>
                 <DialogTrigger asChild>
-                  <Button className="gap-2">
-                    <PlusCircle className="h-4 w-4" />
-                    Adicionar Usuário
-                  </Button>
+                  <span className="hidden"><Button className="gap-2"><PlusCircle className="h-4 w-4" />Adicionar Usuário</Button></span>
                 </DialogTrigger>
                 <DialogContent>
                   <DialogHeader>

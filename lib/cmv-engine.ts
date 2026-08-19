@@ -78,7 +78,75 @@ export function calcularFicha(ficha: FichaTecnica, insumos: Insumo[]) {
   const embalagens = ficha.embalagem || 0
   const cmv = ingredientes + embalagens
   const margem = ficha.precoVenda - cmv
-  return { ingredientes, embalagens, cmv, pendentes, custoPendente: pendentes.length > 0, cmvPercentual: ficha.precoVenda > 0 ? cmv / ficha.precoVenda * 100 : null, margem, margemPercentual: ficha.precoVenda > 0 ? margem / ficha.precoVenda * 100 : null, markup: cmv > 0 && ficha.precoVenda > 0 ? ficha.precoVenda / cmv : null }
+  const cmvPercentual = ficha.precoVenda > 0 ? cmv / ficha.precoVenda * 100 : null
+  const margemPercentual = ficha.precoVenda > 0 ? margem / ficha.precoVenda * 100 : null
+  return { ingredientes, embalagens, cmv, pendentes, custoPendente: pendentes.length > 0, cmvPercentual, margem, margemPercentual, markup: cmv > 0 && ficha.precoVenda > 0 ? ficha.precoVenda / cmv : null, lucroBruto: margem, margemBruta: margemPercentual }
+}
+
+export function calcularCustoCombo(combo: import("./types").Combo, fichas: FichaTecnica[], insumos: Insumo[]) {
+  const detalhes = combo.itens.map((item) => {
+    if (item.tipo === "produto" || item.tipo === "composto") {
+      const ficha = fichas.find((fichaAtual) => fichaAtual.id === item.referenciaId)
+      return { item, custo: ficha ? calcularFicha(ficha, insumos).cmv * item.quantidade : 0, pendente: !ficha }
+    }
+    const insumo = insumos.find((insumoAtual) => insumoAtual.id === item.referenciaId)
+    return { item, custo: insumo ? custoIngrediente({ insumoId: insumo.id, insumoNome: insumo.nome, quantidade: item.quantidade, unidade: item.unidade ?? insumo.unidade }, insumos) : 0, pendente: !insumo }
+  })
+  const cmv = detalhes.reduce((total, detalhe) => total + detalhe.custo, 0)
+  const margem = combo.precoVenda - cmv
+  return { cmv, margem, margemPercentual: combo.precoVenda > 0 ? margem / combo.precoVenda * 100 : null, markup: cmv > 0 ? combo.precoVenda / cmv : null, pendentes: detalhes.filter((detalhe) => detalhe.pendente).map((detalhe) => detalhe.item.nome), detalhes }
+}
+
+const produto = (referenciaId: string, nome: string, quantidade = 1): import("./types").ComboItem => ({ tipo: "produto", referenciaId, nome, quantidade })
+const insumo = (referenciaId: string, nome: string, quantidade: number, unidade: import("./types").UnidadeInsumo = "un"): import("./types").ComboItem => ({ tipo: "insumo", referenciaId, nome, quantidade, unidade })
+const bebida = (referenciaId: string, nome: string) => insumo(referenciaId, nome, 1)
+const batata = () => insumo("batata-frita", "Batata frita", 400, "g")
+
+export const seedCombos: import("./types").Combo[] = [
+  ["Costeloburguer + Batata 400g", 45.99, [produto("costeloburguer", "Costeloburguer"), batata()]],
+  ["Trio Costeloburguer + Batata + Coca 350ml", 49.99, [produto("costeloburguer", "Costeloburguer"), batata(), bebida("coca-cola-350ml", "Coca-Cola 350ml")]],
+  ["Donzão + Batata 400g", 45.99, [produto("donzao", "Donzão"), batata()]],
+  ["Trio Donzão + Batata + Coca 350ml", 49.99, [produto("donzao", "Donzão"), batata(), bebida("coca-cola-350ml", "Coca-Cola 350ml")]],
+  ["Dom Supreme + Batata 400g", 45.99, [produto("dom-supreme", "Dom Supreme"), batata()]],
+  ["Trio Dom Supreme + Batata + Coca 350ml", 49.99, [produto("dom-supreme", "Dom Supreme"), batata(), bebida("coca-cola-350ml", "Coca-Cola 350ml")]],
+  ["Dom Cheddar + Batata 400g", 43.99, [produto("dom-cheddar", "Dom Cheddar"), batata()]],
+  ["Trio Dom Cheddar + Batata + Coca 350ml", 48.99, [produto("dom-cheddar", "Dom Cheddar"), batata(), bebida("coca-cola-350ml", "Coca-Cola 350ml")]],
+  ["Super Bacon BBQ + Batata 400g", 40, [produto("super-bacon-bbq", "Super Bacon BBQ"), batata()]],
+  ["Super Bacon BBQ + Batata + Coca 350ml", 45, [produto("super-bacon-bbq", "Super Bacon BBQ"), batata(), bebida("coca-cola-350ml", "Coca-Cola 350ml")]],
+  ["2 Costeloburguer + 2 Coca-Cola 350ml", 95, [produto("costeloburguer", "Costeloburguer", 2), bebida("coca-cola-350ml", "Coca-Cola 350ml"), bebida("coca-cola-350ml", "Coca-Cola 350ml")]],
+  ["2 Dom Cheddar + Batata Supreme + Guaraná 1L", 99.99, [produto("dom-cheddar", "Dom Cheddar", 2), produto("batata-supreme", "Batata Supreme"), bebida("guarana-1l", "Guaraná 1L")]],
+  ["Costela do Dom + Batata 400g", 74.99, [produto("costela-do-dom", "Costela do Dom"), batata()]],
+  ["Costela do Dom + Onion Rings 160g", 74.99, [produto("costela-do-dom", "Costela do Dom"), insumo("onion-rings", "Onion Rings", 160, "g")]],
+  ["Costela + Batata + Guaraná 1L", 79.99, [produto("costela-do-dom", "Costela do Dom"), batata(), bebida("guarana-1l", "Guaraná 1L")]],
+  ["Costela + Batata + Del Valle 1,5L", 84.99, [produto("costela-do-dom", "Costela do Dom"), batata(), bebida("del-valle-1-5l", "Del Valle 1,5L")]],
+  ["Costela + Batata + Coca-Cola 1,5L", 84.99, [produto("costela-do-dom", "Costela do Dom"), batata(), bebida("coca-cola-1-5l", "Coca-Cola 1,5L")]],
+  ["Costela + Onion Rings + Coca-Cola 1,5L", 84.99, [produto("costela-do-dom", "Costela do Dom"), insumo("onion-rings", "Onion Rings", 160, "g"), bebida("coca-cola-1-5l", "Coca-Cola 1,5L")]],
+  ["Costela completa + Guaraná 1L", 89.99, [produto("costela-do-dom", "Costela do Dom"), batata(), insumo("arroz", "Arroz", 300, "g"), insumo("farofa", "Farofa", 50, "g"), bebida("guarana-1l", "Guaraná 1L")]],
+  ["Costela completa + Del Valle 1,5L", 94.99, [produto("costela-do-dom", "Costela do Dom"), batata(), insumo("arroz", "Arroz", 300, "g"), insumo("farofa", "Farofa", 50, "g"), bebida("del-valle-1-5l", "Del Valle 1,5L")]],
+  ["Costela completa + Coca-Cola 1,5L", 94.99, [produto("costela-do-dom", "Costela do Dom"), batata(), insumo("arroz", "Arroz", 300, "g"), insumo("farofa", "Farofa", 50, "g"), bebida("coca-cola-1-5l", "Coca-Cola 1,5L")]],
+  ["Costela de Queijo", 85, [produto("costela-de-queijo", "Costela de Queijo")]],
+  ["Costela de Queijo + Batata 400g", 105, [produto("costela-de-queijo", "Costela de Queijo"), batata()]],
+  ["Costela de Queijo + Batata + Coca-Cola 1,5L", 115, [produto("costela-de-queijo", "Costela de Queijo"), batata(), bebida("coca-cola-1-5l", "Coca-Cola 1,5L")]],
+].map(([nome, precoVenda, itens]) => ({ id: String(nome).toLowerCase().normalize("NFD").replace(/[\\u0300-\\u036f]/g, "").replace(/[^a-z0-9]+/g, "-"), nome: String(nome), precoVenda: Number(precoVenda), ativo: true, itens: itens as import("./types").ComboItem[] }))
+
+
+export function calcularConsumoComboVenda(venda: { id: string; produtoNome: string; quantidade: number }, combo: import("./types").Combo | undefined, fichas: FichaTecnica[], insumos: Insumo[], estoque: Item[] = []) {
+  if (!combo) return { ok: false as const, codigo: "COMBO_SEM_COMPOSICAO", motivo: "Combo sem composição cadastrada.", consumos: [] as never[] }
+  const consumos: Array<{ insumo: Insumo; quantidadeBase: number; quantidade: number; unidadeBase: string; unidadeEstoque: string }> = []
+  for (const item of combo.itens) {
+    if (item.tipo === "insumo") {
+      const insumo = insumos.find((atual) => atual.id === item.referenciaId)
+      const itemEstoque = estoque.find((atual) => atual.insumoId === item.referenciaId || atual.id === item.referenciaId)
+      if (!insumo || !itemEstoque) return { ok: false as const, codigo: "INSUMO_SEM_VINCULO", motivo: `Componente sem estoque: ${item.nome}`, consumos: [] as typeof consumos }
+      try { const convertido = converterQuantidadeFichaParaEstoque({ quantidadeFicha: item.quantidade * venda.quantidade, unidadeFicha: item.unidade ?? insumo.unidade, insumo, itemEstoque }); consumos.push({ insumo, quantidadeBase: convertido.quantidadeEstoque, quantidade: item.quantidade * venda.quantidade, unidadeBase: item.unidade ?? insumo.unidade, unidadeEstoque: convertido.unidadeEstoque }) } catch { return { ok: false as const, codigo: "UNIDADE_INCOMPATIVEL", motivo: `Conversão incompatível para ${item.nome}`, consumos: [] as typeof consumos } }
+    } else {
+      const ficha = fichas.find((atual) => atual.id === item.referenciaId)
+      const resultado = calcularConsumoVenda({ ...venda, produtoNome: item.nome, fichaTecnicaId: item.referenciaId, quantidade: item.quantidade * venda.quantidade }, ficha, insumos, estoque)
+      if (!resultado.ok) return resultado
+      consumos.push(...resultado.consumos)
+    }
+  }
+  return { ok: true as const, consumos }
 }
 
 export function alertaCmv(percentual: number | null) {
@@ -92,10 +160,43 @@ export function alertaCmv(percentual: number | null) {
 export const formatBRL = (value: number) => value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })
 export const formatPercent = (value: number | null) => value === null ? "Preço pendente" : `${value.toFixed(2).replace(".", ",")}%`
 export const seedFichas: FichaTecnica[] = [
-  { id: "super-bacon-bbq", nome: "Super Bacon BBQ", precoVenda: 0, ingredientes: [{ insumoNome: "Pão brioche 4CT", quantidade: 1, unidade: "un" }, { insumoNome: "Carne de hambúrguer / Blend 180g", quantidade: 1, unidade: "un" }, { insumoNome: "Cheddar Polenghi profissional", quantidade: 30, unidade: "g" }, { insumoNome: "Bacon em cubos", quantidade: 40, unidade: "g" }, { insumoNome: "Barbecue", quantidade: 20, unidade: "g" }] },
-  { id: "costeloburguer", nome: "Costeloburguer", precoVenda: 0, ingredientes: [{ insumoNome: "Pão Australiano Aussie", quantidade: 1, unidade: "un" }, { insumoNome: "Carne de hambúrguer / Blend 180g", quantidade: 1, unidade: "un" }, { insumoNome: "Mussarela", quantidade: 25, unidade: "g" }, { insumoNome: "Cream cheese", quantidade: 30, unidade: "g" }, { insumoNome: "Costela Desfiada", quantidade: 40, unidade: "g" }, { insumoNome: "Cebolinha", quantidade: 5, unidade: "g" }, { insumoNome: "Anel de cebola", quantidade: 40, unidade: "g" }, { insumoNome: "Barbecue", quantidade: 20, unidade: "g" }] },
-  { id: "donzao", nome: "Donzão", precoVenda: 0, ingredientes: [{ insumoNome: "Pão Australiano Aussie", quantidade: 1, unidade: "un" }, { insumoNome: "Carne de hambúrguer / Blend 180g", quantidade: 1, unidade: "un" }, { insumoNome: "Mussarela", quantidade: 25, unidade: "g" }, { insumoNome: "Cream cheese", quantidade: 30, unidade: "g" }, { insumoNome: "Costela Desfiada", quantidade: 40, unidade: "g" }, { insumoNome: "Anel de cebola", quantidade: 40, unidade: "g" }, { insumoNome: "Barbecue", quantidade: 20, unidade: "g" }] },
-  { id: "dom-supreme", nome: "Dom Supreme", precoVenda: 0, ingredientes: [{ insumoNome: "Pão Australiano Aussie", quantidade: 1, unidade: "un" }, { insumoNome: "Carne de hambúrguer / Blend 180g", quantidade: 1, unidade: "un" }, { insumoNome: "Cheddar Polenghi profissional", quantidade: 30, unidade: "g" }, { insumoNome: "Farofa", quantidade: 40, unidade: "g" }, { insumoNome: "Anel de cebola", quantidade: 40, unidade: "g" }] },
-  { id: "costela-do-dom", nome: "Costela do Dom", precoVenda: 0, ingredientes: [{ insumoNome: "Costela suína", quantidade: 1, unidade: "kg" }, { insumoNome: "Tempero do Dom", quantidade: 1, unidade: "aplicação" }, { insumoNome: "Barbecue", quantidade: 100, unidade: "g" }, { insumoNome: "Alho torrado", quantidade: 40, unidade: "g" }, { insumoNome: "Pimenta Biquinho", quantidade: 20, unidade: "g" }] },
+  { id: "super-bacon-bbq", nome: "Super Bacon BBQ", categoria: "Hambúrguer Artesanal", precoVenda: 35, ingredientes: [{ insumoNome: "Pão brioche 4CT", quantidade: 1, unidade: "un" }, { insumoId: "carne-hamburguer-kg", insumoNome: "Carne de hambúrguer", quantidade: 180, unidade: "g" }, { insumoNome: "Cheddar Polenghi profissional", quantidade: 30, unidade: "g" }, { insumoNome: "Bacon fatiado", quantidade: 40, unidade: "g" }, { insumoNome: "Barbecue", quantidade: 20, unidade: "g" }, { insumoNome: "Saco Kraft G", quantidade: 1, unidade: "un" }, { insumoNome: "Papel acoplado metalizado", quantidade: 1, unidade: "un" }] },
+  { id: "costeloburguer", nome: "Costeloburguer", categoria: "Hambúrguer Artesanal", precoVenda: 34.99, ingredientes: [{ insumoNome: "Pão Australiano Aussie", quantidade: 1, unidade: "un" }, { insumoId: "carne-hamburguer-kg", insumoNome: "Carne de hambúrguer", quantidade: 180, unidade: "g" }, { insumoNome: "Mussarela", quantidade: 25, unidade: "g" }, { insumoNome: "Cream Cheese", quantidade: 30, unidade: "g" }, { insumoNome: "Costela Desfiada", quantidade: 40, unidade: "g" }, { insumoNome: "Cebolinha", quantidade: 5, unidade: "g" }, { insumoNome: "Onion Rings", quantidade: 40, unidade: "g" }, { insumoNome: "Barbecue", quantidade: 20, unidade: "g" }, { insumoNome: "Saco Kraft G", quantidade: 1, unidade: "un" }, { insumoNome: "Papel acoplado metalizado", quantidade: 1, unidade: "un" }] },
+  { id: "donzao", nome: "Donzão", categoria: "Hambúrguer Artesanal", precoVenda: 34.99, ingredientes: [{ insumoNome: "Pão brioche 4CT", quantidade: 1, unidade: "un" }, { insumoId: "carne-hamburguer-kg", insumoNome: "Carne de hambúrguer", quantidade: 180, unidade: "g" }, { insumoNome: "Mussarela", quantidade: 25, unidade: "g" }, { insumoNome: "Cream Cheese", quantidade: 30, unidade: "g" }, { insumoNome: "Costela Desfiada", quantidade: 40, unidade: "g" }, { insumoNome: "Cebolinha", quantidade: 5, unidade: "g" }, { insumoNome: "Onion Rings", quantidade: 40, unidade: "g" }, { insumoNome: "Barbecue", quantidade: 20, unidade: "g" }, { insumoNome: "Saco Kraft G", quantidade: 1, unidade: "un" }, { insumoNome: "Papel acoplado metalizado", quantidade: 1, unidade: "un" }] },
+  { id: "dom-supreme", nome: "Dom Supreme", categoria: "Hambúrguer Artesanal", precoVenda: 35, ingredientes: [{ insumoNome: "Pão Australiano Aussie", quantidade: 1, unidade: "un" }, { insumoId: "carne-hamburguer-kg", insumoNome: "Carne de hambúrguer", quantidade: 180, unidade: "g" }, { insumoNome: "Cheddar Polenghi profissional", quantidade: 30, unidade: "g" }, { insumoNome: "Farofa de bacon", quantidade: 40, unidade: "g" }, { insumoNome: "Onion Rings", quantidade: 40, unidade: "g" }, { insumoNome: "Saco Kraft G", quantidade: 1, unidade: "un" }, { insumoNome: "Papel acoplado metalizado", quantidade: 1, unidade: "un" }] },
+  { id: "dom-cheddar", nome: "Dom Cheddar", categoria: "Hambúrguer Artesanal", precoVenda: 32.99, ingredientes: [{ insumoNome: "Pão brioche 4CT", quantidade: 1, unidade: "un" }, { insumoId: "carne-hamburguer-kg", insumoNome: "Carne de hambúrguer", quantidade: 180, unidade: "g" }, { insumoNome: "Cheddar Polenghi profissional", quantidade: 30, unidade: "g" }, { insumoNome: "Farofa de bacon", quantidade: 40, unidade: "g" }, { insumoNome: "Onion Rings", quantidade: 40, unidade: "g" }, { insumoNome: "Saco Kraft G", quantidade: 1, unidade: "un" }, { insumoNome: "Papel acoplado metalizado", quantidade: 1, unidade: "un" }] },
+  { id: "batata-dom-costelo", nome: "Batata Dom Costelo", categoria: "Batatas", precoVenda: 34.99, ingredientes: [{ insumoNome: "Batata", quantidade: 400, unidade: "g" }, { insumoNome: "Cream Cheese", quantidade: 100, unidade: "g" }, { insumoNome: "Costela Desfiada", quantidade: 80, unidade: "g" }, { insumoNome: "Barbecue", quantidade: 50, unidade: "g" }, { insumoNome: "Cebolinha", quantidade: 10, unidade: "g" }, { insumoNome: "Embalagem H7", quantidade: 1, unidade: "un" }, { insumoNome: "Saco Kraft G", quantidade: 1, unidade: "un" }] },
+  { id: "batata-cheddar-bacon", nome: "Batata Cheddar e Bacon", categoria: "Batatas", precoVenda: 32, ingredientes: [{ insumoNome: "Batata", quantidade: 400, unidade: "g" }, { insumoNome: "Cheddar Polenghi profissional", quantidade: 100, unidade: "g" }, { insumoNome: "Farofa de bacon", quantidade: 80, unidade: "g" }, { insumoNome: "Embalagem H7", quantidade: 1, unidade: "un" }, { insumoNome: "Saco Kraft G", quantidade: 1, unidade: "un" }] },
+  { id: "batata-supreme", nome: "Batata Supreme", categoria: "Batatas", precoVenda: 32, ingredientes: [{ insumoNome: "Batata", quantidade: 400, unidade: "g" }, { insumoNome: "Cheddar Polenghi profissional", quantidade: 100, unidade: "g" }, { insumoNome: "Farofa de bacon", quantidade: 80, unidade: "g" }, { insumoNome: "Embalagem H7", quantidade: 1, unidade: "un" }, { insumoNome: "Saco Kraft G", quantidade: 1, unidade: "un" }] },
+  { id: "costela-do-dom", nome: "Costela do Dom", categoria: "Costelas", precoVenda: 69.99, ingredientes: [{ insumoNome: "Costela suína", quantidade: 1, unidade: "kg" }, { insumoNome: "Tempero do Dom", quantidade: 1, unidade: "aplicação" }, { insumoNome: "Barbecue", quantidade: 100, unidade: "g" }, { insumoNome: "Alho torrado", quantidade: 40, unidade: "g" }, { insumoNome: "Pimenta Biquinho", quantidade: 20, unidade: "g" }, { insumoNome: "Cebolinha", quantidade: 15, unidade: "g" }, { insumoNome: "Embalagem H7", quantidade: 1, unidade: "un" }, { insumoNome: "Saco Kraft G", quantidade: 1, unidade: "un" }] },
+  { id: "costela-de-queijo", nome: "Costela de Queijo", categoria: "Costelas", precoVenda: 85, ingredientes: [{ insumoNome: "Costela suína", quantidade: 1, unidade: "kg" }, { insumoNome: "Tempero do Dom", quantidade: 1, unidade: "aplicação" }, { insumoNome: "Barbecue", quantidade: 100, unidade: "g" }, { insumoNome: "Cream Cheese", quantidade: 100, unidade: "g" }, { insumoNome: "Mussarela", quantidade: 200, unidade: "g" }, { insumoNome: "Alho torrado", quantidade: 40, unidade: "g" }, { insumoNome: "Pimenta Biquinho", quantidade: 20, unidade: "g" }, { insumoNome: "Cebolinha", quantidade: 15, unidade: "g" }, { insumoNome: "Embalagem H7", quantidade: 1, unidade: "un" }, { insumoNome: "Saco Kraft G", quantidade: 1, unidade: "un" }] },
+  { id: "costela-bovina-pedra", nome: "Costela Bovina na Pedra", categoria: "Costelas", precoVenda: 100, ingredientes: [{ insumoNome: "Costela bovina", quantidade: 1, unidade: "kg" }, { insumoNome: "Sal de parrilla", quantidade: 20, unidade: "g" }, { insumoNome: "Alho torrado", quantidade: 40, unidade: "g" }, { insumoNome: "Batata", quantidade: 400, unidade: "g" }, { insumoNome: "Arroz", quantidade: 300, unidade: "g" }, { insumoNome: "Farofa", quantidade: 50, unidade: "g" }, { insumoNome: "Embalagem H7", quantidade: 1, unidade: "un" }, { insumoNome: "Saco Kraft G", quantidade: 1, unidade: "un" }] },
 ]
+export function normalizarNomeInsumo(value: string) {
+  return value.trim().toLocaleLowerCase("pt-BR").normalize("NFD").replace(/[\\u0300-\\u036f]/g, "").replace(/\\s+/g, " ")
+}
+
+export function resolverIngredientesFicha(ficha: FichaTecnica, insumos: Insumo[]) {
+  const ingredientes = [] as IngredienteFicha[]
+  for (const ingrediente of ficha.ingredientes) {
+    const porId = ingrediente.insumoId ? insumos.find((item) => item.id === ingrediente.insumoId) : undefined
+    const nome = normalizarNomeInsumo(ingrediente.insumoNome)
+    const candidatos = porId ? [porId] : insumos.filter((item) => normalizarNomeInsumo(item.nome) === nome || item.aliases?.some((alias) => normalizarNomeInsumo(alias) === nome))
+    const unicos = [...new Map(candidatos.filter(Boolean).map((item) => [item.id, item])).values()]
+    if (unicos.length !== 1) return { ok: false as const, codigo: "FICHA_COM_INGREDIENTE_SEM_VINCULO", ingrediente: ingrediente.insumoNome, ficha: ficha.nome }
+    ingredientes.push({ ...ingrediente, insumoId: unicos[0].id, insumoNome: unicos[0].nome })
+  }
+  return { ok: true as const, ficha: { ...ficha, ingredientes } }
+}
+
+export function migrarFichasParaCarneKg(fichas: FichaTecnica[], insumos: Insumo[]) {
+  const carne = insumos.find((item) => item.id === "carne-hamburguer-kg" || item.nome === "Carne de hambúrguer")
+  if (!carne) return fichas
+  return fichas.map((ficha) => ({ ...ficha, ingredientes: ficha.ingredientes.map((ingrediente) => {
+    const nome = ingrediente.insumoNome.trim().toLowerCase()
+    const legado = nome === "carne de hambúrguer / blend 180g" || nome === "blend 180g" || nome === "blend bovino 180g"
+    return legado ? { ...ingrediente, insumoId: carne.id, insumoNome: carne.nome, quantidade: 180, unidade: "g" as const } : ingrediente
+  }) }))
+}
+
 export function seedInsumos(base: Insumo[]) { return base }

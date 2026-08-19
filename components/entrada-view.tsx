@@ -2,7 +2,7 @@
 
 import { useState } from "react"
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog"
-import { Item, HistoricoEntry } from "@/lib/types"
+import { Item, HistoricoEntry, Insumo } from "@/lib/types"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
@@ -18,11 +18,12 @@ import { Truck, Package, Plus } from "lucide-react"
 
 interface EntradaViewProps {
   itens: Item[]
+  insumos?: Insumo[]
   onEntrada: (nome: string, qtd: number, custo: number, fornecedor?: string, observacao?: string, dataMovimentacao?: string) => Promise<void> | void
   canRegister?: boolean
 }
 
-export function EntradaView({ itens, onEntrada, canRegister = true }: EntradaViewProps) {
+export function EntradaView({ itens, insumos = [], onEntrada, canRegister = true }: EntradaViewProps) {
   const [selectedItem, setSelectedItem] = useState("")
   const [quantidade, setQuantidade] = useState("")
   const [precoUnitario, setPrecoUnitario] = useState("")
@@ -44,6 +45,8 @@ export function EntradaView({ itens, onEntrada, canRegister = true }: EntradaVie
   }
 
   const selectedItemData = itens.find((i) => i.nome === selectedItem)
+  const selectedInsumo = selectedItemData ? insumos.find((i) => i.id === selectedItemData.insumoId || i.nome === selectedItemData.nome) : undefined
+  const precoEstimado = selectedInsumo?.precoReferencia ?? selectedInsumo?.precoCompra ?? 0
 
   return (
     <div className="space-y-6">
@@ -66,7 +69,7 @@ export function EntradaView({ itens, onEntrada, canRegister = true }: EntradaVie
             <FieldGroup>
               <Field>
                 <FieldLabel>Item</FieldLabel>
-                <Select value={selectedItem} onValueChange={setSelectedItem}>
+                <Select value={selectedItem} onValueChange={(value) => { setSelectedItem(value); const item = itens.find((entry) => entry.nome === value); const insumo = item ? insumos.find((entry) => entry.id === item.insumoId || entry.nome === item.nome) : undefined; const estimado = insumo?.precoReferencia ?? insumo?.precoCompra ?? 0; setPrecoUnitario(estimado > 0 ? estimado.toFixed(2) : "") }}>
                   <SelectTrigger>
                     <SelectValue placeholder="Selecione um item" />
                   </SelectTrigger>
@@ -112,7 +115,7 @@ export function EntradaView({ itens, onEntrada, canRegister = true }: EntradaVie
                   />
                 </Field>
                 <Field>
-                  <FieldLabel htmlFor="preco">Preço Unitário (R$)</FieldLabel>
+                  <FieldLabel htmlFor="preco">Preço Unitário (R$)</FieldLabel>{precoEstimado > 0 && <p className="text-xs text-muted-foreground">Estimativa baseada no último preço registrado: R$ {precoEstimado.toFixed(2)}</p>}
                   <Input
                     id="preco"
                     type="number"
