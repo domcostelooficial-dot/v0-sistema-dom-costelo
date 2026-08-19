@@ -119,6 +119,16 @@ export function FirebaseLoginForm({ onLogin }: FirebaseLoginFormProps) {
 
       const displayName = user!.email?.split("@")[0] || user!.uid
       const { data: usuarioSistema, error: profileError } = await getUsuarioProfile(user!.uid)
+      const isPrincipalOwner = user!.email?.toLowerCase() === "admin@domcostelo.com"
+
+      // O owner existente no Firebase Authentication continua sendo o fallback
+      // mesmo quando o perfil Firestore ainda não foi provisionado.
+      if ((profileError || !usuarioSistema) && isPrincipalOwner) {
+        setLoading(false)
+        onLogin(displayName, "owner", ["estoque", "entrada", "financeiro", "dashboard", "lista-compras", "cmv", "admin"])
+        return
+      }
+
       if (profileError || !usuarioSistema) {
         await signOut(auth)
         setError("Seu usuário autenticado ainda não possui um perfil autorizado no Firestore.")
