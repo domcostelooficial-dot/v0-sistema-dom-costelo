@@ -19,7 +19,7 @@ export interface FinanceConfig {
   cmvMetaPercentual: number
   metaLucroMensal: number
   diasFuncionamento: Record<string, boolean>
-  despesasFixas: Array<{ id: string; descricao: string; categoria: string; valor: number }>
+  despesasFixas: Array<{ id: string; descricao: string; categoria: string; valor: number; ativo?: boolean }>
 }
 export interface VendaFinanceira {
   id: string; data: string; status: StatusVenda; canalNaVenda: CanalVenda; formaPagamentoNaVenda: FormaPagamento
@@ -153,8 +153,12 @@ export function rentabilidadePorProduto(vendas: VendaFinanceira[]): Rentabilidad
   return Array.from(grupos.values()).map((produto) => ({ ...produto, mcPercentual: produto.faturamento > 0 ? produto.margemContribuicao / produto.faturamento * 100 : 0 }))
 }
 
+export function totalCustosFixosAtivos(config: FinanceConfig) {
+  return (config.despesasFixas ?? []).reduce((total, despesa) => total + (despesa.ativo !== false ? n(despesa.valor) : 0), 0)
+}
+
 export function totalCustosFixos(config: FinanceConfig, despesas: DespesaFinanceira[] = []) {
-  const detalhadas = (config.despesasFixas ?? []).reduce((total, despesa) => total + n(despesa.valor), 0)
+  const detalhadas = totalCustosFixosAtivos(config)
   const registradas = despesas.filter((despesa) => despesa.tipo === "fixa").reduce((total, despesa) => total + n(despesa.valor), 0)
   return detalhadas || registradas || n(config.custosFixosMensais)
 }

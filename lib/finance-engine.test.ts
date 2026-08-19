@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { calcularTaxa, calcularVenda, pontoEquilibrio, resumoFinanceiro, filtrarPeriodo, contarDiasAbertos, totalCustosFixos } from "./finance-engine"
+import { calcularTaxa, calcularVenda, pontoEquilibrio, resumoFinanceiro, filtrarPeriodo, contarDiasAbertos, totalCustosFixos, totalCustosFixosAtivos } from "./finance-engine"
 import { defaultFinanceConfig } from "./finance-engine"
 
 describe("motor financeiro", () => {
@@ -62,5 +62,30 @@ describe("motor financeiro", () => {
 
   it("não transforma dias fechados em abertos", () => {
     expect(contarDiasAbertos(new Date("2026-08-01T12:00:00"), { segunda: true, terca: false, quarta: false, quinta: false, sexta: false, sabado: false, domingo: false })).toBe(5)
+  })
+
+  it("dashboard mensal exclui vendas de meses anteriores", () => {
+    const julho = calcularVenda({ id: "julho", data: "2026-07-31", canal: "salao", produtoId: "p", produtoNome: "Produto", quantidade: 1, precoUnitario: 100, cmvUnitario: 40 }, defaultFinanceConfig)
+    const agosto = calcularVenda({ id: "agosto", data: "2026-08-01", canal: "salao", produtoId: "p", produtoNome: "Produto", quantidade: 1, precoUnitario: 200, cmvUnitario: 40 }, defaultFinanceConfig)
+    const mes = filtrarPeriodo([julho, agosto], [], "2026-08-01", "2026-08-31")
+    expect(resumoFinanceiro(mes.vendas, []).faturamentoBruto).toBe(200)
+  })
+
+  it("considera legado sem ativo como ativo e ignora inativo", () => {
+    const config = { ...defaultFinanceConfig, despesasFixas: [{ id: "a", descricao: "Aluguel", categoria: "Ocupação", valor: 2000 }, { id: "e", descricao: "Energia", categoria: "Utilidades", valor: 500, ativo: true }, { id: "i", descricao: "Internet", categoria: "Sistemas", valor: 100, ativo: false }] }
+    expect(totalCustosFixosAtivos(config)).toBe(2500)
+  })
+
+  it("altera o PE quando um custo é desativado", () => {
+    const ativo = { ...defaultFinanceConfig, despesasFixas: [{ id: "a", descricao: "Aluguel", categoria: "Ocupação", valor: 2000, ativo: true }, { id: "s", descricao: "Segundo auxiliar", categoria: "Funcionários", valor: 2000, ativo: true }] }
+    const inativo = { ...ativo, despesasFixas: ativo.despesasFixas.map(item => item.id === "s" ? { ...item, ativo: false } : item) }
+    expect(pontoEquilibrio(totalCustosFixosAtivos(ativo), 50).faturamento).toBe(8000)
+    expect(pontoEquilibrio(totalCustosFixosAtivos(inativo), 50).faturamento).toBe(4000)
+  })
+
+  it("não gera infinito com todos os custos inativos", () => {
+    const config = { ...defaultFinanceConfig, despesasFixas: defaultFinanceConfig.despesasFixas.map(item => ({ ...item, ativo: false })) }
+    expect(totalCustosFixosAtivos(config)).toBe(0)
+    expect(pontoEquilibrio(0, 0).faturamento).toBe(0)
   })
 })

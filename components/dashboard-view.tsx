@@ -2,7 +2,7 @@
 
 import { useMemo } from "react"
 import { Item, HistoricoEntry } from "@/lib/types"
-import { VendaFinanceira, DespesaFinanceira, FinanceConfig, percentualCmv, resumoFinanceiro, totalCustosFixos, pontoEquilibrio, diferencaPontoEquilibrio, progressoPontoEquilibrio, contarDiasAbertos } from "@/lib/finance-engine"
+import { VendaFinanceira, DespesaFinanceira, FinanceConfig, percentualCmv, resumoFinanceiro, totalCustosFixosAtivos, pontoEquilibrio, diferencaPontoEquilibrio, progressoPontoEquilibrio, contarDiasAbertos, filtrarPeriodo } from "@/lib/finance-engine"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { BarChart3, PieChart, TrendingUp, Package } from "lucide-react"
 import {
@@ -35,10 +35,13 @@ const COLORS = [
 ]
 
 export function DashboardView({ itens, historico, vendasFinanceiras = [], despesasFinanceiras = [], financeConfig }: DashboardViewProps) {
-  const custosFixos = financeConfig ? totalCustosFixos(financeConfig, despesasFinanceiras) : 0
-  const resumoFinanceiroAtual = useMemo(() => resumoFinanceiro(vendasFinanceiras, despesasFinanceiras, custosFixos), [vendasFinanceiras, despesasFinanceiras, custosFixos])
-  const cmvPercentual = percentualCmv(resumoFinanceiroAtual)
   const hoje = new Date()
+  const inicioMes = `${hoje.getFullYear()}-${String(hoje.getMonth() + 1).padStart(2, "0")}-01`
+  const fimMes = `${hoje.getFullYear()}-${String(hoje.getMonth() + 1).padStart(2, "0")}-${String(new Date(hoje.getFullYear(), hoje.getMonth() + 1, 0).getDate()).padStart(2, "0")}`
+  const dadosMesAtual = useMemo(() => filtrarPeriodo(vendasFinanceiras, despesasFinanceiras, inicioMes, fimMes), [vendasFinanceiras, despesasFinanceiras, inicioMes, fimMes])
+  const custosFixos = financeConfig ? totalCustosFixosAtivos(financeConfig) : 0
+  const resumoFinanceiroAtual = useMemo(() => resumoFinanceiro(dadosMesAtual.vendas, dadosMesAtual.despesas, custosFixos), [dadosMesAtual, custosFixos])
+  const cmvPercentual = percentualCmv(resumoFinanceiroAtual)
   const diasAbertos = financeConfig ? contarDiasAbertos(hoje, financeConfig.diasFuncionamento) : 0
   const equilibrio = pontoEquilibrio(custosFixos, resumoFinanceiroAtual.mcPercentual, resumoFinanceiroAtual.ticketMedio, diasAbertos)
   const gastosPorCategoria = useMemo(() => {
