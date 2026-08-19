@@ -93,6 +93,23 @@ export interface VendaProduto {
   produtoNome: string
   quantidade: number
   data: string
+  fichaTecnicaId?: string
+  statusBaixa?: "pendente" | "baixada" | "bloqueada" | "cancelada"
+  baixaId?: string
+  motivoBloqueio?: string
+}
+
+export interface ConsumoVenda {
+  vendaId: string
+  produtoNome: string
+  fichaTecnicaId: string
+  quantidadeVendida: number
+  insumoId: string
+  insumoNomeSnapshot: string
+  quantidade: number
+  unidade: UnidadeInsumo
+  quantidadeBase: number
+  unidadeBase: "g" | "kg" | "ml" | "l" | "un"
 }
 
 export interface PrevisaoVenda {
@@ -100,7 +117,7 @@ export interface PrevisaoVenda {
   quantidade: number
 }
 
-export type TipoMovimentacaoEstoque = "entrada" | "estorno_entrada" | "saida" | "ajuste" | "ajuste_inventario"
+export type TipoMovimentacaoEstoque = "entrada" | "estorno_entrada" | "saida" | "saida_venda" | "ajuste" | "ajuste_inventario"
 
 export interface MovimentacaoEstoque {
   id: string
@@ -115,6 +132,10 @@ export interface MovimentacaoEstoque {
   valorTotal: number
   fornecedor?: string
   observacao?: string
+  vendaId?: string
+  produtoNomeSnapshot?: string
+  saldoAnterior?: number
+  saldoPosterior?: number
   motivo?: "consumo" | "consumo_interno" | "perda" | "descarte" | "vencimento" | "avaria" | "uso_operacional" | "cortesia" | "contagem_fisica" | "correcao_cadastro" | "perda_nao_registrada" | "entrada_nao_registrada" | "erro_operacional" | "ajuste_manual" | "outro"
   estoqueAnterior?: number
   estoqueContado?: number

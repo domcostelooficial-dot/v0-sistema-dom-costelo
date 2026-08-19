@@ -32,6 +32,20 @@ export function ingredientesPendentes(ficha: FichaTecnica, insumos: Insumo[]) {
   return ficha.ingredientes.filter((ingrediente) => !localizarInsumo(ingrediente, insumos)).map((ingrediente) => ingrediente.insumoNome)
 }
 
+export function calcularConsumoVenda(venda: { id: string; produtoNome: string; quantidade: number; fichaTecnicaId?: string }, ficha: FichaTecnica | undefined, insumos: Insumo[]) {
+  if (!ficha) return { ok: false as const, motivo: "Ficha técnica não encontrada", consumos: [] as Array<{ insumo: Insumo; ingrediente: IngredienteFicha; quantidade: number; quantidadeBase: number; unidadeBase: "g" | "kg" | "ml" | "l" | "un" }> }
+  if (!Number.isFinite(venda.quantidade) || venda.quantidade <= 0) return { ok: false as const, motivo: "Quantidade vendida inválida", consumos: [] as Array<{ insumo: Insumo; ingrediente: IngredienteFicha; quantidade: number; quantidadeBase: number; unidadeBase: "g" | "kg" | "ml" | "l" | "un" }> }
+  const missing = ficha.ingredientes.filter((ingrediente) => !localizarInsumo(ingrediente, insumos)).map((ingrediente) => ingrediente.insumoNome)
+  if (missing.length > 0) return { ok: false as const, motivo: `Insumo não encontrado: ${missing.join(", ")}`, consumos: [] as Array<{ insumo: Insumo; ingrediente: IngredienteFicha; quantidade: number; quantidadeBase: number; unidadeBase: "g" | "kg" | "ml" | "l" | "un" }> }
+  const consumos = ficha.ingredientes.map((ingrediente) => {
+    const insumo = localizarInsumo(ingrediente, insumos)!
+    const unidadeBase = (insumo.unidadeBase || insumo.unidadeConteudo || insumo.unidade || "un") as "g" | "kg" | "ml" | "l" | "un"
+    const quantidade = ingrediente.quantidade * venda.quantidade
+    return { insumo, ingrediente, quantidade, quantidadeBase: converterQuantidade(quantidade, ingrediente.unidade, unidadeBase), unidadeBase }
+  })
+  return { ok: true as const, consumos }
+}
+
 export function calcularFicha(ficha: FichaTecnica, insumos: Insumo[]) {
   const pendentes = ingredientesPendentes(ficha, insumos)
   const ingredientes = ficha.ingredientes.reduce((total, ingrediente) => total + custoIngrediente(ingrediente, insumos), 0)

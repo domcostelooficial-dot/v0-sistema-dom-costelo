@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { calcularFicha, custoIngrediente, custoPorUnidade } from "./cmv-engine"
+import { calcularFicha, calcularConsumoVenda, custoIngrediente, custoPorUnidade } from "./cmv-engine"
 import type { FichaTecnica, Insumo } from "./types"
 
 const mussarela: Insumo = {
@@ -33,6 +33,18 @@ describe("CMV", () => {
     const b: Insumo = { ...mussarela, id: "b", nome: "B", unidade: "un", unidadeEmbalagem: "un", precoCompra: 6, quantidadeEmbalagem: 1 }
     expect(custoIngrediente({ insumoNome: "A", quantidade: 1, unidade: "un" }, [a, b])).toBe(2)
     expect(custoIngrediente({ insumoNome: "B", quantidade: 1, unidade: "un" }, [a, b])).toBe(6)
+  })
+
+  it("calcula consumo agregado por venda e converte unidade", () => {
+    const ficha: FichaTecnica = { id: "hamb", nome: "Hambúrguer", precoVenda: 20, ingredientes: [{ insumoNome: "Mussarela", quantidade: 25, unidade: "g" }] }
+    const result = calcularConsumoVenda({ id: "v1", produtoNome: "Hambúrguer", quantidade: 4, fichaTecnicaId: "hamb" }, ficha, [mussarela])
+    expect(result.ok).toBe(true)
+    if (result.ok) expect(result.consumos[0].quantidadeBase).toBeCloseTo(0.1)
+  })
+
+  it("bloqueia ficha ausente ou insumo não vinculado", () => {
+    expect(calcularConsumoVenda({ id: "v1", produtoNome: "X", quantidade: 1 }, undefined, []).ok).toBe(false)
+    expect(calcularConsumoVenda({ id: "v1", produtoNome: "X", quantidade: 1 }, { id: "x", nome: "X", precoVenda: 1, ingredientes: [{ insumoNome: "Não existe", quantidade: 1, unidade: "g" }] }, []).ok).toBe(false)
   })
 
   it("não cria percentuais para preço ou CMV inválidos", () => {

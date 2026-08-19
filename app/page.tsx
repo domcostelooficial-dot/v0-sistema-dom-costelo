@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
-import { Item, HistoricoEntry, Receita, Insumo, CompraRegistro, VendaFinanceira, DespesaFinanceira, FinanceConfig, MovimentacaoEstoque, defaultInsumos } from "@/lib/types"
+import { Item, HistoricoEntry, Receita, Insumo, CompraRegistro, VendaFinanceira, DespesaFinanceira, FinanceConfig, MovimentacaoEstoque, VendaProduto, defaultInsumos } from "@/lib/types"
 import {
   saveEstoque as saveEstoqueLocal,
   getEstoque as getEstoqueLocal,
@@ -41,11 +41,14 @@ import {
   registrarSaidaAtomica,
   ajustarEstoqueAtomico,
   ajustarInventarioAtomico,
+  registrarBaixaVendaAtomica,
+  getVendasProdutos,
   estornarMovimentacaoAtomica,
 } from "@/lib/firebase-db"
 import { criarEntrada, criarSaida } from "@/lib/estoque-movements"
 import { SaidaEstoqueView } from "@/components/saida-estoque-view"
 import { InventarioView } from "@/components/inventario-view"
+import { BaixasPendentesView } from "@/components/baixas-pendentes-view"
 import { toast } from "sonner"
 import type { FinanceAuditSnapshot } from "@/lib/finance-engine"
 import { FirebaseLoginForm } from "@/components/firebase-login-form"
@@ -57,7 +60,7 @@ import { DashboardView } from "@/components/dashboard-view"
 import { ListaComprasView } from "@/components/lista-compras-view"
 import { AdminView } from "@/components/admin-view"
 import { CmvView } from "@/components/cmv-view"
-import { seedFichas } from "@/lib/cmv-engine"
+import { seedFichas, calcularConsumoVenda } from "@/lib/cmv-engine"
 import { Menu, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { signOut } from "firebase/auth"
@@ -175,6 +178,7 @@ export default function Home() {
   const [fichasLoading, setFichasLoading] = useState(true)
   const [financeConfig, setFinanceConfig] = useState<FinanceConfig | undefined>(undefined)
   const [vendasFinanceiras, setVendasFinanceiras] = useState<VendaFinanceira[]>([])
+  const [vendasProdutos, setVendasProdutos] = useState<VendaProduto[]>([])
   const [despesasFinanceiras, setDespesasFinanceiras] = useState<DespesaFinanceira[]>([])
  const [auditoriaJulho, setAuditoriaJulho] = useState<FinanceAuditSnapshot | undefined>(undefined)
   const persistirFichas = (data: typeof seedFichas) => { if (userRole !== "owner" && userRole !== "admin") return false; setFichasTecnicas(data); saveFichasTecnicas(data).catch((err) => console.error("[v0] Erro ao salvar fichas:", err)); return true }
@@ -211,6 +215,21 @@ export default function Home() {
     const movimento = { ...criarEntrada({ insumo: { ...insumo, id: item.insumoId ?? insumo.id }, quantidade: qtd, unidade, precoUnitario: qtd > 0 ? custo / qtd : 0, fornecedor, observacao, dataMovimentacao, usuario: { id: currentUser.uid, email: currentUser.email ?? undefined, nome: currentUser.displayName ?? undefined } }), status: "ativa" as const }
     const atualizados = await registrarEntradaAtomica({ movimento, itemNome: nome, userId: currentUser.uid })
     setItens(atualizados); setMovimentacoes(await getMovimentacoesEstoque()); toast.success("Entrada registrada com sucesso.")
+  }
+
+  const processarBaixaVenda = async (venda: VendaProduto) => {
+    if (userRole !== "owner" && userRole !== "admin") throw new Error("Somente owner/admin podem processar baixas de venda.")
+    const ficha = fichasTecnicas.find((item) => item.id === venda.fichaTecnicaId || item.nome.toLowerCase() === venda.produtoNome.toLowerCase())
+    const consumo = calcularConsumoVenda(venda, ficha, insumos)
+    if (!consumo.ok) throw new Error(consumo.motivo)
+    const currentUser = auth.currentUser
+    if (!currentUser || !ficha) throw new Error("Venda sem usuário ou ficha técnica válida")
+    const agora = new Date().toISOString()
+    const result = await registrarBaixaVendaAtomica({ venda, consumos: consumo.consumos.map((item) => ({ insumoId: item.insumo.id, insumoNomeSnapshot: item.insumo.nome, quantidadeBase: item.quantidadeBase, unidadeBase: item.unidadeBase })), userId: currentUser.uid, agora })
+    setItens(result.itens)
+    setVendasProdutos((rows) => rows.map((row) => row.id === venda.id ? { ...row, statusBaixa: "baixada", baixaId: result.baixaId } : row))
+    setMovimentacoes(await getMovimentacoesEstoque())
+    toast.success(result.idempotente ? "Venda já estava baixada." : "Baixa de venda registrada.")
   }
 
   // Load data on mount
@@ -274,11 +293,12 @@ export default function Home() {
       const historico = await getHistoricoHybrid(username)
       const receitas = await getReceitasHybrid(username)
       const fichas = await initializeFichasTecnicas(seedFichas)
-      const [config, vendas, despesas, auditorias] = await Promise.all([getFinanceConfig(), getVendasFinanceiras(), getDespesasFinanceiras(), getFinanceAuditSnapshots()])
+      const [config, vendas, despesas, auditorias, vendasProdutosResult] = await Promise.all([getFinanceConfig(), getVendasFinanceiras(), getDespesasFinanceiras(), getFinanceAuditSnapshots(), getVendasProdutos()])
       setFinanceConfig(config)
       setAuditoriaJulho(auditorias.find(item => item.competencia === "2026-07"))
       setVendasFinanceiras(vendas)
       setDespesasFinanceiras(despesas)
+      setVendasProdutos(vendasProdutosResult)
       setFichasTecnicas(fichas.data)
       setFichasLoading(false)
       await getComprasHybrid()
@@ -496,8 +516,7 @@ export default function Home() {
           </div>
 
           {/* Content */}
-          {activeTab === "estoque" && (
-            <EstoqueView
+          {activeTab === "estoque" && <div className="flex flex-col gap-6"><EstoqueView
               itens={itens}
               onUpdateItem={handleUpdateItem}
               onAddItem={handleAddItem}
@@ -506,8 +525,7 @@ export default function Home() {
               userRole={userRole as "admin" | "operador" | "owner"}
               movimentacoes={movimentacoes}
               onEstornarMovimentacao={estornarMovimentacao}
-            />
-          )}
+            /><BaixasPendentesView vendas={vendasProdutos} onProcessar={async (venda) => { try { await processarBaixaVenda(venda) } catch (error) { toast.error(error instanceof Error ? error.message : "Não foi possível processar a baixa.") } }} /></div>}
           {activeTab === "entrada" && (
             <EntradaView itens={itens} onEntrada={handleEntrada} canRegister={userPermissoes.includes("entrada") || userRole === "owner" || userRole === "admin"} />
           )}

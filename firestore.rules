@@ -79,6 +79,16 @@ service cloud.firestore {
       allow create, update: if isAdminOrOwner();
       allow delete: if isOwner();
     }
+    match /baixasVendas/{baixaId} {
+      allow read: if isOperatorOrHigher();
+      allow create: if isAdminOrOwner();
+      allow update, delete: if false;
+    }
+    match /compras/vendas {
+      allow read: if isOperatorOrHigher();
+      allow create, update: if isAdminOrOwner();
+      allow delete: if false;
+    }
     match /compras/{docId} {
       allow read: if isOperatorOrHigher();
       allow create, update: if isOperatorOrHigher() && docId != 'fichas-tecnicas' && docId != 'insumos';

@@ -306,6 +306,36 @@ export async function saveMovimentacoesEstoque(data: MovimentacaoEstoque[]) {
   }
 }
 
+export async function registrarBaixaVendaAtomica(params: { venda: VendaProduto; consumos: Array<{ insumoId?: string; insumoNomeSnapshot: string; quantidadeBase: number; unidadeBase: string }>; userId: string; agora: string }) {
+  const estoqueRef = doc(db, "estoque", "global")
+  const vendaRef = doc(db, "compras", "vendas")
+  const baixaRef = doc(db, "baixasVendas", params.venda.id)
+  return runTransaction(db, async (transaction) => {
+    const estoqueSnap = await transaction.get(estoqueRef)
+    const vendaSnap = await transaction.get(vendaRef)
+    const baixaSnap = await transaction.get(baixaRef)
+    if (baixaSnap.exists()) return { idempotente: true, itens: (estoqueSnap.data()?.itens ?? []) as Item[] }
+    const itens = (estoqueSnap.exists() ? estoqueSnap.data().itens : []) as Item[]
+    const atualizados = [...itens]
+    for (const consumo of params.consumos) {
+      const index = atualizados.findIndex((item) => (consumo.insumoId && item.insumoId === consumo.insumoId) || item.nome === consumo.insumoNomeSnapshot)
+      if (index < 0) throw new Error(`Insumo não encontrado no estoque: ${consumo.insumoNomeSnapshot}`)
+      if (atualizados[index].atual < consumo.quantidadeBase) throw new Error(`Estoque insuficiente: ${consumo.insumoNomeSnapshot}`)
+      atualizados[index] = { ...atualizados[index], atual: atualizados[index].atual - consumo.quantidadeBase }
+      const movimentoRef = doc(collection(db, MOVIMENTACOES_COLLECTION))
+      transaction.set(movimentoRef, { id: movimentoRef.id, tipo: "saida_venda", insumoId: atualizados[index].insumoId ?? movimentoRef.id, insumoNomeSnapshot: consumo.insumoNomeSnapshot, quantidade: -consumo.quantidadeBase, quantidadeBase: -consumo.quantidadeBase, unidadeSnapshot: consumo.unidadeBase, unidadeBase: consumo.unidadeBase, saldoAnterior: atualizados[index].atual + consumo.quantidadeBase, saldoPosterior: atualizados[index].atual, valorTotal: 0, precoUnitarioSnapshot: 0, origem: "estoque", status: "efetivada", vendaId: params.venda.id, produtoNomeSnapshot: params.venda.produtoNome, criadoPorUid: params.userId, dataMovimentacao: params.agora, criadoEm: params.agora })
+    }
+    const baixaId = crypto.randomUUID()
+    transaction.set(estoqueRef, { itens: atualizados, updatedAt: Timestamp.now(), lastModifiedBy: params.userId })
+    transaction.set(baixaRef, { id: baixaId, vendaId: params.venda.id, consumos: params.consumos, criadoPorUid: params.userId, criadoEm: params.agora })
+    if (vendaSnap.exists()) {
+      const vendas = (vendaSnap.data().data ?? []) as VendaProduto[]
+      transaction.update(vendaRef, { data: vendas.map((venda) => venda.id === params.venda.id ? { ...venda, statusBaixa: "baixada", baixaId } : venda), updatedAt: Timestamp.now() })
+    }
+    return { idempotente: false, itens: atualizados, baixaId }
+  })
+}
+
 export async function registrarEntradaAtomica(params: { movimento: MovimentacaoEstoque; itemNome: string; userId: string }) {
   const movimentoRef = doc(db, MOVIMENTACOES_COLLECTION, params.movimento.id)
   const estoqueRef = doc(db, "estoque", "global")
