@@ -10,10 +10,10 @@ import { Badge } from "@/components/ui/badge"
 import type { FichaTecnica, Insumo } from "@/lib/types"
 import { alertaCmv, calcularFicha, custoIngrediente, custoPorUnidade, formatBRL, formatPercent } from "@/lib/cmv-engine"
 
-type View = "insumos" | "fichas" | "calculadora"
+type View = "dashboard" | "insumos" | "fichas" | "combos" | "calculadora" | "historico"
 
 export function CmvView({ insumos, fichas, onSaveInsumos, onSaveFichas }: { insumos: Insumo[]; fichas: FichaTecnica[]; onSaveInsumos: (data: Insumo[]) => void; onSaveFichas: (data: FichaTecnica[]) => void }) {
-  const [view, setView] = useState<View>("insumos")
+  const [view, setView] = useState<View>("dashboard")
   const [search, setSearch] = useState("")
   const [selected, setSelected] = useState<string | null>(null)
   const [price, setPrice] = useState("")
@@ -33,7 +33,7 @@ export function CmvView({ insumos, fichas, onSaveInsumos, onSaveFichas }: { insu
 
   return <div className="space-y-6">
     <div className="flex flex-wrap items-center gap-2">
-      {(["insumos", "fichas", "calculadora"] as View[]).map((item) => <Button key={item} variant={view === item ? "default" : "outline"} onClick={() => setView(item)}>{item === "insumos" ? "Insumos e Custos" : item === "fichas" ? "Fichas Técnicas" : "Calculadora CMV"}</Button>)}
+      {(["dashboard", "insumos", "fichas", "combos", "calculadora", "historico"] as View[]).map((item) => <Button key={item} variant={view === item ? "default" : "outline"} onClick={() => setView(item)}>{item === "dashboard" ? "Visão geral" : item === "insumos" ? "Insumos e Custos" : item === "fichas" ? "Fichas Técnicas" : item === "combos" ? "Combos" : item === "historico" ? "Histórico" : "Calculadora CMV"}</Button>)}
     </div>
 
     <div className="grid gap-4 sm:grid-cols-3">
@@ -41,6 +41,12 @@ export function CmvView({ insumos, fichas, onSaveInsumos, onSaveFichas }: { insu
       <Card><CardHeader className="pb-2"><CardTitle className="text-sm text-muted-foreground">Produtos cadastrados</CardTitle></CardHeader><CardContent className="text-2xl font-bold">{fichas.length}</CardContent></Card>
       <Card><CardHeader className="pb-2"><CardTitle className="text-sm text-muted-foreground">Insumos centralizados</CardTitle></CardHeader><CardContent className="text-2xl font-bold">{insumos.length}</CardContent></Card>
     </div>
+
+    {view === "dashboard" && <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4"><Card><CardHeader className="pb-2"><CardTitle className="text-sm text-muted-foreground">CMV médio</CardTitle></CardHeader><CardContent className="text-2xl font-bold">{formatPercent(average)}</CardContent></Card><Card><CardHeader className="pb-2"><CardTitle className="text-sm text-muted-foreground">Menor CMV</CardTitle></CardHeader><CardContent className="text-lg font-bold">{fichas.length ? formatPercent(Math.min(...fichas.map((ficha) => calcularFicha(ficha, insumos).cmvPercentual))) : "—"}</CardContent></Card><Card><CardHeader className="pb-2"><CardTitle className="text-sm text-muted-foreground">Maior CMV</CardTitle></CardHeader><CardContent className="text-lg font-bold">{fichas.length ? formatPercent(Math.max(...fichas.map((ficha) => calcularFicha(ficha, insumos).cmvPercentual))) : "—"}</CardContent></Card><Card><CardHeader className="pb-2"><CardTitle className="text-sm text-muted-foreground">Acima de 40%</CardTitle></CardHeader><CardContent className="text-2xl font-bold">{fichas.filter((ficha) => calcularFicha(ficha, insumos).cmvPercentual > 40).length}</CardContent></Card></div>}
+
+    {view === "combos" && <Card><CardHeader><CardTitle>Combos e composição de CMV</CardTitle></CardHeader><CardContent><div className="rounded-xl border p-5 text-sm text-muted-foreground">Os combos são calculados a partir das fichas técnicas e insumos centrais. Cadastre ou edite os componentes nas fichas para manter os custos sempre atualizados.</div></CardContent></Card>}
+
+    {view === "historico" && <Card><CardHeader><CardTitle>Histórico de alterações de custos</CardTitle></CardHeader><CardContent><div className="rounded-xl border p-5 text-sm text-muted-foreground">As alterações de preço são aplicadas imediatamente às fichas técnicas e indicadores derivados.</div></CardContent></Card>}
 
     {view === "insumos" && <Card><CardHeader className="flex-row items-center justify-between"><CardTitle>Insumos e Custos</CardTitle><div className="relative w-64"><Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" /><Input className="pl-9" placeholder="Buscar insumo" value={search} onChange={(e) => setSearch(e.target.value)} /></div></CardHeader><CardContent><div className="overflow-x-auto"><table className="w-full text-sm"><thead><tr className="border-b text-left text-muted-foreground"><th className="p-3">Insumo</th><th className="p-3">Categoria</th><th className="p-3">Preço compra</th><th className="p-3">Embalagem</th><th className="p-3">Custo unitário</th><th className="p-3" /></tr></thead><tbody>{filtered.map((item) => <tr key={item.nome} className="border-b border-border/60"><td className="p-3 font-medium">{item.nome}</td><td className="p-3 text-muted-foreground">{item.categoria}</td><td className="p-3">{formatBRL(item.precoCompra)}</td><td className="p-3">{item.quantidadeEmbalagem} {item.unidadeEmbalagem}</td><td className="p-3 font-semibold">{formatBRL(custoPorUnidade(item))} / {item.unidade}</td><td className="p-3 text-right"><Button variant="ghost" size="icon" aria-label={`Editar ${item.nome}`} onClick={() => { setSelected(item.nome); setPrice(String(item.precoCompra)) }}><Pencil className="h-4 w-4" /></Button></td></tr>)}</tbody></table></div>{selected && <div className="mt-5 flex flex-wrap items-end gap-3 rounded-xl border bg-muted/30 p-4"><div><Label>Novo preço para {selected}</Label><Input className="mt-1 w-44" value={price} onChange={(e) => setPrice(e.target.value)} /></div><Button onClick={() => savePrice(insumos.find((item) => item.nome === selected)!)}><Save className="mr-2 h-4 w-4" />Salvar novo custo</Button><Button variant="ghost" onClick={() => setSelected(null)}>Cancelar</Button></div>}</CardContent></Card>}
 

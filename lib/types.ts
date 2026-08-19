@@ -45,7 +45,35 @@ export interface FichaTecnica {
   nome: string
   precoVenda: number
   ingredientes: IngredienteFicha[]
+  embalagem?: number
+  categoria?: string
+  ativo?: boolean
   metaCmv?: number
+}
+
+export interface HistoricoPrecoInsumo {
+  id: string
+  insumoNome: string
+  precoAnterior: number
+  precoNovo: number
+  data: string
+  usuario?: string
+}
+
+export interface ComboItem {
+  tipo: "produto" | "insumo"
+  referenciaId: string
+  nome: string
+  quantidade: number
+  unidade?: UnidadeInsumo
+}
+
+export interface Combo {
+  id: string
+  nome: string
+  precoVenda: number
+  itens: ComboItem[]
+  ativo: boolean
 }
 
 export interface VendaProduto {

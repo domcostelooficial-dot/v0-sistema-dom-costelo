@@ -22,9 +22,10 @@ export function custoIngrediente(ingrediente: IngredienteFicha, insumos: Insumo[
 
 export function calcularFicha(ficha: FichaTecnica, insumos: Insumo[]) {
   const ingredientes = ficha.ingredientes.reduce((total, ingrediente) => total + custoIngrediente(ingrediente, insumos), 0)
-  const cmv = ingredientes
+  const embalagens = ficha.embalagem || 0
+  const cmv = ingredientes + embalagens
   const margem = Math.max(ficha.precoVenda - cmv, 0)
-  return { ingredientes, embalagens: 0, cmv, cmvPercentual: ficha.precoVenda ? cmv / ficha.precoVenda * 100 : 0, margem, margemPercentual: ficha.precoVenda ? margem / ficha.precoVenda * 100 : 0, markup: cmv ? ficha.precoVenda / cmv : 0 }
+  return { ingredientes, embalagens, cmv, cmvPercentual: ficha.precoVenda ? cmv / ficha.precoVenda * 100 : 0, margem, margemPercentual: ficha.precoVenda ? margem / ficha.precoVenda * 100 : 0, markup: cmv ? ficha.precoVenda / cmv : 0 }
 }
 
 export function alertaCmv(percentual: number) {
