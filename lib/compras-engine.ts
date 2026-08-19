@@ -32,6 +32,13 @@ const normalizar = (i: Insumo): Insumo => {
   return { ...i, unidade: (normalizarUnidadeCompra(i.unidade) as UnidadeInsumo), unidadeEmbalagem: unidadeCompra as UnidadeInsumo, quantidadeEmbalagem: conteudo, precoReferencia: preco, unidadeReferencia: unidadeCompra, unidadeConteudo: base.unidade, quantidadePorEmbalagem: base.quantidade, custoUnitario: preco / Math.max(conteudo, 1) }
 }
 
+export function calcularValorEstoque(insumo: Insumo | Item, quantidadeAtual = insumo.atual ?? 0): number {
+  const preco = insumo.precoCompra ?? insumo.precoReferencia ?? insumo.preco ?? 0
+  const unidadeCompra = ("unidadeCompra" in insumo ? insumo.unidadeCompra : undefined) ?? insumo.unidadeEmbalagem ?? insumo.unidade ?? "un"
+  if (["pacote", "caixa", "bobina", "pct"].includes(unidadeCompra)) return quantidadeAtual * preco
+  return quantidadeAtual * preco
+}
+
 export function catalogoCompletoCompras(itens: Item[], insumos: Insumo[]): Insumo[] {
   const porNome = new Map<string, Insumo>()
   insumos.forEach((insumo) => porNome.set(insumo.nome.trim().toLocaleLowerCase("pt-BR"), normalizar(insumo)))

@@ -4,7 +4,8 @@ const unitFactor: Record<string, number> = { g: 1, kg: 1000, ml: 1, l: 1000, un:
 
 export function custoPorUnidade(insumo: Insumo) {
   const quantidade = Math.max(insumo.quantidadeEmbalagem || 1, 0.0001)
-  const fator = unitFactor[insumo.unidadeEmbalagem || insumo.unidade || "un"] || 1
+  const unidadeConteudo = insumo.unidadeConteudo || insumo.unidadeEmbalagem || insumo.unidade
+  const fator = unitFactor[unidadeConteudo] || 1
   return insumo.precoCompra / (quantidade * fator)
 }
 
@@ -14,20 +15,30 @@ export function converterQuantidade(quantidade: number, origem: string, destino:
   return quantidade * origemFactor / destinoFactor
 }
 
+export function localizarInsumo(ingrediente: IngredienteFicha, insumos: Insumo[]) {
+  return insumos.find((item) => ingrediente.insumoId ? item.id === ingrediente.insumoId : item.nome.toLowerCase() === ingrediente.insumoNome.toLowerCase() || item.aliases?.some((alias) => alias.toLowerCase() === ingrediente.insumoNome.toLowerCase()))
+}
+
 export function custoIngrediente(ingrediente: IngredienteFicha, insumos: Insumo[]) {
-  const insumo = insumos.find((item) => ingrediente.insumoId ? item.id === ingrediente.insumoId : item.nome.toLowerCase() === ingrediente.insumoNome.toLowerCase())
+  const insumo = localizarInsumo(ingrediente, insumos)
   if (!insumo) return 0
-  const unidadeEmbalagem = insumo.unidadeEmbalagem || insumo.unidade
-  const quantidadeNaEmbalagem = converterQuantidade(ingrediente.quantidade, ingrediente.unidade, unidadeEmbalagem) / Math.max(insumo.quantidadeEmbalagem || 1, 0.0001)
+  const unidadeConteudo = insumo.unidadeConteudo || insumo.unidadeEmbalagem || insumo.unidade
+  if ((insumo.unidadeCompra || insumo.unidade) === "un" && unidadeConteudo === "g" && ingrediente.unidade === "un") return ingrediente.quantidade * insumo.precoCompra
+  const quantidadeNaEmbalagem = converterQuantidade(ingrediente.quantidade, ingrediente.unidade, unidadeConteudo) / Math.max(insumo.quantidadeEmbalagem || 1, 0.0001)
   return quantidadeNaEmbalagem * insumo.precoCompra
 }
 
+export function ingredientesPendentes(ficha: FichaTecnica, insumos: Insumo[]) {
+  return ficha.ingredientes.filter((ingrediente) => !localizarInsumo(ingrediente, insumos)).map((ingrediente) => ingrediente.insumoNome)
+}
+
 export function calcularFicha(ficha: FichaTecnica, insumos: Insumo[]) {
+  const pendentes = ingredientesPendentes(ficha, insumos)
   const ingredientes = ficha.ingredientes.reduce((total, ingrediente) => total + custoIngrediente(ingrediente, insumos), 0)
   const embalagens = ficha.embalagem || 0
   const cmv = ingredientes + embalagens
   const margem = ficha.precoVenda - cmv
-  return { ingredientes, embalagens, cmv, cmvPercentual: ficha.precoVenda > 0 ? cmv / ficha.precoVenda * 100 : null, margem, margemPercentual: ficha.precoVenda > 0 ? margem / ficha.precoVenda * 100 : null, markup: cmv > 0 && ficha.precoVenda > 0 ? ficha.precoVenda / cmv : null }
+  return { ingredientes, embalagens, cmv, pendentes, custoPendente: pendentes.length > 0, cmvPercentual: ficha.precoVenda > 0 ? cmv / ficha.precoVenda * 100 : null, margem, margemPercentual: ficha.precoVenda > 0 ? margem / ficha.precoVenda * 100 : null, markup: cmv > 0 && ficha.precoVenda > 0 ? ficha.precoVenda / cmv : null }
 }
 
 export function alertaCmv(percentual: number | null) {

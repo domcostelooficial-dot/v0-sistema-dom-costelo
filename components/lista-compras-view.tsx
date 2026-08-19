@@ -10,7 +10,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import type { Item, Insumo, CompraRegistro, CategoriaInsumo, UnidadeInsumo } from "@/lib/types"
-import { catalogoCompletoCompras } from "@/lib/compras-engine"
+import { calcularValorEstoque, catalogoCompletoCompras } from "@/lib/compras-engine"
 
 const dinheiro = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })
 const hoje = () => new Date().toISOString().slice(0, 10)
@@ -41,7 +41,7 @@ export function ListaComprasView({ itens, insumos: initialInsumos = [], historic
     const minimo = estoque.get(i.nome)?.min ?? i.min ?? 0
     const comprar = Math.max(0, minimo - atual)
     const preco = i.precoReferencia ?? i.precoCompra ?? 0
-    return { ...i, atual, minimo, comprar, valorEstoque: atual * preco, valorCompra: comprar * preco }
+    return { ...i, atual, minimo, comprar, valorEstoque: calcularValorEstoque(i, atual), valorCompra: calcularValorEstoque(i, comprar) }
   }).filter((i) => categoria === "todas" || i.categoria === categoria), [categoria, estoque, insumos])
   const valorEstoque = rows.reduce((sum, i) => sum + i.valorEstoque, 0)
   const valorCompra = rows.reduce((sum, i) => sum + i.valorCompra, 0)
