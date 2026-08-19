@@ -42,10 +42,9 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Checkbox } from "@/components/ui/checkbox"
-import { Users, Shield, Key, PlusCircle, Edit, Trash2, Save, UserCheck, UserX, Clock, Eye, EyeOff, RefreshCw } from "lucide-react"
+import { Users, Shield, Key, PlusCircle, Edit, Trash2, Save, UserCheck, UserX, Clock } from "lucide-react"
 import { 
-  getAllUsuarios, 
-  saveUsuariosFirebase, 
+  getAllUsuarios,
   subscribeToUsuarios,
   createUsuarioProfile,
   updateUsuarioProfile,
@@ -129,7 +128,7 @@ export function AdminView({ currentUser, onPasswordChange }: AdminViewProps) {
       login: formData.email.split("@")[0],
       nome: formData.nome.trim(),
       email: formData.email.trim().toLowerCase(),
-      role: formData.role,
+      role: formData.role === "owner" ? "operador" : formData.role,
       permissoes: formData.permissoes,
       status: "aprovado",
       dataCriacao: new Date().toLocaleString("pt-BR"),
@@ -137,7 +136,6 @@ export function AdminView({ currentUser, onPasswordChange }: AdminViewProps) {
 
     const updated = [...usuarios, newUser]
     setUsuarios(updated)
-    saveUsuarios(updated)
     
     // Salvar no Firebase
     const { login, ...userData } = newUser
@@ -173,7 +171,6 @@ export function AdminView({ currentUser, onPasswordChange }: AdminViewProps) {
     )
 
     setUsuarios(updated)
-    saveUsuarios(updated)
     
     // Atualizar no Firebase
     await updateUsuarioProfile(selectedUser.login, updatedUserData)
@@ -193,7 +190,6 @@ export function AdminView({ currentUser, onPasswordChange }: AdminViewProps) {
 
     const updated = usuarios.filter((u) => u.login !== selectedUser.login)
     setUsuarios(updated)
-    saveUsuarios(updated)
     
     // Remover do Firebase
     await deleteUsuarioFirebase(selectedUser.login)
@@ -220,15 +216,6 @@ export function AdminView({ currentUser, onPasswordChange }: AdminViewProps) {
     setIsDeleteDialogOpen(true)
   }
 
-  const generatePassword = () => {
-    const chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789"
-    const values = new Uint32Array(10)
-    crypto.getRandomValues(values)
-    const senha = Array.from(values, (value) => chars[value % chars.length]).join("")
-    setFormData((prev) => ({ ...prev, senha }))
-    setShowFormPassword(true)
-  }
-
   const handlePermissaoToggle = (permissao: TabPermissao) => {
     setFormData((prev) => {
       const hasPermissao = prev.permissoes.includes(permissao)
@@ -253,7 +240,6 @@ export function AdminView({ currentUser, onPasswordChange }: AdminViewProps) {
       return u
     })
     setUsuarios(updated)
-    saveUsuarios(updated)
     
     // Atualizar no Firebase
     await updateUsuarioProfile(userId, { permissoes: newPermissoes })
@@ -368,8 +354,7 @@ export function AdminView({ currentUser, onPasswordChange }: AdminViewProps) {
                                   u.login === user.login ? { ...u, ...newData } : u
                                 )
                                 setUsuarios(updated)
-                                saveUsuarios(updated)
-                                await updateUsuarioProfile(user.login, newData)
+                                                            await updateUsuarioProfile(user.login, newData)
                                 toast.success(`Usuário "${user.login}" aprovado e sincronizado na nuvem!`)
                               }}
                             >
@@ -386,8 +371,7 @@ export function AdminView({ currentUser, onPasswordChange }: AdminViewProps) {
                                   u.login === user.login ? { ...u, ...newData } : u
                                 )
                                 setUsuarios(updated)
-                                saveUsuarios(updated)
-                                await updateUsuarioProfile(user.login, newData)
+                                                            await updateUsuarioProfile(user.login, newData)
                                 toast.success(`Usuário "${user.login}" rejeitado.`)
                               }}
                             >
