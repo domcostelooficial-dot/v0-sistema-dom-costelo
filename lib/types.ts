@@ -34,6 +34,7 @@ export interface Insumo extends Item {
   unidadeConteudo?: UnidadeInsumo
   precoCompra: number
   quantidadeEmbalagem: number
+  quantidadeConteudo?: number
   unidadeEmbalagem: UnidadeInsumo
   custoUnitario: number
   aliases?: string[]
@@ -163,10 +164,18 @@ export interface Receita {
 export type { CanalVenda, FinanceConfig, VendaFinanceira, DespesaFinanceira } from "./finance-engine"
 
 const defaultInsumoRows: Array<[string, UnidadeInsumo, number, number, UnidadeInsumo, CategoriaInsumo]> = [
-  ["Pão brioche 4CT", "un", 2.07, 1, "un", "Pães"], ["Pão Australiano Aussie", "un", 2.53, 1, "un", "Pães"], ["Carne de hambúrguer / Blend 180g", "un", 6.35, 1, "un", "Carnes"],
-  ["Cheddar Polenghi profissional", "pacote", 60, 1.5, "kg", "Queijos"], ["Cream cheese", "pacote", 60, 1.5, "kg", "Queijos"], ["Bacon em cubos", "kg", 32, 1, "kg", "Carnes"], ["Bacon fatiado", "kg", 32, 1, "kg", "Carnes"], ["Barbecue", "kg", 40, 3.5, "kg", "Molhos"], ["Costela Desfiada", "kg", 80, 1, "kg", "Carnes"], ["Mussarela", "kg", 43, 1, "kg", "Queijos"], ["Batata frita", "pacote", 20, 2, "kg", "Batatas/congelados"], ["Anel de cebola", "kg", 22, 1, "kg", "Batatas/congelados"], ["Farofa", "kg", 55, 1, "kg", "Mercearia"], ["Cebolinha", "kg", 30, 1, "kg", "Mercearia"], ["Embalagem H7", "un", 50, 100, "un", "Embalagens"], ["Saco Kraft", "un", 70, 100, "un", "Embalagens"], ["Papel acoplado", "un", 35, 200, "un", "Embalagens"], ["Sacola para Refrigerante", "un", 0, 1, "un", "Embalagens"]
+  ["Pão brioche 4CT", "un", 2.07, 1, "un", "Pães"], ["Pão Australiano Aussie", "un", 2.53, 1, "un", "Pães"], ["Carne de hambúrguer / Blend 180g", "un", 6.35, 180, "g", "Carnes"],
+  ["Cheddar Polenghi profissional", "pacote", 60, 1.5, "kg", "Queijos"], ["Cream cheese", "pacote", 60, 1.5, "kg", "Queijos"], ["Bacon em cubos", "kg", 32, 1, "kg", "Carnes"], ["Bacon fatiado", "kg", 32, 1, "kg", "Carnes"], ["Barbecue", "kg", 40, 3.5, "kg", "Molhos"], ["Costela Desfiada", "kg", 80, 1, "kg", "Carnes"], ["Mussarela", "kg", 43, 1, "kg", "Queijos"], ["Batata frita", "pacote", 20, 2, "kg", "Batatas/congelados"], ["Anel de cebola", "kg", 22, 1, "kg", "Batatas/congelados"], ["Farofa", "kg", 55, 1, "kg", "Mercearia"], ["Cebolinha", "maço", 3, 100, "g", "Mercearia"], ["Embalagem H7", "un", 50, 100, "un", "Embalagens"], ["Saco Kraft", "un", 70, 100, "un", "Embalagens"], ["Papel acoplado", "un", 35, 200, "un", "Embalagens"], ["Sacola para Refrigerante", "un", 0, 1, "un", "Embalagens"]
 ]
-export const defaultInsumos: Insumo[] = defaultInsumoRows.map(([nome, unidade, precoCompra, quantidadeEmbalagem, unidadeEmbalagem, categoria]) => ({ nome, unidade, unidadeCompra: unidade, precoCompra, quantidadeEmbalagem, unidadeEmbalagem, unidadeConteudo: unidadeEmbalagem, unidadeBase: ["kg", "g"].includes(unidadeEmbalagem) ? "g" : unidadeEmbalagem === "l" ? "ml" : "un", categoria, custoUnitario: precoCompra / quantidadeEmbalagem, min: 0, atual: 0 }))
+const aliasesPorInsumo: Record<string, string[]> = {
+  "Carne de hambúrguer / Blend 180g": ["Carne de hambúrguer", "Blend bovino 180g", "Blend 180g"],
+  "Pão Australiano Aussie": ["Pão australiano", "Pão de Australiano Aussie", "Pão Australiano"],
+  "Pão brioche 4CT": ["Pão brioche", "Pão Brioche"],
+  "Bacon em cubos": ["Bacon", "Bacon cubos"],
+  "Costela Desfiada": ["Costela bovina desfiada", "Costela desfiada"],
+  "Cheddar Polenghi profissional": ["Cheddar cremoso", "Cheddar Polengui profissional"],
+}
+export const defaultInsumos: Insumo[] = defaultInsumoRows.map(([nome, unidade, precoCompra, quantidadeEmbalagem, unidadeEmbalagem, categoria]) => ({ nome, unidade, unidadeCompra: unidade, precoCompra, quantidadeEmbalagem, quantidadeConteudo: quantidadeEmbalagem, unidadeEmbalagem, unidadeConteudo: unidadeEmbalagem, unidadeBase: ["kg", "g"].includes(unidadeEmbalagem) ? "g" : unidadeEmbalagem === "l" ? "ml" : "un", aliases: aliasesPorInsumo[nome], categoria, custoUnitario: precoCompra / quantidadeEmbalagem, min: 0, atual: 0 }))
 
 export const defaultReceitas: Receita[] = [
   {

@@ -1,10 +1,10 @@
 import type { Insumo, Item, UnidadeInsumo } from "./types"
 
-export type UnidadeCompraNormalizada = "g" | "kg" | "ml" | "l" | "un" | "pacote" | "caixa" | "bobina" | "maço" | "pct" | "aplicação"
+export type UnidadeCompraNormalizada = "kg" | "ml" | "l" | "un" | "pacote" | "caixa" | "bobina" | "maço" | "pct" | "aplicação"
+export type UnidadeConteudoNormalizada = "g" | "kg" | "ml" | "l" | "m" | "un"
 
 export function normalizarUnidadeCompra(unidade?: string | null): UnidadeCompraNormalizada {
   const valor = (unidade ?? "un").trim().toLocaleLowerCase("pt-BR")
-  if (["grama", "gramas", "gr", "g"].includes(valor)) return "g"
   if (["quilo", "quilos", "kilograma", "kilogramas", "kg"].includes(valor)) return "kg"
   if (["mililitro", "mililitros", "ml"].includes(valor)) return "ml"
   if (["litro", "litros", "l"].includes(valor)) return "l"
@@ -12,24 +12,35 @@ export function normalizarUnidadeCompra(unidade?: string | null): UnidadeCompraN
   if (["pack", "pacote", "pacotes"].includes(valor)) return "pacote"
   if (["caixa", "caixas"].includes(valor)) return "caixa"
   if (["bobina", "bobinas"].includes(valor)) return "bobina"
-  if (["maço", "maço", "maços"].includes(valor)) return "maço"
+  if (["maço", "maços"].includes(valor)) return "maço"
   if (["pct", "pcts"].includes(valor)) return "pct"
   return "aplicação"
 }
 
+export function normalizarUnidadeConteudo(unidade?: string | null): UnidadeConteudoNormalizada {
+  const valor = (unidade ?? "un").trim().toLocaleLowerCase("pt-BR")
+  if (["grama", "gramas", "gr", "g"].includes(valor)) return "g"
+  if (["quilo", "quilos", "kilograma", "kilogramas", "kg"].includes(valor)) return "kg"
+  if (["mililitro", "mililitros", "ml"].includes(valor)) return "ml"
+  if (["litro", "litros", "l"].includes(valor)) return "l"
+  if (["metro", "metros", "m"].includes(valor)) return "m"
+  return "un"
+}
+
 export function converterParaUnidadeBase(quantidade: number, unidade?: string | null) {
-  const normalizada = normalizarUnidadeCompra(unidade)
+  const normalizada = normalizarUnidadeConteudo(unidade)
   if (normalizada === "kg") return { quantidade: quantidade * 1000, unidade: "g" as const }
   if (normalizada === "l") return { quantidade: quantidade * 1000, unidade: "ml" as const }
   return { quantidade, unidade: normalizada as UnidadeInsumo }
 }
 
 const normalizar = (i: Insumo): Insumo => {
-  const unidadeCompra = normalizarUnidadeCompra(i.unidadeEmbalagem ?? i.unidadeReferencia ?? i.unidade)
-  const conteudo = i.quantidadeEmbalagem ?? 1
-  const base = converterParaUnidadeBase(conteudo, unidadeCompra)
+  const unidadeCompra = normalizarUnidadeCompra(i.unidadeCompra ?? i.unidadeReferencia ?? i.unidade)
+  const unidadeConteudo = normalizarUnidadeConteudo(i.unidadeConteudo ?? i.unidadeEmbalagem ?? i.unidade)
+  const conteudo = i.quantidadeConteudo ?? i.quantidadeEmbalagem ?? 1
+  const base = converterParaUnidadeBase(conteudo, unidadeConteudo)
   const preco = i.precoReferencia ?? i.precoCompra ?? 0
-  return { ...i, unidade: (normalizarUnidadeCompra(i.unidade) as UnidadeInsumo), unidadeEmbalagem: unidadeCompra as UnidadeInsumo, quantidadeEmbalagem: conteudo, precoReferencia: preco, unidadeReferencia: unidadeCompra, unidadeConteudo: base.unidade, quantidadePorEmbalagem: base.quantidade, custoUnitario: preco / Math.max(conteudo, 1) }
+  return { ...i, unidade: (normalizarUnidadeConteudo(i.unidade) as UnidadeInsumo), unidadeCompra: unidadeCompra as UnidadeInsumo, unidadeEmbalagem: unidadeConteudo as UnidadeInsumo, quantidadeConteudo: conteudo, quantidadeEmbalagem: conteudo, precoReferencia: preco, unidadeReferencia: unidadeCompra as "g" | "un" | "kg" | "ml" | "l", unidadeConteudo: unidadeConteudo as "g" | "un" | "kg" | "ml" | "l", unidadeBase: base.unidade as "g" | "un" | "kg" | "ml" | "l", quantidadePorEmbalagem: base.quantidade, custoUnitario: preco / Math.max(conteudo, 1) }
 }
 
 export function calcularValorEstoque(insumo: Insumo | Item, quantidadeAtual = insumo.atual ?? 0): number {

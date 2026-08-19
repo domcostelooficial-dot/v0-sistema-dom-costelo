@@ -1,11 +1,12 @@
 import { describe, expect, it } from "vitest"
-import { converterParaUnidadeBase, normalizarUnidadeCompra } from "./compras-engine"
+import { converterParaUnidadeBase, normalizarUnidadeCompra, normalizarUnidadeConteudo } from "./compras-engine"
 
 describe("unidades de compra", () => {
-  it("normaliza g, grama e gramas para g", () => {
-    expect(normalizarUnidadeCompra("g")).toBe("g")
-    expect(normalizarUnidadeCompra("grama")).toBe("g")
-    expect(normalizarUnidadeCompra("gramas")).toBe("g")
+  it("separa compra comercial de conteúdo físico", () => {
+    expect(normalizarUnidadeCompra("pacote")).toBe("pacote")
+    expect(normalizarUnidadeCompra("g")).toBe("aplicação")
+    expect(normalizarUnidadeConteudo("g")).toBe("g")
+    expect(normalizarUnidadeConteudo("gramas")).toBe("g")
   })
 
   it("converte kg para g", () => {
