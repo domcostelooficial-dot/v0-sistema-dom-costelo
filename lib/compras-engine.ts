@@ -57,13 +57,15 @@ export function catalogoCompletoCompras(itens: Item[], insumos: Insumo[]): Insum
   insumos.forEach((insumo) => { const central = normalizar(insumo); porNome.set(normalizarChave(central.nome), central); (central.aliases ?? []).forEach((alias) => { if (!porNome.has(normalizarChave(alias)) || !porNome.get(normalizarChave(alias))?.nome.includes("Bacon fatiado")) porNome.set(normalizarChave(alias), central) }) })
   itens.forEach((item) => {
     const chave = normalizarChave(item.nome)
-    const vinculado = (item.id && porId.get(item.id)) || porNome.get(chave)
+    const vinculado = (item.insumoId && porId.get(item.insumoId)) || (item.id && porId.get(item.id)) || porNome.get(chave)
     if (vinculado) { porNome.set(chave, vinculado); return }
     const unidade = normalizarUnidadeCompra(item.unidade ?? item.unidadeEstoque ?? item.unidadeEmbalagem ?? "un") as Insumo["unidade"]
     const unidadeEmbalagem = normalizarUnidadeCompra(item.unidadeEmbalagem ?? item.unidadeConteudo ?? unidade) as Insumo["unidadeEmbalagem"]
     const preco = item.precoReferencia ?? item.precoCompra ?? item.preco ?? 0
     const quantidadeEmbalagem = item.quantidadeEmbalagem ?? item.quantidadePorEmbalagem ?? 1
-    porNome.set(chave, normalizar({ ...item, unidade, categoria: (item.categoria || "Mercearia") as Insumo["categoria"], precoCompra: preco, quantidadeEmbalagem, unidadeEmbalagem, custoUnitario: item.custoUnitario ?? preco } as Insumo))
+    porNome.set(chave, normalizar({ ...item, unidade, categoria: (item.categoria || "Mercearia") as Insumo["categoria"], precoCompra: preco, quantidadeEmbalagem, unidadeEmbalagem, custoUnitario: item.custoUnitario ?? preco, naoVinculado: true, origem: "estoque" } as Insumo))
   })
-  return Array.from(porNome.values()).sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR"))
+  const unicos = new Map<string, Insumo>()
+  for (const item of porNome.values()) unicos.set(item.id ?? normalizarChave(item.nome), item)
+  return Array.from(unicos.values()).sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR"))
 }

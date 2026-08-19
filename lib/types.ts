@@ -3,6 +3,7 @@ export type CategoriaInsumo = "Carnes" | "Pães" | "Queijos" | "Molhos" | "Batat
 
 export interface Item {
   id?: string
+  insumoId?: string
   nome: string
   min: number
   atual: number
@@ -21,6 +22,8 @@ export interface Item {
   unidadeReferencia?: string
   ultimaAtualizacaoPreco?: string
   ativo?: boolean
+  naoVinculado?: boolean
+  origem?: "estoque" | "central"
   ultimaAlteracao?: {
     usuario: string
     data: string
