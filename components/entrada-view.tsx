@@ -2,7 +2,7 @@
 
 import { useState } from "react"
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog"
-import { Item, HistoricoEntry } from "@/lib/types"
+import { Item, Insumo, HistoricoEntry } from "@/lib/types"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
@@ -18,11 +18,12 @@ import { Truck, Package, Plus } from "lucide-react"
 
 interface EntradaViewProps {
   itens: Item[]
+  insumos?: Insumo[]
   onEntrada: (nome: string, qtd: number, custo: number, fornecedor?: string, observacao?: string, dataMovimentacao?: string) => Promise<void> | void
   canRegister?: boolean
 }
 
-export function EntradaView({ itens, onEntrada, canRegister = true }: EntradaViewProps) {
+export function EntradaView({ itens, insumos = [], onEntrada, canRegister = true }: EntradaViewProps) {
   const [selectedItem, setSelectedItem] = useState("")
   const [quantidade, setQuantidade] = useState("")
   const [precoUnitario, setPrecoUnitario] = useState("")
@@ -44,6 +45,12 @@ export function EntradaView({ itens, onEntrada, canRegister = true }: EntradaVie
   }
 
   const selectedItemData = itens.find((i) => i.nome === selectedItem)
+  const selectedInsumo = selectedItemData ? insumos.find((i) => i.id === selectedItemData.insumoId || i.nome === selectedItemData.nome) : undefined
+  const precoEstimado = selectedInsumo?.precoReferencia ?? selectedInsumo?.precoCompra ?? 0
+  const quantidadeNumerica = Number(quantidade) || 0
+  const precoNumerico = Number(precoUnitario) || precoEstimado
+  const custoEstimado = quantidadeNumerica * precoNumerico
+  const estoqueProjetado = (selectedItemData?.atual ?? 0) + quantidadeNumerica
 
   return (
     <div className="space-y-6">
@@ -66,7 +73,7 @@ export function EntradaView({ itens, onEntrada, canRegister = true }: EntradaVie
             <FieldGroup>
               <Field>
                 <FieldLabel>Item</FieldLabel>
-                <Select value={selectedItem} onValueChange={setSelectedItem}>
+                <Select value={selectedItem} onValueChange={(value) => { setSelectedItem(value); const item = itens.find((entry) => entry.nome === value); const insumo = item ? insumos.find((entry) => entry.id === item.insumoId || entry.nome === item.nome) : undefined; const estimado = insumo?.precoReferencia ?? insumo?.precoCompra ?? 0; setPrecoUnitario(estimado > 0 ? estimado.toFixed(2) : "") }}>
                   <SelectTrigger>
                     <SelectValue placeholder="Selecione um item" />
                   </SelectTrigger>
@@ -125,12 +132,12 @@ export function EntradaView({ itens, onEntrada, canRegister = true }: EntradaVie
                 </Field>
               </div>
 
-              {quantidade && precoUnitario && (
-                <div className="rounded-lg bg-primary/10 p-4">
-                  <p className="text-sm text-foreground">
-                    <strong>Custo Total:</strong> R${" "}
-                    {(Number(quantidade) * Number(precoUnitario)).toFixed(2)}
-                  </p>
+              {selectedItemData && (precoEstimado > 0 || precoUnitario) && <p className="text-xs text-muted-foreground">Valor estimado baseado no último preço conhecido: R$ {precoEstimado.toFixed(2)} por unidade.</p>}
+              {quantidade && (
+                <div className="grid gap-3 rounded-lg bg-primary/10 p-4 sm:grid-cols-3">
+                  <p className="text-sm text-foreground"><strong>Custo total:</strong> R$ {custoEstimado.toFixed(2)}</p>
+                  <p className="text-sm text-foreground"><strong>Estoque após entrada:</strong> {estoqueProjetado}</p>
+                  <p className="text-sm text-foreground"><strong>Preço usado:</strong> R$ {precoNumerico.toFixed(2)}</p>
                 </div>
               )}
 
@@ -147,7 +154,7 @@ export function EntradaView({ itens, onEntrada, canRegister = true }: EntradaVie
           </form>
         </CardContent>
       </Card>
-      <AlertDialog open={confirmOpen} onOpenChange={(open) => !isSubmitting && setConfirmOpen(open)}><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Confirmar entrada?</AlertDialogTitle><AlertDialogDescription>{selectedItemData?.nome} · {quantidade} {selectedItemData?.unidadeEstoque ?? "unidade"} · R$ {(Number(quantidade) * Number(precoUnitario || 0)).toFixed(2)}. Estoque após entrada: {(selectedItemData?.atual ?? 0) + Number(quantidade || 0)}.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel disabled={isSubmitting}>Cancelar</AlertDialogCancel><AlertDialogAction disabled={isSubmitting} onClick={async (event) => { event.preventDefault(); if (isSubmitting) return; setIsSubmitting(true); try { await onEntrada(selectedItem, Number(quantidade), Number(quantidade) * Number(precoUnitario || 0), fornecedor.trim() || undefined, observacao.trim() || undefined, dataMovimentacao); setConfirmOpen(false); setSelectedItem(""); setQuantidade(""); setPrecoUnitario(""); setFornecedor(""); setObservacao("") } finally { setIsSubmitting(false) } }}>{isSubmitting ? "Registrando..." : "Confirmar entrada"}</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
+      <AlertDialog open={confirmOpen} onOpenChange={(open) => !isSubmitting && setConfirmOpen(open)}><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Confirmar entrada?</AlertDialogTitle><AlertDialogDescription>{selectedItemData?.nome} · {quantidade} {selectedItemData?.unidadeEstoque ?? "unidade"} · R$ {(Number(quantidade) * (Number(precoUnitario) || precoEstimado)).toFixed(2)}. Estoque após entrada: {(selectedItemData?.atual ?? 0) + Number(quantidade || 0)}.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel disabled={isSubmitting}>Cancelar</AlertDialogCancel><AlertDialogAction disabled={isSubmitting} onClick={async (event) => { event.preventDefault(); if (isSubmitting) return; setIsSubmitting(true); try { await onEntrada(selectedItem, Number(quantidade), Number(quantidade) * (Number(precoUnitario) || precoEstimado), fornecedor.trim() || undefined, observacao.trim() || undefined, dataMovimentacao); setConfirmOpen(false); setSelectedItem(""); setQuantidade(""); setPrecoUnitario(""); setFornecedor(""); setObservacao("") } finally { setIsSubmitting(false) } }}>{isSubmitting ? "Registrando..." : "Confirmar entrada"}</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
     </div>
   )
 }

@@ -566,7 +566,7 @@ export default function Home() {
               onEstornarMovimentacao={estornarMovimentacao}
             /><BaixasPendentesView vendas={vendasFinanceiras} onProcessar={async (venda) => { try { await processarBaixaVenda(venda) } catch (error) { toast.error(error instanceof Error ? error.message : "Não foi possível processar a baixa.") } }} /></div>}
           {activeTab === "entrada" && (
-            <EntradaView itens={itens} onEntrada={handleEntrada} canRegister={userPermissoes.includes("entrada") || userRole === "owner" || userRole === "admin"} />
+            <EntradaView itens={itens} insumos={insumos} onEntrada={handleEntrada} canRegister={userPermissoes.includes("entrada") || userRole === "owner" || userRole === "admin"} />
           )}
           {activeTab === "inventario" && <InventarioView itens={itens} userRole={userRole} onAplicar={aplicarInventario} />}
           {activeTab === "saida" && <SaidaEstoqueView itens={itens} canRegister={userPermissoes.includes("saida") || userRole === "owner" || userRole === "admin"} onSaida={registrarSaida} />}
