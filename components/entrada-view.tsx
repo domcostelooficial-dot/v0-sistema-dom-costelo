@@ -17,13 +17,15 @@ import { Truck, Package, Plus } from "lucide-react"
 
 interface EntradaViewProps {
   itens: Item[]
-  onEntrada: (nome: string, qtd: number, custo: number) => void
+  onEntrada: (nome: string, qtd: number, custo: number, fornecedor?: string, observacao?: string) => void
 }
 
 export function EntradaView({ itens, onEntrada }: EntradaViewProps) {
   const [selectedItem, setSelectedItem] = useState("")
   const [quantidade, setQuantidade] = useState("")
   const [precoUnitario, setPrecoUnitario] = useState("")
+  const [fornecedor, setFornecedor] = useState("")
+  const [observacao, setObservacao] = useState("")
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
@@ -33,7 +35,7 @@ export function EntradaView({ itens, onEntrada }: EntradaViewProps) {
     const preco = Number(precoUnitario) || 0
     const custo = qtd * preco
 
-    onEntrada(selectedItem, qtd, custo)
+    onEntrada(selectedItem, qtd, custo, fornecedor.trim() || undefined, observacao.trim() || undefined)
     setSelectedItem("")
     setQuantidade("")
     setPrecoUnitario("")
@@ -92,6 +94,8 @@ export function EntradaView({ itens, onEntrada }: EntradaViewProps) {
                   </div>
                 </div>
               )}
+
+              <div className="grid gap-4 md:grid-cols-2"><Field><FieldLabel htmlFor="fornecedor">Fornecedor</FieldLabel><Input id="fornecedor" value={fornecedor} onChange={(e) => setFornecedor(e.target.value)} placeholder="Nome do fornecedor" /></Field><Field><FieldLabel htmlFor="observacao">Observação</FieldLabel><Input id="observacao" value={observacao} onChange={(e) => setObservacao(e.target.value)} placeholder="Nota opcional" /></Field></div>
 
               <div className="grid gap-4 md:grid-cols-2">
                 <Field>

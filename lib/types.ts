@@ -100,6 +100,31 @@ export interface PrevisaoVenda {
   quantidade: number
 }
 
+export type TipoMovimentacaoEstoque = "entrada" | "estorno_entrada"
+
+export interface MovimentacaoEstoque {
+  id: string
+  tipo: TipoMovimentacaoEstoque
+  insumoId: string
+  insumoNomeSnapshot: string
+  quantidade: number
+  unidadeSnapshot: UnidadeInsumo
+  quantidadeBase: number
+  unidadeBase: UnidadeInsumo
+  precoUnitarioSnapshot: number
+  valorTotal: number
+  fornecedor?: string
+  observacao?: string
+  origem: "compras" | "estoque"
+  movimentacaoOrigemId?: string
+  status: "efetivada" | "estornada"
+  usuarioId: string
+  usuarioEmail: string
+  criadoEm: string
+  estornadoEm?: string
+  estornadoPor?: string
+}
+
 export interface CompraRegistro {
   id: string
   data: string

@@ -14,7 +14,7 @@ import {
   onSnapshot,
 } from "firebase/firestore"
 import { db } from "./firebase"
-import type { Item, HistoricoEntry, Receita, UsuarioSistema, Insumo, FichaTecnica, VendaProduto, CompraRegistro, FinanceConfig, VendaFinanceira, DespesaFinanceira } from "./types"
+import type { Item, HistoricoEntry, Receita, UsuarioSistema, Insumo, FichaTecnica, VendaProduto, CompraRegistro, FinanceConfig, VendaFinanceira, DespesaFinanceira, MovimentacaoEstoque } from "./types"
 import type { FinanceAuditSnapshot } from "./finance-engine"
 
 // Collections - dados globais compartilhados
@@ -289,6 +289,8 @@ export async function getVendasProdutos() { return getComprasData<VendaProduto>(
 export async function saveVendasProdutos(data: VendaProduto[]) { return saveComprasData("vendas", data) }
 export async function getComprasHistorico() { return getComprasData<CompraRegistro>("historico") }
 export async function saveComprasHistorico(data: CompraRegistro[]) { return saveComprasData("historico", data) }
+export async function getMovimentacoesEstoque() { return getComprasData<MovimentacaoEstoque>("movimentacoes-estoque") }
+export async function saveMovimentacoesEstoque(data: MovimentacaoEstoque[]) { return saveComprasData("movimentacoes-estoque", data) }
 
 export function subscribeToReceitas(callback: (receitas: Receita[]) => void) {
   return onSnapshot(

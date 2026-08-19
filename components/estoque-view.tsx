@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import type { Item } from "@/lib/types"
+import type { Item, MovimentacaoEstoque } from "@/lib/types"
 import {
   Select,
   SelectContent,
@@ -66,10 +66,12 @@ interface EstoqueViewProps {
   onAddItem: (item: Item) => void
   onEditItem: (oldNome: string, item: Item) => void
   onDeleteItem: (nome: string) => void
-  userRole: "admin" | "operador"
+  userRole: "admin" | "operador" | "owner"
+  movimentacoes?: MovimentacaoEstoque[]
+  onEstornarMovimentacao?: (movimentacao: MovimentacaoEstoque) => void
 }
 
-export function EstoqueView({ itens, onUpdateItem, onAddItem, onEditItem, onDeleteItem, userRole }: EstoqueViewProps) {
+export function EstoqueView({ itens, onUpdateItem, onAddItem, onEditItem, onDeleteItem, userRole, movimentacoes = [], onEstornarMovimentacao }: EstoqueViewProps) {
   const isAdmin = userRole === "admin"
   const [search, setSearch] = useState("")
   const [categoriaFilter, setCategoriaFilter] = useState<string>("todas")
@@ -505,6 +507,8 @@ export function EstoqueView({ itens, onUpdateItem, onAddItem, onEditItem, onDele
           </div>
         </CardContent>
       </Card>
+
+      <Card><CardHeader><CardTitle>Histórico de Entradas</CardTitle></CardHeader><CardContent><div className="space-y-2">{movimentacoes.filter((mov) => mov.tipo === "entrada").slice().reverse().map((mov) => <div key={mov.id} className="flex flex-col gap-2 rounded-lg border p-3 text-sm md:flex-row md:items-center md:justify-between"><div><p className="font-medium">{mov.insumoNomeSnapshot} · +{mov.quantidade} {mov.unidadeSnapshot}</p><p className="text-muted-foreground">{new Date(mov.criadoEm).toLocaleString("pt-BR")} · {mov.usuarioEmail}{mov.fornecedor ? ` · ${mov.fornecedor}` : ""}</p></div><div className="flex items-center gap-2"><Badge variant={mov.status === "estornada" ? "destructive" : "secondary"}>{mov.status === "estornada" ? "Estornada" : "Efetivada"}</Badge>{mov.status === "efetivada" && (userRole === "admin" || userRole === "owner") && <Button size="sm" variant="outline" onClick={() => onEstornarMovimentacao?.(mov)}>Estornar</Button>}</div></div>)}{movimentacoes.filter((mov) => mov.tipo === "entrada").length === 0 && <p className="text-sm text-muted-foreground">Nenhuma entrada rastreável registrada.</p>}</div></CardContent></Card>
 
       {/* Edit Dialog */}
       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>

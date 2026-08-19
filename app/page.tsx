@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
-import { Item, HistoricoEntry, Receita, Insumo, CompraRegistro, VendaFinanceira, DespesaFinanceira, FinanceConfig, defaultInsumos } from "@/lib/types"
+import { Item, HistoricoEntry, Receita, Insumo, CompraRegistro, VendaFinanceira, DespesaFinanceira, FinanceConfig, MovimentacaoEstoque, defaultInsumos } from "@/lib/types"
 import {
   saveEstoque as saveEstoqueLocal,
   getEstoque as getEstoqueLocal,
@@ -35,7 +35,10 @@ import {
   saveDespesasFinanceiras,
   getFinanceAuditSnapshots,
   saveFinanceAuditSnapshot,
+  getMovimentacoesEstoque,
+  saveMovimentacoesEstoque,
 } from "@/lib/firebase-db"
+import { criarEntrada } from "@/lib/estoque-movements"
 import type { FinanceAuditSnapshot } from "@/lib/finance-engine"
 import { FirebaseLoginForm } from "@/components/firebase-login-form"
 import { AppSidebar } from "@/components/app-sidebar"
@@ -159,6 +162,7 @@ export default function Home() {
   const [receitas, setReceitas] = useState<Receita[]>([])
   const [insumos, setInsumos] = useState<Insumo[]>(defaultInsumos)
   const [comprasHistorico, setComprasHistorico] = useState<CompraRegistro[]>([])
+  const [movimentacoes, setMovimentacoes] = useState<MovimentacaoEstoque[]>([])
   const [fichasTecnicas, setFichasTecnicas] = useState<typeof seedFichas>([])
   const [fichasLoading, setFichasLoading] = useState(true)
   const [financeConfig, setFinanceConfig] = useState<FinanceConfig | undefined>(undefined)
@@ -169,16 +173,35 @@ export default function Home() {
 
   const getComprasHybrid = async () => {
     try {
-  const [insumosResult, historicoResult, fichasResult] = await Promise.all([getInsumos(), getComprasHistorico(), getFichasTecnicas()])
+  const [insumosResult, historicoResult, fichasResult, movimentacoesResult] = await Promise.all([getInsumos(), getComprasHistorico(), getFichasTecnicas(), getMovimentacoesEstoque()])
   if (insumosResult.length > 0) setInsumos(insumosResult)
   if (historicoResult.length > 0) setComprasHistorico(historicoResult)
   if (fichasResult.length > 0) setFichasTecnicas(fichasResult)
+  if (movimentacoesResult.length > 0) setMovimentacoes(movimentacoesResult)
     } catch (err) {
       console.error("[v0] Erro ao carregar dados financeiros do estoque:", err)
     }
   }
   const persistirInsumos = (data: Insumo[]) => { if (userRole !== "owner" && userRole !== "admin") return; setInsumos(data); saveInsumos(data).catch((err) => console.error("[v0] Erro ao salvar insumos:", err)) }
   const persistirCompras = (data: CompraRegistro[]) => { setComprasHistorico(data); saveComprasHistorico(data).catch((err) => console.error("[v0] Erro ao salvar compras:", err)) }
+  const estornarMovimentacao = (movimentacao: MovimentacaoEstoque) => {
+    if (userRole !== "owner" && userRole !== "admin") return
+    const item = itens.find((row) => row.insumoId === movimentacao.insumoId || row.nome === movimentacao.insumoNomeSnapshot)
+    if (!item || item.atual < movimentacao.quantidade) return
+    const atualizados = itens.map((row) => row.nome === item.nome ? { ...row, atual: row.atual - movimentacao.quantidade } : row)
+    const novos = movimentacoes.map((row) => row.id === movimentacao.id ? { ...row, status: "estornada" as const, estornadoEm: new Date().toISOString(), estornadoPor: user ?? "unknown" } : row)
+    setItens(atualizados); saveEstoqueFirebase(user ?? "unknown", atualizados); setMovimentacoes(novos); saveMovimentacoesEstoque(novos)
+  }
+
+  const registrarEntradaRastreavel = (nome: string, qtd: number, custo: number, fornecedor?: string, observacao?: string) => {
+    const item = itens.find((row) => row.nome === nome)
+    const insumo = insumos.find((row) => row.id === item?.insumoId || row.nome === nome)
+    if (!item || !insumo || userRole !== "owner" && userRole !== "admin") return
+    const movimento = criarEntrada({ insumo, quantidade: qtd, unidade: (insumo.unidadeCompra ?? insumo.unidade) as Insumo["unidade"], precoUnitario: qtd > 0 ? custo / qtd : 0, fornecedor, observacao, usuario: { id: user ?? "unknown", email: user ?? "unknown" } })
+    const atualizados = itens.map((row) => row.nome === nome ? { ...row, atual: row.atual + qtd } : row)
+    setItens(atualizados); saveEstoqueFirebase(user ?? "unknown", atualizados)
+    const novos = [...movimentacoes, movimento]; setMovimentacoes(novos); saveMovimentacoesEstoque(novos)
+  }
 
   // Load data on mount
   useEffect(() => {
@@ -332,33 +355,9 @@ export default function Home() {
     saveEstoqueHybrid(user, updated)
   }
 
-  const handleEntrada = (nome: string, qtd: number, custo: number) => {
-    const now = new Date()
-    const dataHora = `${now.toLocaleDateString("pt-BR")} às ${now.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}`
-    
-    // Update estoque
-    const updated = itens.map((item) =>
-      item.nome === nome
-        ? {
-            ...item,
-            atual: item.atual + qtd,
-            ultimaAlteracao: {
-              usuario: user || "Desconhecido",
-              data: dataHora,
-            },
-          }
-        : item
-    )
-    setItens(updated)
-    saveEstoqueHybrid(user, updated)
-
-    // Add to historico
-    const entry: HistoricoEntry = {
-      nome,
-      qtd,
-      custo,
-      data: new Date().toLocaleDateString("pt-BR"),
-    }
+  const handleEntrada = (nome: string, qtd: number, custo: number, fornecedor?: string, observacao?: string) => {
+    registrarEntradaRastreavel(nome, qtd, custo, fornecedor, observacao)
+    const entry: HistoricoEntry = { nome, qtd, custo, data: new Date().toLocaleDateString("pt-BR") }
     const newHistorico = [...historico, entry]
     setHistorico(newHistorico)
     saveHistoricoHybrid(user, newHistorico)
@@ -467,7 +466,9 @@ export default function Home() {
               onAddItem={handleAddItem}
               onEditItem={handleEditItem}
               onDeleteItem={handleDeleteItem}
-              userRole={userRole as "admin" | "operador"}
+              userRole={userRole as "admin" | "operador" | "owner"}
+              movimentacoes={movimentacoes}
+              onEstornarMovimentacao={estornarMovimentacao}
             />
           )}
           {activeTab === "entrada" && (
