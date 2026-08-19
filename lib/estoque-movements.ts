@@ -15,7 +15,7 @@ export function criarEntrada(params: { insumo: Insumo; quantidade: number; unida
 }
 
 export function criarEstorno(movimentacao: MovimentacaoEstoque, usuario: UsuarioMovimentacao, agora = new Date().toISOString()): MovimentacaoEstoque {
-  return { ...movimentacao, id: crypto.randomUUID(), tipo: "estorno_entrada", quantidade: -Math.abs(movimentacao.quantidade), quantidadeBase: -Math.abs(movimentacao.quantidadeBase), valorTotal: -Math.abs(movimentacao.valorTotal), movimentacaoOrigemId: movimentacao.id, status: "efetivada", usuarioId: usuario.id, usuarioEmail: usuario.email ?? "Usuário autenticado", criadoEm: agora }
+  return { ...movimentacao, id: crypto.randomUUID(), tipo: "estorno_entrada", quantidade: -Math.abs(movimentacao.quantidade), quantidadeBase: -Math.abs(movimentacao.quantidadeBase), valorTotal: -Math.abs(movimentacao.valorTotal), precoTotal: -Math.abs(movimentacao.precoTotal ?? movimentacao.valorTotal), movimentacaoOrigemId: movimentacao.id, movimentacaoOriginalId: movimentacao.id, unidade: movimentacao.unidadeSnapshot, status: "efetivada", usuarioId: usuario.id, usuarioEmail: usuario.email ?? "Usuário autenticado", criadoEm: agora }
 }
 
 export function podeEstornar(movimentacao: MovimentacaoEstoque, saldoAtual: number) {

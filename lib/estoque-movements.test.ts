@@ -11,12 +11,15 @@ describe("movimentações de estoque", () => {
     expect(movimento.quantidadeBase).toBe(2000)
     expect(movimento.unidadeBase).toBe("g")
     expect(movimento.valorTotal).toBe(40)
+    expect(movimento.criadoPorUid).toBe("u1")
+    expect(movimento.dataMovimentacao).toBe("2026-01-01T10:00:00.000Z")
   })
 
   it("cria estorno inverso sem apagar a origem", () => {
     const origem = criarEntrada({ insumo, quantidade: 2, unidade: "kg", precoUnitario: 20, usuario: { id: "u1", email: "a@dom.com" }, agora: "2026-01-01T10:00:00.000Z" })
     const estorno = criarEstorno(origem, { id: "u2", email: "b@dom.com" }, "2026-01-02T10:00:00.000Z")
     expect(estorno.movimentacaoOrigemId).toBe(origem.id)
+    expect(estorno.movimentacaoOriginalId).toBe(origem.id)
     expect(estorno.quantidade).toBe(-2)
     expect(origem.status).toBe("efetivada")
   })

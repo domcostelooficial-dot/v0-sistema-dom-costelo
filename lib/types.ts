@@ -117,6 +117,7 @@ export interface MovimentacaoEstoque {
   observacao?: string
   origem: "compras" | "estoque"
   movimentacaoOrigemId?: string
+  movimentacaoOriginalId?: string
   status: "efetivada" | "estornada" | "ativa"
   usuarioId: string
   usuarioEmail: string
