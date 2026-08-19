@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
-import { Item, HistoricoEntry, Receita, Insumo, CompraRegistro, VendaFinanceira, DespesaFinanceira, FinanceConfig, MovimentacaoEstoque, defaultInsumos, aliasesPorInsumo } from "@/lib/types"
+import { Item, HistoricoEntry, Receita, Insumo, CompraRegistro, VendaFinanceira, DespesaFinanceira, FinanceConfig, MovimentacaoEstoque, defaultInsumos, defaultItens, aliasesPorInsumo } from "@/lib/types"
 import {
   saveEstoque as saveEstoqueLocal,
   getEstoque as getEstoqueLocal,
@@ -22,6 +22,7 @@ import {
   subscribeToReceitas,
   getInsumos,
   migrarCustosMestresDomCosteloV1,
+  migrarMinimosEstoqueV1,
   saveInsumos,
   getFichasTecnicas,
   initializeFichasTecnicas,
@@ -332,8 +333,11 @@ export default function Home() {
     
     // Recarregar dados do Firebase do novo usuario
     const loadUserData = async () => {
-      const itens = await getEstoqueHybrid(username)
-      const historico = await getHistoricoHybrid(username)
+  let itens = await getEstoqueHybrid(username)
+  if (role === "owner" || role === "admin") {
+    try { itens = (await migrarMinimosEstoqueV1(username, defaultItens)).data } catch (error) { console.error("[v0] Falha ao aplicar mínimos de estoque:", error) }
+  }
+  const historico = await getHistoricoHybrid(username)
       const receitas = await getReceitasHybrid(username)
       let fichas = { data: seedFichas, seeded: false }
       try {
