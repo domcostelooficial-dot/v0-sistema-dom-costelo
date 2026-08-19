@@ -40,10 +40,12 @@ import {
   registrarEntradaAtomica,
   registrarSaidaAtomica,
   ajustarEstoqueAtomico,
+  ajustarInventarioAtomico,
   estornarMovimentacaoAtomica,
 } from "@/lib/firebase-db"
 import { criarEntrada, criarSaida } from "@/lib/estoque-movements"
 import { SaidaEstoqueView } from "@/components/saida-estoque-view"
+import { InventarioView } from "@/components/inventario-view"
 import { toast } from "sonner"
 import type { FinanceAuditSnapshot } from "@/lib/finance-engine"
 import { FirebaseLoginForm } from "@/components/firebase-login-form"
@@ -61,7 +63,7 @@ import { Button } from "@/components/ui/button"
 import { signOut } from "firebase/auth"
 import { auth } from "@/lib/firebase"
 
-type Tab = "estoque" | "entrada" | "saida" | "financeiro" | "dashboard" | "lista-compras" | "cmv" | "admin"
+type Tab = "estoque" | "entrada" | "saida" | "inventario" | "financeiro" | "dashboard" | "lista-compras" | "cmv" | "admin"
 
 const ITENS_REMOVIDOS = new Set(["Costela Crua", "Contra filé", "Manteiga de Garrafa", "Limoneto"])
 
@@ -365,6 +367,23 @@ export default function Home() {
 
   const handleEntrada = (nome: string, qtd: number, custo: number, fornecedor?: string, observacao?: string, dataMovimentacao?: string) => registrarEntradaRastreavel(nome, qtd, custo, fornecedor, observacao, dataMovimentacao)
 
+  const aplicarInventario = async (item: Item, base: number, contado: number, motivo: NonNullable<MovimentacaoEstoque["motivo"]>, observacao?: string) => {
+    if (userRole !== "owner" && userRole !== "admin") throw new Error("Somente owner/admin podem aplicar ajustes de inventário.")
+    const currentUser = auth.currentUser
+    if (!currentUser) throw new Error("Usuário autenticado não encontrado.")
+    const diferenca = contado - base
+    if (diferenca === 0) return
+    const agora = new Date().toISOString()
+    const movimento: MovimentacaoEstoque = { id: crypto.randomUUID(), tipo: "ajuste_inventario", insumoId: item.insumoId ?? item.id ?? item.nome, insumoNomeSnapshot: item.nome, quantidade: diferenca, unidadeSnapshot: (item.unidadeEstoque === "Unidade" ? "un" : item.unidadeEstoque ?? item.unidade ?? "un") as Insumo["unidade"], quantidadeBase: diferenca, unidadeBase: (item.unidadeEstoque === "Unidade" ? "un" : item.unidadeEstoque ?? item.unidade ?? "un") as Insumo["unidade"], precoUnitarioSnapshot: item.custoUnitario ?? item.preco ?? 0, valorTotal: diferenca * (item.custoUnitario ?? item.preco ?? 0), origem: "estoque", motivo, observacao, estoqueAnterior: base, estoqueContado: contado, diferenca, status: "ativa", usuarioId: currentUser.uid, usuarioEmail: currentUser.email ?? "", criadoPorUid: currentUser.uid, criadoPorEmail: currentUser.email ?? undefined, criadoPorNome: currentUser.displayName ?? undefined, dataMovimentacao: agora, criadoEm: agora }
+    try {
+      const atualizados = await ajustarInventarioAtomico({ itemNome: item.nome, insumoId: item.insumoId, estoqueBaseDaContagem: base, estoqueContado: contado, movimento, userId: currentUser.uid })
+      setItens(atualizados); setMovimentacoes(await getMovimentacoesEstoque()); toast.success("Ajuste de inventário aplicado.")
+    } catch (error) {
+      if (error instanceof Error && error.message === "CONCORRENCIA_INVENTARIO") { const atualizados = await getEstoqueHybrid(user); setItens(atualizados); toast.error("O estoque deste item foi alterado após o início da conferência. Atualize a contagem antes de aplicar o ajuste.") }
+      throw error
+    }
+  }
+
   const registrarSaida = async (nome: string, quantidade: number, motivo: NonNullable<MovimentacaoEstoque["motivo"]>, observacao?: string) => {
     if (!userPermissoes.includes("saida") && userRole !== "owner" && userRole !== "admin") throw new Error("Você não tem permissão para registrar saídas.")
     const item = itens.find((row) => row.nome === nome)
@@ -450,6 +469,7 @@ export default function Home() {
               {activeTab === "estoque" && "Controle de Estoque"}
               {activeTab === "entrada" && "Entrada de Mercadoria"}
               {activeTab === "saida" && "Saída de Estoque"}
+              {activeTab === "inventario" && "Inventário"}
               {activeTab === "financeiro" && "Financeiro"}
               {activeTab === "dashboard" && "Dashboard"}
  {activeTab === "lista-compras" && "Lista de Compras"}
@@ -462,6 +482,7 @@ export default function Home() {
               {activeTab === "entrada" &&
                 "Registre novas entradas de mercadoria"}
               {activeTab === "saida" && "Registre saídas, perdas e consumos do estoque"}
+              {activeTab === "inventario" && "Compare o estoque do sistema com a contagem física"}
               {activeTab === "financeiro" &&
                 "Acompanhe seus gastos e histórico"}
               {activeTab === "dashboard" &&
@@ -490,6 +511,7 @@ export default function Home() {
           {activeTab === "entrada" && (
             <EntradaView itens={itens} onEntrada={handleEntrada} canRegister={userPermissoes.includes("entrada") || userRole === "owner" || userRole === "admin"} />
           )}
+          {activeTab === "inventario" && <InventarioView itens={itens} userRole={userRole} onAplicar={aplicarInventario} />}
           {activeTab === "saida" && <SaidaEstoqueView itens={itens} canRegister={userPermissoes.includes("saida") || userRole === "owner" || userRole === "admin"} onSaida={registrarSaida} />}
           {activeTab === "financeiro" && (
             <FinanceiroCentral

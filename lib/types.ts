@@ -100,7 +100,7 @@ export interface PrevisaoVenda {
   quantidade: number
 }
 
-export type TipoMovimentacaoEstoque = "entrada" | "estorno_entrada" | "saida" | "ajuste"
+export type TipoMovimentacaoEstoque = "entrada" | "estorno_entrada" | "saida" | "ajuste" | "ajuste_inventario"
 
 export interface MovimentacaoEstoque {
   id: string
@@ -115,7 +115,10 @@ export interface MovimentacaoEstoque {
   valorTotal: number
   fornecedor?: string
   observacao?: string
-  motivo?: "consumo" | "perda" | "vencimento" | "ajuste_manual" | "outro"
+  motivo?: "consumo" | "consumo_interno" | "perda" | "descarte" | "vencimento" | "avaria" | "uso_operacional" | "cortesia" | "contagem_fisica" | "correcao_cadastro" | "perda_nao_registrada" | "entrada_nao_registrada" | "erro_operacional" | "ajuste_manual" | "outro"
+  estoqueAnterior?: number
+  estoqueContado?: number
+  diferenca?: number
   origem: "compras" | "estoque"
   movimentacaoOrigemId?: string
   movimentacaoOriginalId?: string

@@ -343,6 +343,26 @@ export async function registrarSaidaAtomica(params: { movimento: MovimentacaoEst
   })
 }
 
+export async function ajustarInventarioAtomico(params: { itemNome: string; insumoId?: string; estoqueBaseDaContagem: number; estoqueContado: number; movimento: MovimentacaoEstoque; userId: string }) {
+  const movimentoRef = doc(db, MOVIMENTACOES_COLLECTION, params.movimento.id)
+  const estoqueRef = doc(db, "estoque", "global")
+  return runTransaction(db, async (transaction) => {
+    const estoqueSnap = await transaction.get(estoqueRef)
+    const itens = (estoqueSnap.exists() ? estoqueSnap.data().itens : []) as Item[]
+    const index = itens.findIndex((item) => item.nome === params.itemNome && (!params.insumoId || item.insumoId === params.insumoId))
+    if (index < 0) throw new Error("Item não encontrado no estoque")
+    const item = itens[index]
+    if (item.atual !== params.estoqueBaseDaContagem) throw new Error("CONCORRENCIA_INVENTARIO")
+    if (!Number.isFinite(params.estoqueContado) || params.estoqueContado < 0) throw new Error("Quantidade contada inválida")
+    const diferenca = params.estoqueContado - item.atual
+    if (diferenca === 0) return itens
+    const atualizados = itens.map((row, rowIndex) => rowIndex === index ? { ...row, atual: params.estoqueContado } : row)
+    transaction.set(estoqueRef, { itens: atualizados, updatedAt: Timestamp.now(), lastModifiedBy: params.userId })
+    transaction.set(movimentoRef, { ...params.movimento, estoqueAnterior: item.atual, estoqueContado: params.estoqueContado, diferenca, quantidade: diferenca, quantidadeBase: diferenca })
+    return atualizados
+  })
+}
+
 export async function ajustarEstoqueAtomico(params: { itemNome: string; quantidadeAtual: number; movimento: MovimentacaoEstoque; userId: string }) {
   const movimentoRef = doc(db, MOVIMENTACOES_COLLECTION, params.movimento.id)
   const estoqueRef = doc(db, "estoque", "global")
