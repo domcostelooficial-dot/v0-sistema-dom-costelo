@@ -86,15 +86,12 @@ function limparItensEstoque(itens: Item[]) {
 // Funções wrapper que salvam em Firebase e localStorage
 async function saveEstoqueHybrid(user: string | null, itens: Item[]) {
   const itensPersistidos = limparItensEstoque(itens)
-  saveEstoqueLocal(itensPersistidos)
   if (user) {
-    try {
-      await saveEstoqueFirebase(user, itensPersistidos)
-      console.log("[v0] Estoque salvo no Firebase")
-    } catch (err) {
-      console.error("[v0] Erro ao salvar no Firebase:", err)
-    }
+    const result = await saveEstoqueFirebase(user, itensPersistidos)
+    if (result?.error) throw new Error(result.error)
   }
+  saveEstoqueLocal(itensPersistidos)
+  return { error: null }
 }
 
 async function getEstoqueHybrid(user: string | null): Promise<Item[]> {
@@ -365,7 +362,8 @@ export default function Home() {
     handleLogout()
   }
 
-  const handleUpdateItem = (nome: string, novoAtual: number) => {
+  const handleUpdateItem = async (nome: string, novoAtual: number) => {
+    if (!Number.isFinite(novoAtual) || novoAtual < 0) { toast.error("Quantidade de estoque inválida."); return }
     const now = new Date()
     const dataHora = `${now.toLocaleDateString("pt-BR")} às ${now.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}`
     const updated = itens.map((item) =>
@@ -380,8 +378,13 @@ export default function Home() {
           }
         : item
     )
-    setItens(updated)
-    saveEstoqueHybrid(user, updated)
+    try {
+      const result = await saveEstoqueHybrid(user, updated)
+      if (result?.error) throw new Error(result.error)
+      setItens(updated)
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Não foi possível salvar o estoque.")
+    }
   }
 
   const handleAddItem = (newItem: Item) => {
