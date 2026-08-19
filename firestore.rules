@@ -63,10 +63,15 @@ service cloud.firestore {
       allow create, update: if isAdminOrOwner();
       allow delete: if isOwner();
     }
+    match /compras/insumos {
+      allow read: if isOperatorOrHigher();
+      allow create, update: if isAdminOrOwner();
+      allow delete: if isOwner();
+    }
     match /compras/{docId} {
       allow read: if isOperatorOrHigher();
-      allow create, update: if isOperatorOrHigher() && docId != 'fichas-tecnicas';
-      allow delete: if isAdminOrOwner() && docId != 'fichas-tecnicas';
+      allow create, update: if isOperatorOrHigher() && docId != 'fichas-tecnicas' && docId != 'insumos';
+      allow delete: if isAdminOrOwner() && docId != 'fichas-tecnicas' && docId != 'insumos';
     }
     match /insumos/{docId} {
       allow read: if isOperatorOrHigher();

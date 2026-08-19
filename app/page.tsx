@@ -495,6 +495,8 @@ export default function Home() {
             <ListaComprasView
               itens={itens}
               user={user}
+              userRole={userRole}
+              fichas={fichasTecnicas}
               insumos={insumos}
               historico={comprasHistorico}
               onSaveInsumos={persistirInsumos}

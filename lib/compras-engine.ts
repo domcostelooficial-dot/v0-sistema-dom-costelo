@@ -52,10 +52,13 @@ export function calcularValorEstoque(insumo: Insumo | Item, quantidadeAtual = in
 
 export function catalogoCompletoCompras(itens: Item[], insumos: Insumo[]): Insumo[] {
   const porNome = new Map<string, Insumo>()
-  insumos.forEach((insumo) => porNome.set(insumo.nome.trim().toLocaleLowerCase("pt-BR"), normalizar(insumo)))
+  const normalizarChave = (valor: string) => valor.trim().toLocaleLowerCase("pt-BR").replace(/\s+/g, " ")
+  const porId = new Map(insumos.filter((insumo) => insumo.id).map((insumo) => [insumo.id as string, normalizar(insumo)]))
+  insumos.forEach((insumo) => { const central = normalizar(insumo); porNome.set(normalizarChave(central.nome), central); (central.aliases ?? []).forEach((alias) => { if (!porNome.has(normalizarChave(alias)) || !porNome.get(normalizarChave(alias))?.nome.includes("Bacon fatiado")) porNome.set(normalizarChave(alias), central) }) })
   itens.forEach((item) => {
-    const chave = item.nome.trim().toLocaleLowerCase("pt-BR")
-    if (porNome.has(chave)) return
+    const chave = normalizarChave(item.nome)
+    const vinculado = (item.id && porId.get(item.id)) || porNome.get(chave)
+    if (vinculado) { porNome.set(chave, vinculado); return }
     const unidade = normalizarUnidadeCompra(item.unidade ?? item.unidadeEstoque ?? item.unidadeEmbalagem ?? "un") as Insumo["unidade"]
     const unidadeEmbalagem = normalizarUnidadeCompra(item.unidadeEmbalagem ?? item.unidadeConteudo ?? unidade) as Insumo["unidadeEmbalagem"]
     const preco = item.precoReferencia ?? item.precoCompra ?? item.preco ?? 0
