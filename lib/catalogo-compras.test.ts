@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { catalogoCompletoCompras } from "./compras-engine"
+import { apenasInsumosCentrais, catalogoCompletoCompras } from "./compras-engine"
 import type { Insumo, Item } from "./types"
 
 const central = (overrides: Partial<Insumo>): Insumo => ({ id: "base", nome: "Batata", categoria: "Congelados", unidade: "kg", unidadeCompra: "kg", precoCompra: 20, quantidadeEmbalagem: 2, quantidadeConteudo: 2, unidadeEmbalagem: "kg", unidadeConteudo: "kg", custoUnitario: 10, min: 0, atual: 0, ...overrides })
@@ -24,6 +24,20 @@ describe("catalogoCompletoCompras", () => {
     expect(item?.naoVinculado).toBe(true)
     expect(item?.origem).toBe("estoque")
     expect(result.filter((entry) => entry.naoVinculado).length).toBe(1)
+  })
+
+  it("não persiste itens não vinculados", () => {
+    const result = apenasInsumosCentrais([
+      central({ id: "batata", nome: "Batata" }),
+      central({ id: "produto-x", nome: "Produto X", naoVinculado: true, origem: "estoque" }),
+    ])
+    expect(result.map((item) => item.nome)).toEqual(["Batata"])
+  })
+
+  it("mantém itens não vinculados apenas na visualização", () => {
+    const result = catalogoCompletoCompras([estoque({ nome: "Produto Novo" })], [central({ id: "batata", nome: "Batata" })])
+    expect(result.find((item) => item.nome === "Produto Novo")?.naoVinculado).toBe(true)
+    expect(apenasInsumosCentrais(result).find((item) => item.nome === "Produto Novo")).toBeUndefined()
   })
 
   it("mantém bacon em cubos e fatiado separados", () => {

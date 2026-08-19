@@ -43,6 +43,10 @@ const normalizar = (i: Insumo): Insumo => {
   return { ...i, unidade: (normalizarUnidadeConteudo(i.unidade) as UnidadeInsumo), unidadeCompra: unidadeCompra as UnidadeInsumo, unidadeEmbalagem: unidadeConteudo as UnidadeInsumo, quantidadeConteudo: conteudo, quantidadeEmbalagem: conteudo, precoReferencia: preco, unidadeReferencia: unidadeCompra as "g" | "un" | "kg" | "ml" | "l", unidadeConteudo: unidadeConteudo as "g" | "un" | "kg" | "ml" | "l", unidadeBase: base.unidade as "g" | "un" | "kg" | "ml" | "l", quantidadePorEmbalagem: base.quantidade, custoUnitario: preco / Math.max(conteudo, 1) }
 }
 
+export function apenasInsumosCentrais(insumos: Insumo[]): Insumo[] {
+  return insumos.filter((insumo) => insumo.naoVinculado !== true)
+}
+
 export function calcularValorEstoque(insumo: Insumo | Item, quantidadeAtual = insumo.atual ?? 0): number {
   const preco = insumo.precoCompra ?? insumo.precoReferencia ?? insumo.preco ?? 0
   const unidadeCompra = ("unidadeCompra" in insumo ? insumo.unidadeCompra : undefined) ?? insumo.unidadeEmbalagem ?? insumo.unidade ?? "un"
