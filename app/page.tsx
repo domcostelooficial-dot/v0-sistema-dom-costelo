@@ -573,6 +573,7 @@ export default function Home() {
           {activeTab === "financeiro" && (
             <FinanceiroCentral
               fichas={fichasTecnicas}
+              combos={combos}
               insumos={insumos}
               vendas={vendasFinanceiras}
               despesas={despesasFinanceiras}
