@@ -27,10 +27,10 @@ interface Props {
   historico?: CompraRegistro[]
   onSaveInsumos?: (data: Insumo[]) => void
   onSaveHistorico?: (data: CompraRegistro[]) => void
-  onUpdateEstoque: (nome: string, qtd: number) => void
+  onRegistrarEntrada: (params: { item: Insumo; quantidade: number; unidade: UnidadeInsumo; precoUnitario: number; fornecedor: string; data: string }) => Promise<void>
 }
 
-export function ListaComprasView({ itens, userRole = "operador", fichas = [], insumos: initialInsumos = [], historico: initialHistorico = [], onSaveInsumos, onSaveHistorico, onUpdateEstoque }: Props) {
+export function ListaComprasView({ itens, userRole = "operador", fichas = [], insumos: initialInsumos = [], historico: initialHistorico = [], onSaveInsumos, onSaveHistorico, onRegistrarEntrada }: Props) {
   const [insumos, setInsumos] = useState(() => catalogoCompletoCompras(itens, initialInsumos))
   const [historico, setHistorico] = useState(initialHistorico)
   useEffect(() => { setInsumos(catalogoCompletoCompras(itens, initialInsumos)) }, [itens, initialInsumos])
@@ -72,17 +72,17 @@ export function ListaComprasView({ itens, userRole = "operador", fichas = [], in
   }
 
   const salvarInsumo = (data: Insumo) => { const atualizados = insumos.some((item) => item.id === data.id) ? insumos.map((item) => item.id === data.id ? data : item) : [...insumos, data]; setInsumos(atualizados); onSaveInsumos?.(apenasInsumosCentrais(atualizados)); setDraftInsumo(null) }
-  const registrarCompra = () => {
+  const registrarCompra = async () => {
     const item = insumos.find((i) => i.nome === compra.nome && i.naoVinculado !== true)
     const quantidade = Number(compra.quantidade)
     const unitario = Number(compra.unitario)
     if (!item || quantidade <= 0 || unitario <= 0) return
     const anterior = item.precoReferencia ?? item.precoCompra
     const registro: CompraRegistro = { id: crypto.randomUUID(), data: compra.data, fornecedor, insumoNome: item.nome, quantidade, unidade: (item.unidadeReferencia ?? item.unidade) as UnidadeInsumo, precoUnitario: unitario, valorTotal: quantidade * unitario, precoAnterior: anterior, variacao: anterior ? ((unitario - anterior) / anterior) * 100 : 0, adicionadaAoEstoque: true }
+    await onRegistrarEntrada({ item, quantidade, unidade: (item.unidadeReferencia ?? item.unidade) as UnidadeInsumo, precoUnitario: unitario, fornecedor, data: compra.data })
     const novoHistorico = [registro, ...historico]
     setHistorico(novoHistorico)
     onSaveHistorico?.(novoHistorico)
-    onUpdateEstoque(item.nome, quantidade)
     salvarInsumo({ ...item, precoReferencia: unitario, precoCompra: unitario, ultimaAtualizacaoPreco: compra.data })
     setCompra({ nome: "", quantidade: "", unitario: "", data: hoje() })
   }

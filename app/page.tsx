@@ -225,17 +225,25 @@ export default function Home() {
     } catch (error) { toast.error(error instanceof Error ? error.message : "Não foi possível estornar a entrada.") }
   }
 
-  const registrarEntradaRastreavel = async (nome: string, qtd: number, custo: number, fornecedor?: string, observacao?: string, dataMovimentacao?: string) => {
-    const item = itens.find((row) => row.nome === nome)
-    const insumo = insumos.find((row) => row.id === item?.insumoId || row.nome === nome)
+  const registrarEntradaRastreavel = async (nome: string, qtd: number, custo: number, fornecedor?: string, observacao?: string, dataMovimentacao?: string, insumoId?: string, unidadeInformada?: Insumo["unidade"]) => {
+    const item = itens.find((row) => (insumoId && row.insumoId === insumoId) || row.nome === nome)
+    const insumo = insumos.find((row) => row.id === insumoId || row.id === item?.insumoId || row.nome === nome)
     if (!userPermissoes.includes("entrada") && userRole !== "owner" && userRole !== "admin") throw new Error("Você não tem permissão para registrar entrada.")
     if (!item || !insumo || item.ativo === false || item.naoVinculado === true) throw new Error("Este item não está disponível para entrada.")
     const currentUser = auth.currentUser
     if (!currentUser) throw new Error("Usuário autenticado não encontrado.")
-    const unidade = (item.unidadeEstoque === "Unidade" ? "un" : item.unidadeEstoque) as Insumo["unidade"]
+    const unidade = unidadeInformada ?? ((item.unidadeEstoque === "Unidade" ? "un" : item.unidadeEstoque) as Insumo["unidade"])
     const movimento = { ...criarEntrada({ insumo: { ...insumo, id: item.insumoId ?? insumo.id }, quantidade: qtd, unidade, precoUnitario: qtd > 0 ? custo / qtd : 0, fornecedor, observacao, dataMovimentacao, usuario: { id: currentUser.uid, email: currentUser.email ?? undefined, nome: currentUser.displayName ?? undefined } }), status: "ativa" as const }
     const atualizados = await registrarEntradaAtomica({ movimento, itemNome: nome, userId: currentUser.uid })
-    setItens(atualizados); setMovimentacoes(await getMovimentacoesEstoque()); toast.success("Entrada registrada com sucesso.")
+    setItens(atualizados)
+    setMovimentacoes(await getMovimentacoesEstoque())
+    if (insumo && custo > 0) {
+      const precoAtualizado = { ...insumo, precoReferencia: custo / qtd, precoCompra: custo / qtd, ultimaAtualizacaoPreco: dataMovimentacao ?? new Date().toISOString().slice(0, 10) }
+      const novosInsumos = insumos.map((row) => row.id === precoAtualizado.id ? precoAtualizado : row)
+      setInsumos(novosInsumos)
+      await saveInsumos(novosInsumos)
+    }
+    toast.success("Entrada registrada com sucesso.")
   }
 
   const processarBaixaVenda = async (venda: VendaFinanceira) => {
@@ -598,11 +606,10 @@ export default function Home() {
               insumos={insumos}
               historico={comprasHistorico}
               onSaveInsumos={persistirInsumos}
-              onSaveHistorico={persistirCompras}
-              onUpdateEstoque={(nome, qtd) => {
-                const item = itens.find((current) => current.nome === nome)
-                if (item) handleUpdateItem(nome, item.atual + qtd)
-              }}
+  onSaveHistorico={persistirCompras}
+  onRegistrarEntrada={async ({ item, quantidade, unidade, precoUnitario, fornecedor, data }) => {
+  await registrarEntradaRastreavel(item.nome, quantidade, quantidade * precoUnitario, fornecedor, "Compra efetivada", data, item.id, unidade)
+  }}
             />
           )}
   {activeTab === "cmv" && (
