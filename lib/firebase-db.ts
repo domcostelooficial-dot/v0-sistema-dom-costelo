@@ -300,7 +300,10 @@ export async function getMovimentacoesEstoque() {
 }
 
 export async function saveMovimentacoesEstoque(data: MovimentacaoEstoque[]) {
-  for (const item of data) await setDoc(doc(db, MOVIMENTACOES_COLLECTION, item.id || crypto.randomUUID()), { ...item, id: item.id || crypto.randomUUID() })
+  for (const item of data) {
+    const id = item.id || crypto.randomUUID()
+    await setDoc(doc(db, MOVIMENTACOES_COLLECTION, id), { ...item, id })
+  }
 }
 
 export async function registrarEntradaAtomica(params: { movimento: MovimentacaoEstoque; itemNome: string; userId: string }) {
@@ -325,7 +328,8 @@ export async function estornarMovimentacaoAtomica(params: { movimentoId: string;
   const movimentoRef = doc(db, MOVIMENTACOES_COLLECTION, params.movimentoId)
   const estoqueRef = doc(db, "estoque", "global")
   return runTransaction(db, async (transaction) => {
-    const [movimentoSnap, estoqueSnap] = await Promise.all([transaction.get(movimentoRef), transaction.get(estoqueRef)])
+    const movimentoSnap = await transaction.get(movimentoRef)
+    const estoqueSnap = await transaction.get(estoqueRef)
     if (!movimentoSnap.exists()) throw new Error("Movimentação não encontrada")
     const original = { id: movimentoSnap.id, ...movimentoSnap.data() } as MovimentacaoEstoque
     if (original.tipo !== "entrada" || original.status === "estornada") throw new Error("Esta entrada já foi estornada.")
@@ -333,7 +337,7 @@ export async function estornarMovimentacaoAtomica(params: { movimentoId: string;
     const index = itens.findIndex((item) => item.insumoId === original.insumoId || item.nome === original.insumoNomeSnapshot)
     if (index < 0 || itens[index].atual < original.quantidade) throw new Error("Não é possível estornar esta entrada porque o estoque atual é insuficiente.")
     const agora = new Date().toISOString()
-    const inversa: MovimentacaoEstoque = { ...original, id: crypto.randomUUID(), tipo: "estorno_entrada", quantidade: -Math.abs(original.quantidade), quantidadeBase: -Math.abs(original.quantidadeBase), valorTotal: -Math.abs(original.valorTotal), precoTotal: -Math.abs(original.precoTotal ?? original.valorTotal), movimentacaoOrigemId: original.id, movimentacaoOriginalId: original.id, unidade: original.unidadeSnapshot, status: "ativa", usuarioId: params.usuario.uid, usuarioEmail: params.usuario.email ?? "", criadoPorUid: params.usuario.uid, criadoPorEmail: params.usuario.email, criadoPorNome: params.usuario.nome, criadoEm: agora, dataMovimentacao: agora }
+    const inversa: MovimentacaoEstoque = { ...original, id: crypto.randomUUID(), tipo: "estorno_entrada", quantidade: -Math.abs(original.quantidade), quantidadeBase: -Math.abs(original.quantidadeBase), valorTotal: -Math.abs(original.valorTotal), precoTotal: -Math.abs(original.precoTotal ?? original.valorTotal), movimentacaoOrigemId: original.id, movimentacaoOriginalId: original.id, unidade: original.unidadeSnapshot, status: "ativa", usuarioId: params.usuario.uid, insumoNomeSnapshot: original.insumoNomeSnapshot, dataMovimentacao: original.dataMovimentacao ?? agora, usuarioEmail: params.usuario.email ?? "", criadoPorUid: params.usuario.uid, criadoPorEmail: params.usuario.email, criadoPorNome: params.usuario.nome, criadoEm: agora }
     transaction.update(movimentoRef, { status: "estornada", estornadoEm: agora, estornadoPor: params.usuario.uid, estornadaPorUid: params.usuario.uid })
     transaction.update(estoqueRef, { itens: itens.map((item, itemIndex) => itemIndex === index ? { ...item, atual: item.atual - original.quantidade } : item), updatedAt: Timestamp.now(), lastModifiedBy: params.usuario.uid })
     transaction.set(doc(db, MOVIMENTACOES_COLLECTION, inversa.id), inversa)
