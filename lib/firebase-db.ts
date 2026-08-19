@@ -30,7 +30,7 @@ export async function createUsuarioProfile(
   data: Omit<UsuarioSistema, "login">
 ) {
   try {
-    const safeRole = data.role === "owner" || data.role === "admin" ? "operador" : data.role
+    const safeRole = data.role === "owner" || data.role === "admin" || data.role === "analista" || data.role === "operador" ? data.role : "operador"
     await setDoc(doc(db, USUARIOS_COLLECTION, userId), {
       ...data,
       uid: userId,

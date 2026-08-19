@@ -93,7 +93,13 @@ export function FirebaseLoginForm({ onLogin }: FirebaseLoginFormProps) {
           ativo: false,
           dataCriacao: new Date().toLocaleString("pt-BR"),
         }
-        await createUsuarioProfile(user!.uid, novoUsuario)
+        const profileResult = await createUsuarioProfile(user!.uid, novoUsuario)
+        if (profileResult.error) {
+          await signOut(auth)
+          setError("A conta foi criada, mas não foi possível salvar o perfil na nuvem. Tente novamente.")
+          setLoading(false)
+          return
+        }
 
         // Mostrar mensagem de sucesso e aguardar aprovacao
         setSuccess("Conta criada com sucesso! Aguarde a aprovacao do administrador para acessar o sistema.")
@@ -106,7 +112,7 @@ export function FirebaseLoginForm({ onLogin }: FirebaseLoginFormProps) {
 
       } else {
         // Fazer login
-        const result = await signInWithEmail(email, password)
+        const result = await signInWithEmail(email.trim(), password)
         user = result.user
         authError = result.error
       }
@@ -118,16 +124,17 @@ export function FirebaseLoginForm({ onLogin }: FirebaseLoginFormProps) {
       }
 
       const displayName = user!.email?.split("@")[0] || user!.uid
-      const { data: usuarioSistema, error: profileError } = await getUsuarioProfile(user!.uid)
       const isPrincipalOwner = user!.email?.toLowerCase() === "admin@domcostelo.com"
 
-      // O owner existente no Firebase Authentication continua sendo o fallback
-      // mesmo quando o perfil Firestore ainda não foi provisionado.
-      if ((profileError || !usuarioSistema) && isPrincipalOwner) {
+      // O administrador principal não deve esperar uma leitura do Firestore
+      // para entrar. Isso evita lentidão quando o Firestore está indisponível.
+      if (isPrincipalOwner) {
         setLoading(false)
         onLogin(displayName, "owner", ["estoque", "entrada", "financeiro", "dashboard", "lista-compras", "cmv", "admin"])
         return
       }
+
+      const { data: usuarioSistema, error: profileError } = await getUsuarioProfile(user!.uid)
 
       if (profileError || !usuarioSistema) {
         await signOut(auth)
