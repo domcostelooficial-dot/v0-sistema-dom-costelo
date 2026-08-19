@@ -146,8 +146,16 @@ describe("motor financeiro", () => {
     expect(`${calculado - esperado}`).toContain("-")
   })
 
-  it("usa ponto de equilíbrio esperado exato na homologação", () => {
-    expect(GABARITO_JULHO_2026.pontoEquilibrio).toBe(22970)
-    expect(GABARITO_JULHO_2026.pontoEquilibrio.toFixed(2)).toBe("22970.00")
+  it("deriva o ponto de equilíbrio com o índice MC integral", () => {
+    const indiceMc = 13074.73 / 26609.46
+    const peEsperado = 11290 / indiceMc
+    expect(GABARITO_JULHO_2026.pontoEquilibrio).toBeCloseTo(peEsperado, 2)
+    expect(GABARITO_JULHO_2026.pontoEquilibrio).not.toBe(22970)
+  })
+
+  it("mapeia os três estados visuais da homologação", () => {
+    expect(statusAuditoria({ indicador: true })).toBe("ok")
+    expect(statusAuditoria({ indicador: false })).toBe("divergente")
+    expect(statusAuditoria({ indicador: null })).toBe("sem-dados")
   })
 })

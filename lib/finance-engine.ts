@@ -190,12 +190,21 @@ export interface FinanceAuditSnapshot {
   observacao?: string
 }
 
+const JULHO_2026_BASE = {
+  faturamentoBruto: 26609.46,
+  margemContribuicao: 13074.73,
+  custosFixos: 11290.00,
+} as const
+
+const JULHO_2026_INDICE_MC = JULHO_2026_BASE.margemContribuicao / JULHO_2026_BASE.faturamentoBruto
+const JULHO_2026_PE = JULHO_2026_INDICE_MC > 0 ? JULHO_2026_BASE.custosFixos / JULHO_2026_INDICE_MC : 0
+
 export const GABARITO_JULHO_2026 = {
-  competencia: "2026-07", faturamentoBruto: 26609.46, descontos: 184.73, receitaAposDescontos: 26424.73,
+  competencia: "2026-07", faturamentoBruto: JULHO_2026_BASE.faturamentoBruto, descontos: 184.73, receitaAposDescontos: 26424.73,
   taxas: 2000.00, receitaLiquida: 24424.73, cmv: 11350.00, cmvPercentual: 42.65,
-  margemContribuicao: 13074.73, mcPercentual: 49.14, custosFixos: 11290.00,
+  margemContribuicao: JULHO_2026_BASE.margemContribuicao, mcPercentual: 49.14, custosFixos: JULHO_2026_BASE.custosFixos,
   resultadoOperacional: 1784.73, margemOperacionalPercentual: 6.71, totalVendas: 357,
-  ticketMedio: 74.54, pontoEquilibrio: 22970.00, origem: "homologacao_julho_2026", tipo: "gabarito_historico",
+  ticketMedio: 74.54, pontoEquilibrio: JULHO_2026_PE, origem: "homologacao_julho_2026", tipo: "gabarito_historico",
 } as const
 
 export function criarAuditoriaFinanceira(vendas: VendaFinanceira[], despesas: DespesaFinanceira[], config: FinanceConfig, competencia: string): FinanceAuditSnapshot {
