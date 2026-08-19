@@ -43,10 +43,8 @@ import {
 } from "@/components/ui/select"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Users, Shield, Key, PlusCircle, Edit, Trash2, Save, UserCheck, UserX, Clock } from "lucide-react"
-import { getUsuarios, saveUsuarios } from "@/lib/store"
 import { 
-  getAllUsuarios, 
-  saveUsuariosFirebase, 
+  getAllUsuarios,
   subscribeToUsuarios,
   createUsuarioProfile,
   updateUsuarioProfile,
@@ -54,6 +52,8 @@ import {
 } from "@/lib/firebase-db"
 import type { UsuarioSistema, UserRole, TabPermissao, UserStatus } from "@/lib/types"
 import { toast } from "sonner"
+import { auth } from "@/lib/firebase"
+import { changePassword } from "@/lib/firebase-auth"
 
 interface AdminViewProps {
   currentUser: string
@@ -78,7 +78,6 @@ export function AdminView({ currentUser, onPasswordChange }: AdminViewProps) {
     login: "",
     nome: "",
     email: "",
-    senha: "",
     role: "operador" as UserRole,
     permissoes: [] as TabPermissao[],
   })
@@ -90,16 +89,12 @@ export function AdminView({ currentUser, onPasswordChange }: AdminViewProps) {
     confirmarSenha: "",
   })
   useEffect(() => {
-    // Carregar usuários locais primeiro
-    setUsuarios(getUsuarios())
-    
     // Tentar carregar do Firebase e configurar listener em tempo real
     const loadFromFirebase = async () => {
       try {
         const { data, error } = await getAllUsuarios()
         if (!error && data && data.length > 0) {
           setUsuarios(data)
-          saveUsuarios(data) // Sincronizar com localStorage
         }
       } catch (err) {
         console.error("[Firebase] Erro ao carregar usuários:", err)
@@ -112,7 +107,6 @@ export function AdminView({ currentUser, onPasswordChange }: AdminViewProps) {
     const unsubscribe = subscribeToUsuarios((firebaseUsuarios) => {
       if (firebaseUsuarios.length > 0) {
         setUsuarios(firebaseUsuarios)
-        saveUsuarios(firebaseUsuarios)
       }
     })
     
@@ -134,8 +128,7 @@ export function AdminView({ currentUser, onPasswordChange }: AdminViewProps) {
       login: formData.email.split("@")[0],
       nome: formData.nome.trim(),
       email: formData.email.trim().toLowerCase(),
-      senha: "",
-      role: formData.role,
+      role: formData.role === "owner" ? "operador" : formData.role,
       permissoes: formData.permissoes,
       status: "aprovado",
       dataCriacao: new Date().toLocaleString("pt-BR"),
@@ -143,26 +136,30 @@ export function AdminView({ currentUser, onPasswordChange }: AdminViewProps) {
 
     const updated = [...usuarios, newUser]
     setUsuarios(updated)
-    saveUsuarios(updated)
     
     // Salvar no Firebase
     const { login, ...userData } = newUser
     await createUsuarioProfile(login, userData)
     
     setIsAddDialogOpen(false)
-    setFormData({ login: "", nome: "", email: "", senha: "", role: "operador", permissoes: [] })
+    setFormData({ login: "", nome: "", email: "", role: "operador", permissoes: [] })
     toast.success(`Usuário "${newUser.nome}" criado e sincronizado na nuvem!`)
   }
 
   const handleEditUser = async () => {
     if (!selectedUser) return
 
+    if (selectedUser.role === "owner" && formData.role !== "owner") {
+      toast.error("Não é possível alterar a função do Responsável Principal.")
+      return
+    }
+
     if (!formData.nome.trim() || !formData.email.trim()) {
       toast.error("Preencha nome e email")
       return
     }
 
-    const updatedUserData = {
+    const updatedUserData: Partial<UsuarioSistema> = {
       nome: formData.nome.trim(),
       email: formData.email.trim().toLowerCase(),
       role: formData.role,
@@ -179,7 +176,6 @@ export function AdminView({ currentUser, onPasswordChange }: AdminViewProps) {
     )
 
     setUsuarios(updated)
-    saveUsuarios(updated)
     
     // Atualizar no Firebase
     await updateUsuarioProfile(selectedUser.login, updatedUserData)
@@ -192,14 +188,13 @@ export function AdminView({ currentUser, onPasswordChange }: AdminViewProps) {
   const handleDeleteUser = async () => {
     if (!selectedUser) return
 
-    if (selectedUser.login === currentUser) {
-      toast.error("Você não pode remover seu próprio usuário!")
+    if (selectedUser.login === currentUser || selectedUser.role === "owner") {
+      toast.error(selectedUser.role === "owner" ? "Não é possível remover o último Responsável Principal." : "Você não pode remover seu próprio usuário!")
       return
     }
 
     const updated = usuarios.filter((u) => u.login !== selectedUser.login)
     setUsuarios(updated)
-    saveUsuarios(updated)
     
     // Remover do Firebase
     await deleteUsuarioFirebase(selectedUser.login)
@@ -215,7 +210,6 @@ export function AdminView({ currentUser, onPasswordChange }: AdminViewProps) {
       login: user.login,
       nome: user.nome || "",
       email: user.email || "",
-      senha: user.senha,
       role: user.role,
       permissoes: user.permissoes ? [...user.permissoes] : [],
     })
@@ -251,7 +245,6 @@ export function AdminView({ currentUser, onPasswordChange }: AdminViewProps) {
       return u
     })
     setUsuarios(updated)
-    saveUsuarios(updated)
     
     // Atualizar no Firebase
     await updateUsuarioProfile(userId, { permissoes: newPermissoes })
@@ -267,34 +260,27 @@ export function AdminView({ currentUser, onPasswordChange }: AdminViewProps) {
       return
     }
 
-    const currentUserData = usuarios.find((u) => u.login === currentUser)
-    if (!currentUserData || currentUserData.senha !== senhaAtual) {
-      toast.error("Senha atual incorreta")
-      return
-    }
-
     if (novaSenha !== confirmarSenha) {
       toast.error("As senhas não coincidem")
       return
     }
 
-    if (novaSenha.length < 3) {
-      toast.error("A senha deve ter pelo menos 3 caracteres")
+    if (novaSenha.length < 6) {
+      toast.error("A senha deve ter pelo menos 6 caracteres")
       return
     }
 
-    const updated = usuarios.map((u) =>
-      u.login === currentUser ? { ...u, senha: novaSenha } : u
-    )
-
-    setUsuarios(updated)
-    saveUsuarios(updated)
-    
-    // Atualizar no Firebase
-    await updateUsuarioProfile(currentUser, { senha: novaSenha })
-    
+    if (!auth.currentUser) {
+      toast.error("Sessão Firebase não encontrada")
+      return
+    }
+    const result = await changePassword(auth.currentUser, senhaAtual, novaSenha)
+    if (result.error) {
+      toast.error(result.error)
+      return
+    }
     setPasswordForm({ senhaAtual: "", novaSenha: "", confirmarSenha: "" })
-    toast.success("Senha alterada e sincronizada na nuvem!")
+    toast.success("Senha alterada pelo Firebase Authentication!")
     
     // Notificar o componente pai para fazer logout ou atualizar
     onPasswordChange()
@@ -372,8 +358,7 @@ export function AdminView({ currentUser, onPasswordChange }: AdminViewProps) {
                                   u.login === user.login ? { ...u, ...newData } : u
                                 )
                                 setUsuarios(updated)
-                                saveUsuarios(updated)
-                                await updateUsuarioProfile(user.login, newData)
+                                                            await updateUsuarioProfile(user.login, newData)
                                 toast.success(`Usuário "${user.login}" aprovado e sincronizado na nuvem!`)
                               }}
                             >
@@ -390,8 +375,7 @@ export function AdminView({ currentUser, onPasswordChange }: AdminViewProps) {
                                   u.login === user.login ? { ...u, ...newData } : u
                                 )
                                 setUsuarios(updated)
-                                saveUsuarios(updated)
-                                await updateUsuarioProfile(user.login, newData)
+                                                            await updateUsuarioProfile(user.login, newData)
                                 toast.success(`Usuário "${user.login}" rejeitado.`)
                               }}
                             >
@@ -496,7 +480,7 @@ export function AdminView({ currentUser, onPasswordChange }: AdminViewProps) {
                       variant="outline"
                       onClick={() => {
                         setIsAddDialogOpen(false)
-                        setFormData({ login: "", nome: "", email: "", senha: "", role: "operador", permissoes: [] })
+                        setFormData({ login: "", nome: "", email: "", role: "operador", permissoes: [] })
                       }}
                     >
                       Cancelar

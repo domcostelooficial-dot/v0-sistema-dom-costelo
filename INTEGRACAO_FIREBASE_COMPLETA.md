@@ -1,170 +1,36 @@
-# ✅ Integração Firebase Completa
+# Integração Firebase — Dom Costelo PRO
 
-## O que foi implementado
+## Arquitetura atual
 
-### 🔧 Arquivos Criados
+- Firebase Authentication: identidade, login, sessão e alteração voluntária de senha.
+- Firestore `usuarios/{uid}`: `role`, `ativo` e `permissoes`.
+- Firestore: fonte oficial das fichas técnicas após inicialização.
+- `settings/system`: `ownerUid` e `seedVersion`.
 
-| Arquivo | Função |
-|---------|--------|
-| `lib/firebase.ts` | Configuração e inicialização do Firebase |
-| `lib/firebase-auth.ts` | Sistema de autenticação (login, logout, registro) |
-| `lib/firebase-db.ts` | Operações de banco de dados (CRUD completo) |
-| `components/firebase-login-form.tsx` | Componente de login com Firebase Auth |
-| `firestore.rules` | Regras de segurança do Firestore |
-| `firebase.json` | Configuração para Firebase Hosting |
+O Responsável Principal é `admin@domcostelo.com`. Essa conta existente, seu UID, e-mail, role owner, status e credencial atual devem ser preservados. Nenhum seed, startup, deploy ou migração altera sua senha ou recria seu usuário.
 
-### 📚 Documentação Criada
+## Senhas
 
-| Guia | Descrição |
-|------|-----------|
-| `ATIVAR_FIREBASE.md` | 🚀 **Guia rápido de 3 passos** para ativar Firebase |
-| `INICIO_RAPIDO_FIREBASE.md` | Guia completo com prints e exemplos |
-| `FIREBASE_SETUP.md` | Documentação técnica detalhada |
-| `README.md` | Atualizado com instruções de uso |
+O projeto não contém senhas administrativas. A troca voluntária usa `EmailAuthProvider.credential()`, `reauthenticateWithCredential()` e `updatePassword()`. A senha atual é validada no Firebase Authentication e os campos são limpos após a operação.
 
-### 🎯 Funcionalidades Implementadas
+Nenhuma senha é armazenada em Firestore ou localStorage.
 
-#### Autenticação
-- ✅ Login com email/senha
-- ✅ Registro de novos usuários
-- ✅ Logout seguro
-- ✅ Gestão de sessão automática
-- ✅ Proteção de rotas
+## Fichas técnicas
 
-#### Banco de Dados (Firestore)
-- ✅ Estoque sincronizado em tempo real
-- ✅ Histórico de operações
-- ✅ Receitas de produção
-- ✅ Lista de compras com preços
-- ✅ Gestão de usuários e permissões
-- ✅ Dados isolados por usuário
+`seedFichas` é a única estrutura de seed. Ele só executa quando a coleção do Firestore está vazia, é idempotente e registra `seedVersion`. Dados existentes têm prioridade e não são sobrescritos. `defaultFichasTecnicas` não é utilizado.
 
-#### Segurança
-- ✅ Regras de acesso no Firestore
-- ✅ Apenas usuários autenticados acessam dados
-- ✅ Cada usuário vê apenas seus dados
-- ✅ Senhas criptografadas pelo Firebase Auth
+## Dados híbridos legados
 
-### 🔄 Como Funciona Agora
+Estoque, histórico e receitas ainda mantêm algumas rotinas Firebase + localStorage por compatibilidade. Essa migração será feita em etapa separada. localStorage não é fonte de identidade, autorização ou fichas financeiras oficiais.
 
-**Sistema Híbrido:**
-- 📦 **localStorage** (padrão) - Funciona offline, dados no navegador
-- ☁️ **Firebase** (opcional) - Dados na nuvem, sincronização em tempo real
+## Segurança
 
-**Você escolhe qual usar:**
-1. Para continuar com localStorage: não precisa fazer nada
-2. Para ativar Firebase: siga o guia `ATIVAR_FIREBASE.md`
+As regras em `firestore.rules` implementam owner, admin, operador, `/compras` e deny-by-default. Admin comum não pode substituir o owner, remover o último Responsável Principal ou alterar a credencial do owner.
 
-### 🚀 Próximos Passos
+## Validação
 
-#### Se quiser usar Firebase:
-1. Abra o guia: `ATIVAR_FIREBASE.md`
-2. Siga os 3 passos simples
-3. Pronto! Seus dados estarão na nuvem
-
-#### Se quiser continuar com localStorage:
-- Não precisa fazer nada
-- O sistema continua funcionando normalmente
-- Dados salvos no navegador
-
-### 📊 Comparação
-
-| Característica | localStorage | Firebase |
-|----------------|--------------|----------|
-| **Setup** | ✅ Já ativo | ⚙️ Precisa configurar |
-| **Funciona offline** | ✅ Sim | ❌ Precisa internet |
-| **Backup automático** | ❌ Não | ✅ Sim |
-| **Acesso remoto** | ❌ Só neste PC | ✅ De qualquer lugar |
-| **Sincronização** | ❌ Não | ✅ Tempo real |
-| **Múltiplos usuários** | ⚠️ Simulado | ✅ Real |
-| **Custo** | ✅ Grátis | ✅ Grátis (até 50k/dia) |
-| **Escalabilidade** | ⚠️ Limitado | ✅ Alta |
-
-### 🎓 Estrutura de Dados no Firestore
-
-```
-firestore/
-├── usuarios/{userId}/
-│   ├── perfil/
-│   │   └── info (role, permissoes, login)
-│   ├── estoque/
-│   │   └── itens[] (nome, min, atual, categoria)
-│   ├── historico/
-│   │   └── entradas[] (data, tipo, item, qtd, custo)
-│   ├── receitas/
-│   │   └── receitas[] (input, output, custos)
-│   └── listaCompras/
-│       └── itens[] (nome, qtd, preco, fornecedor)
-```
-
-### 🔐 Usuários Padrão
-
-**Com localStorage (atual):**
-- `thiago` / `123` (Admin)
-- `debora` / `456` (Operador)
-- `marcos` / `789` (Operador)
-
-**Com Firebase:**
-- Você cria os usuários no Firebase Console
-- Primeiro usuário deve ser criado manualmente
-- Demais usuários podem ser criados pelo painel Admin
-
-### 📦 Deploy
-
-**Vercel (com localStorage):**
 ```bash
-vercel deploy
+pnpm install
+pnpm test
+pnpm build
 ```
-
-**Firebase Hosting (com Firebase):**
-```bash
-npm run build
-firebase deploy --only hosting
-```
-
-### ⚠️ Importante
-
-**Variáveis de ambiente já configuradas:**
-- ✅ `NEXT_PUBLIC_FIREBASE_API_KEY`
-- ✅ `NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN`
-- ✅ `NEXT_PUBLIC_FIREBASE_PROJECT_ID`
-- ✅ `NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET`
-- ✅ `NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID`
-- ✅ `NEXT_PUBLIC_FIREBASE_APP_ID`
-
-**Para usar Firebase:**
-- Copie as credenciais do seu projeto Firebase
-- Cole nas variáveis de ambiente acima (no v0 ou Vercel)
-
-### 🛠️ Manutenção
-
-**Atualizar regras de segurança:**
-1. Edite `firestore.rules`
-2. No Firebase Console, publique as novas regras
-
-**Backup manual dos dados:**
-1. Firebase Console → Firestore Database
-2. Export/import manual
-3. Ou use scripts de backup automatizado
-
----
-
-## 📞 Suporte Rápido
-
-**Quero ativar Firebase agora:**
-→ Abra `ATIVAR_FIREBASE.md`
-
-**Quero ver exemplos de código:**
-→ Abra `INICIO_RAPIDO_FIREBASE.md`
-
-**Quero documentação técnica:**
-→ Abra `FIREBASE_SETUP.md`
-
-**Estou com problema:**
-→ Verifique os logs do console do navegador
-→ Verifique se as variáveis de ambiente estão corretas
-→ Verifique se criou o usuário no Firebase Authentication
-
----
-
-✨ **Tudo pronto para usar Firebase quando quiser!**

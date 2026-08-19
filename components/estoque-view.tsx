@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import type { Item } from "@/lib/types"
+import type { Item, MovimentacaoEstoque } from "@/lib/types"
 import {
   Select,
   SelectContent,
@@ -66,20 +66,34 @@ interface EstoqueViewProps {
   onAddItem: (item: Item) => void
   onEditItem: (oldNome: string, item: Item) => void
   onDeleteItem: (nome: string) => void
+  userRole: "admin" | "operador" | "owner"
+  movimentacoes?: MovimentacaoEstoque[]
+  onEstornarMovimentacao?: (movimentacao: MovimentacaoEstoque) => void
 }
 
-export function EstoqueView({ itens, onUpdateItem, onAddItem, onEditItem, onDeleteItem }: EstoqueViewProps) {
+export function EstoqueView({ itens, onUpdateItem, onAddItem, onEditItem, onDeleteItem, userRole, movimentacoes = [], onEstornarMovimentacao }: EstoqueViewProps) {
+  const isAdmin = userRole === "admin"
   const [search, setSearch] = useState("")
   const [categoriaFilter, setCategoriaFilter] = useState<string>("todas")
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
   const [selectedItem, setSelectedItem] = useState<Item | null>(null)
+  const [movimentacaoParaEstorno, setMovimentacaoParaEstorno] = useState<MovimentacaoEstoque | null>(null)
+  const [estornoProcessando, setEstornoProcessando] = useState(false)
+  const [historicoBusca, setHistoricoBusca] = useState("")
+  const [historicoStatus, setHistoricoStatus] = useState("todos")
+  const [detalheMovimentacao, setDetalheMovimentacao] = useState<MovimentacaoEstoque | null>(null)
+  const [historicoDe, setHistoricoDe] = useState("")
+  const [historicoAte, setHistoricoAte] = useState("")
   const [formData, setFormData] = useState({
     nome: "",
     categoria: "Carnes",
     min: 1,
     atual: 0,
+    unidadeEstoque: "Unidade",
+    quantidadePorEmbalagem: 1,
+    unidadeConteudo: "un",
   })
 
   const filteredItens = useMemo(() => {
@@ -145,12 +159,15 @@ export function EstoqueView({ itens, onUpdateItem, onAddItem, onEditItem, onDele
       categoria: formData.categoria,
       min: formData.min,
       atual: formData.atual,
+      unidadeEstoque: formData.unidadeEstoque,
+      quantidadePorEmbalagem: formData.quantidadePorEmbalagem,
+      unidadeConteudo: formData.unidadeConteudo,
       ultimaAlteracao: undefined,
     }
 
     onAddItem(newItem)
     setIsAddDialogOpen(false)
-    setFormData({ nome: "", categoria: "Carnes", min: 1, atual: 0 })
+    setFormData({ nome: "", categoria: "Carnes", min: 1, atual: 0, unidadeEstoque: "Unidade", quantidadePorEmbalagem: 1, unidadeConteudo: "un" })
     toast.success(`Item "${newItem.nome}" adicionado com sucesso!`)
   }
 
@@ -168,6 +185,9 @@ export function EstoqueView({ itens, onUpdateItem, onAddItem, onEditItem, onDele
       categoria: formData.categoria,
       min: formData.min,
       atual: formData.atual,
+      unidadeEstoque: formData.unidadeEstoque,
+      quantidadePorEmbalagem: formData.quantidadePorEmbalagem,
+      unidadeConteudo: formData.unidadeConteudo,
     }
 
     onEditItem(selectedItem.nome, updatedItem)
@@ -177,7 +197,7 @@ export function EstoqueView({ itens, onUpdateItem, onAddItem, onEditItem, onDele
   }
 
   const handleDeleteItem = () => {
-    if (!selectedItem) return
+    if (!isAdmin || !selectedItem) return
     
     onDeleteItem(selectedItem.nome)
     setIsDeleteDialogOpen(false)
@@ -192,6 +212,9 @@ export function EstoqueView({ itens, onUpdateItem, onAddItem, onEditItem, onDele
       categoria: item.categoria,
       min: item.min,
       atual: item.atual,
+      unidadeEstoque: item.unidadeEstoque ?? "Unidade",
+      quantidadePorEmbalagem: item.quantidadePorEmbalagem ?? 1,
+      unidadeConteudo: item.unidadeConteudo ?? "un",
     })
     setIsEditDialogOpen(true)
   }
@@ -310,6 +333,20 @@ export function EstoqueView({ itens, onUpdateItem, onAddItem, onEditItem, onDele
                       </SelectContent>
                     </Select>
                   </div>
+                  <div className="grid grid-cols-3 gap-3">
+                    <div className="space-y-2">
+                      <Label htmlFor="add-unidade">Unidade de estoque</Label>
+                      <Input id="add-unidade" value={formData.unidadeEstoque} onChange={(e) => setFormData({ ...formData, unidadeEstoque: e.target.value })} placeholder="Pacote" />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="add-conteudo">Qtd. embalagem</Label>
+                      <Input id="add-conteudo" type="number" min="0" value={formData.quantidadePorEmbalagem} onChange={(e) => setFormData({ ...formData, quantidadePorEmbalagem: Number(e.target.value) })} />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="add-unidade-conteudo">Unidade conteúdo</Label>
+                      <Input id="add-unidade-conteudo" value={formData.unidadeConteudo} onChange={(e) => setFormData({ ...formData, unidadeConteudo: e.target.value })} placeholder="kg" />
+                    </div>
+                  </div>
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label htmlFor="add-min">Estoque Mínimo</Label>
@@ -342,7 +379,7 @@ export function EstoqueView({ itens, onUpdateItem, onAddItem, onEditItem, onDele
                     variant="outline"
                     onClick={() => {
                       setIsAddDialogOpen(false)
-                      setFormData({ nome: "", categoria: "Carnes", min: 1, atual: 0 })
+                      setFormData({ nome: "", categoria: "Carnes", min: 1, atual: 0, unidadeEstoque: "Unidade", quantidadePorEmbalagem: 1, unidadeConteudo: "un" })
                     }}
                   >
                     Cancelar
@@ -387,6 +424,7 @@ export function EstoqueView({ itens, onUpdateItem, onAddItem, onEditItem, onDele
                 <TableRow className="border-border hover:bg-transparent">
                   <TableHead className="text-muted-foreground">Item</TableHead>
                   <TableHead className="text-muted-foreground">Categoria</TableHead>
+                  <TableHead className="text-muted-foreground">Embalagem</TableHead>
                   <TableHead className="text-muted-foreground text-center">Mínimo</TableHead>
                   <TableHead className="text-muted-foreground text-center">Atual</TableHead>
                   <TableHead className="text-muted-foreground text-center">Status</TableHead>
@@ -402,6 +440,9 @@ export function EstoqueView({ itens, onUpdateItem, onAddItem, onEditItem, onDele
                     </TableCell>
                     <TableCell className="text-muted-foreground">
                       {item.categoria}
+                    </TableCell>
+                    <TableCell className="text-muted-foreground text-xs">
+                      {item.quantidadePorEmbalagem ?? 1} {item.unidadeConteudo ?? "un"} / {item.unidadeEstoque ?? "Unidade"}
                     </TableCell>
                     <TableCell className="text-center text-muted-foreground">
                       {item.min}
@@ -453,14 +494,17 @@ export function EstoqueView({ itens, onUpdateItem, onAddItem, onEditItem, onDele
                         >
                           <Edit className="h-3 w-3" />
                         </Button>
-                        <Button
-                          variant="outline"
-                          size="icon"
-                          className="h-8 w-8 text-destructive hover:text-destructive"
-                          onClick={() => openDeleteDialog(item)}
-                        >
-                          <Trash2 className="h-3 w-3" />
-                        </Button>
+                        {isAdmin && (
+                          <Button
+                            variant="outline"
+                            size="icon"
+                            className="h-8 w-8 text-destructive hover:text-destructive"
+                            onClick={() => openDeleteDialog(item)}
+                            aria-label={`Excluir ${item.nome}`}
+                          >
+                            <Trash2 className="h-3 w-3" />
+                          </Button>
+                        )}
                       </div>
                     </TableCell>
                   </TableRow>
@@ -470,6 +514,11 @@ export function EstoqueView({ itens, onUpdateItem, onAddItem, onEditItem, onDele
           </div>
         </CardContent>
       </Card>
+
+      <Card><CardHeader><CardTitle>Histórico de Movimentações</CardTitle><div className="flex flex-wrap gap-2"><Input className="max-w-xs" placeholder="Buscar insumo, fornecedor ou responsável" value={historicoBusca} onChange={(e) => setHistoricoBusca(e.target.value)} /><Input className="w-36" type="date" aria-label="Data inicial" value={historicoDe} onChange={(e) => setHistoricoDe(e.target.value)} /><Input className="w-36" type="date" aria-label="Data final" value={historicoAte} onChange={(e) => setHistoricoAte(e.target.value)} /><Select value={historicoStatus} onValueChange={setHistoricoStatus}><SelectTrigger className="w-36"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="todos">Todas</SelectItem><SelectItem value="ativa">Ativas</SelectItem><SelectItem value="estornada">Estornadas</SelectItem><SelectItem value="saida">Saídas</SelectItem><SelectItem value="ajuste">Ajustes</SelectItem></SelectContent></Select></div></CardHeader><CardContent><div className="space-y-2">{movimentacoes.filter((mov) => { const termo = historicoBusca.toLocaleLowerCase(); const statusOk = historicoStatus === "todos" || (historicoStatus === "ativa" ? mov.status !== "estornada" : historicoStatus === "estornada" ? mov.status === "estornada" : mov.tipo === historicoStatus); const data = (mov.dataMovimentacao ?? mov.criadoEm).slice(0, 10); const periodoOk = (!historicoDe || data >= historicoDe) && (!historicoAte || data <= historicoAte); return (mov.tipo === "entrada" || mov.tipo === "saida" || mov.tipo === "estorno_entrada" || mov.tipo === "ajuste") && statusOk && periodoOk && (!termo || `${mov.insumoNomeSnapshot} ${mov.fornecedor ?? ""} ${mov.criadoPorEmail ?? mov.usuarioEmail}`.toLocaleLowerCase().includes(termo)) }).sort((a, b) => new Date(b.criadoEm).getTime() - new Date(a.criadoEm).getTime()).map((mov) => <div key={mov.id} className="flex flex-col gap-2 rounded-lg border p-3 text-sm md:flex-row md:items-center md:justify-between"><div><p className="font-medium">{mov.tipo === "saida" ? "Saída" : mov.tipo === "estorno_entrada" ? "Estorno" : mov.tipo === "ajuste" ? "Ajuste" : "Entrada"} · {mov.insumoNomeSnapshot} · {mov.quantidade > 0 ? "+" : ""}{mov.quantidade} {mov.unidadeSnapshot}</p><p className="text-muted-foreground">{new Date(mov.criadoEm).toLocaleString("pt-BR")} · {mov.usuarioEmail}{mov.fornecedor ? ` · ${mov.fornecedor}` : ""}</p></div><div className="flex items-center gap-2"><Button size="sm" variant="ghost" onClick={() => setDetalheMovimentacao(mov)}>Ver detalhes</Button><Badge variant={mov.status === "estornada" ? "destructive" : "secondary"}>{mov.status === "estornada" ? "Estornada" : "Efetivada"}</Badge>{(mov.status === "efetivada" || mov.status === "ativa") && (userRole === "admin" || userRole === "owner") && <Button size="sm" variant="outline" onClick={() => setMovimentacaoParaEstorno(mov)}>Estornar</Button>}</div></div>)}{movimentacoes.filter((mov) => mov.tipo === "entrada").length === 0 && <p className="text-sm text-muted-foreground">Nenhuma entrada rastreável registrada.</p>}</div></CardContent></Card>
+
+      <Dialog open={Boolean(detalheMovimentacao)} onOpenChange={(open) => !open && setDetalheMovimentacao(null)}><DialogContent><DialogHeader><DialogTitle>Detalhes da movimentação</DialogTitle><DialogDescription>{detalheMovimentacao && <span className="space-y-1"><span className="block">ID: {detalheMovimentacao.id}</span><span className="block">Tipo: {detalheMovimentacao.tipo} · Status: {detalheMovimentacao.status}</span><span className="block">Insumo: {detalheMovimentacao.insumoNomeSnapshot} ({detalheMovimentacao.insumoId})</span><span className="block">Quantidade: {detalheMovimentacao.quantidade} {detalheMovimentacao.unidadeSnapshot}</span><span className="block">Preço total: R$ {(detalheMovimentacao.precoTotal ?? detalheMovimentacao.valorTotal).toFixed(2)}</span><span className="block">Fornecedor: {detalheMovimentacao.fornecedor ?? "—"}</span><span className="block">Data: {new Date(detalheMovimentacao.dataMovimentacao ?? detalheMovimentacao.criadoEm).toLocaleDateString("pt-BR")}</span><span className="block">Criado em: {new Date(detalheMovimentacao.criadoEm).toLocaleString("pt-BR")}</span><span className="block">Responsável: {detalheMovimentacao.criadoPorEmail ?? detalheMovimentacao.usuarioEmail}</span>{detalheMovimentacao.movimentacaoOrigemId && <span className="block">Movimentação original: {detalheMovimentacao.movimentacaoOrigemId}</span>}</span>}</DialogDescription></DialogHeader></DialogContent></Dialog>
+      <AlertDialog open={Boolean(movimentacaoParaEstorno)} onOpenChange={(open) => !estornoProcessando && !open && setMovimentacaoParaEstorno(null)}><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Estornar entrada?</AlertDialogTitle><AlertDialogDescription>{movimentacaoParaEstorno && <span className="space-y-1"><span className="block">{movimentacaoParaEstorno.insumoNomeSnapshot} · {movimentacaoParaEstorno.quantidade} {movimentacaoParaEstorno.unidadeSnapshot}</span><span className="block">Estoque atual: {itens.find((item) => item.insumoId === movimentacaoParaEstorno.insumoId || item.nome === movimentacaoParaEstorno.insumoNomeSnapshot)?.atual ?? 0}</span><span className="block">Data: {new Date(movimentacaoParaEstorno.dataMovimentacao ?? movimentacaoParaEstorno.criadoEm).toLocaleDateString("pt-BR")}</span><span className="block">Responsável: {movimentacaoParaEstorno.criadoPorEmail ?? movimentacaoParaEstorno.usuarioEmail}</span></span>}</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel disabled={estornoProcessando}>Cancelar</AlertDialogCancel><AlertDialogAction disabled={estornoProcessando} onClick={async (event) => { event.preventDefault(); if (!movimentacaoParaEstorno || estornoProcessando) return; setEstornoProcessando(true); try { await onEstornarMovimentacao?.(movimentacaoParaEstorno); setMovimentacaoParaEstorno(null) } finally { setEstornoProcessando(false) } }}>{estornoProcessando ? "Estornando..." : "Confirmar estorno"}</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
 
       {/* Edit Dialog */}
       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
@@ -511,6 +560,20 @@ export function EstoqueView({ itens, onUpdateItem, onAddItem, onEditItem, onDele
                   ))}
                 </SelectContent>
               </Select>
+            </div>
+            <div className="grid grid-cols-3 gap-3">
+              <div className="space-y-2">
+                <Label htmlFor="edit-unidade">Unidade de estoque</Label>
+                <Input id="edit-unidade" value={formData.unidadeEstoque} onChange={(e) => setFormData({ ...formData, unidadeEstoque: e.target.value })} />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-conteudo">Qtd. embalagem</Label>
+                <Input id="edit-conteudo" type="number" min="0" value={formData.quantidadePorEmbalagem} onChange={(e) => setFormData({ ...formData, quantidadePorEmbalagem: Number(e.target.value) })} />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-unidade-conteudo">Unidade conteúdo</Label>
+                <Input id="edit-unidade-conteudo" value={formData.unidadeConteudo} onChange={(e) => setFormData({ ...formData, unidadeConteudo: e.target.value })} />
+              </div>
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">

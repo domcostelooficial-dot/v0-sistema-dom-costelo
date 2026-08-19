@@ -2,36 +2,106 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-    
-    // Helper function to check if user is authenticated
-    function isAuthenticated() {
-      return request.auth != null;
+    function isAuthenticated() { return request.auth != null; }
+    function profile() { return get(/databases/$(database)/documents/usuarios/$(request.auth.uid)); }
+    function isOwner() {
+      return isAuthenticated() && (
+        (exists(/databases/$(database)/documents/settings/system) && get(/databases/$(database)/documents/settings/system).data.ownerUid == request.auth.uid) ||
+        (!exists(/databases/$(database)/documents/settings/system) && request.auth.token.email == 'admin@domcostelo.com') ||
+        (profile().data.role == 'owner')
+      );
     }
-    
-    // Usuarios collection - qualquer usuário autenticado pode ler e escrever
-    // (o sistema gerencia permissões internamente)
+    function isAdminOrOwner() { return isOwner() || (isAuthenticated() && profile().data.role == 'admin'); }
+    function isOperatorOrHigher() { return isAdminOrOwner() || (isAuthenticated() && profile().data.role == 'operador'); }
+
+    match /settings/system {
+      allow read: if isAdminOrOwner();
+      allow write: if isOwner();
+    }
+
     match /usuarios/{userId} {
-      allow read, write: if isAuthenticated();
+      allow read: if isOwner() || (isAuthenticated() && request.auth.uid == userId);
+      allow create: if isOwner() || (isAuthenticated() && request.auth.uid == userId && request.resource.data.role == 'operador');
+      allow update: if isOwner() || (isAuthenticated() && request.auth.uid == userId && request.resource.data.role == resource.data.role);
+      allow delete: if isOwner() && resource.data.role != 'owner';
     }
-    
-    // Estoque global - qualquer usuário autenticado pode ler e escrever
+
     match /estoque/{docId} {
-      allow read, write: if isAuthenticated();
+      allow read: if isOperatorOrHigher();
+      allow create, update: if isOperatorOrHigher();
+      allow delete: if isAdminOrOwner();
     }
-    
-    // Histórico global - qualquer usuário autenticado pode ler e escrever
     match /historico/{docId} {
-      allow read, write: if isAuthenticated();
+      allow read: if isAdminOrOwner();
+      allow create: if isAdminOrOwner();
+      allow update, delete: if isOwner();
     }
-    
-    // Receitas globais - qualquer usuário autenticado pode ler e escrever
     match /receitas/{docId} {
-      allow read, write: if isAuthenticated();
+      allow read: if isOperatorOrHigher();
+      allow create, update: if isAdminOrOwner();
+      allow delete: if isOwner();
     }
-    
-    // User-specific data (legado - para compatibilidade)
+    match /compras/finance-config {
+      allow read: if isOperatorOrHigher();
+      allow write: if isAdminOrOwner();
+    }
+    match /compras/finance-vendas {
+      allow read: if isOperatorOrHigher();
+      allow create, update: if isOperatorOrHigher();
+      allow delete: if isAdminOrOwner();
+    }
+    match /compras/finance-despesas {
+      allow read: if isOperatorOrHigher();
+      allow create, update, delete: if isAdminOrOwner();
+    }
+    match /compras/finance-auditoria {
+      allow read: if isOperatorOrHigher();
+      allow create, update, delete: if isAdminOrOwner();
+    }
+    match /compras/fichas-tecnicas {
+      allow read: if isOperatorOrHigher();
+      allow create, update: if isAdminOrOwner();
+      allow delete: if isOwner();
+    }
+    match /movimentacoesEstoque/{movimentacaoId} {
+      allow read: if isOperatorOrHigher();
+      allow create: if isOperatorOrHigher();
+      allow update: if isAdminOrOwner();
+      allow delete: if false;
+    }
+    match /compras/movimentacoes-estoque {
+      allow read: if isOperatorOrHigher();
+      allow create, update: if isAdminOrOwner();
+      allow delete: if false;
+    }
+    match /compras/insumos {
+      allow read: if isOperatorOrHigher();
+      allow create, update: if isAdminOrOwner();
+      allow delete: if isOwner();
+    }
+    match /compras/{docId} {
+      allow read: if isOperatorOrHigher();
+      allow create, update: if isOperatorOrHigher() && docId != 'fichas-tecnicas' && docId != 'insumos';
+      allow delete: if isAdminOrOwner() && docId != 'fichas-tecnicas' && docId != 'insumos';
+    }
+    match /insumos/{docId} {
+      allow read: if isOperatorOrHigher();
+      allow create, update: if isAdminOrOwner();
+      allow delete: if isOwner();
+    }
+    match /fichas-tecnicas/{docId} {
+      allow read: if isOperatorOrHigher();
+      allow create, update: if isAdminOrOwner();
+      allow delete: if isOwner();
+    }
+    match /vendas/{docId} {
+      allow read: if isOperatorOrHigher();
+      allow create: if isOperatorOrHigher();
+      allow update, delete: if isAdminOrOwner();
+    }
     match /users/{userId}/{document=**} {
       allow read, write: if isAuthenticated() && request.auth.uid == userId;
     }
+    match /{document=**} { allow read, write: if false; }
   }
 }

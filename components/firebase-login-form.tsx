@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState } from "react"
 import Image from "next/image"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -9,8 +9,9 @@ import { FieldGroup, Field, FieldLabel } from "@/components/ui/field"
 import { Lock, User, Mail } from "lucide-react"
 import { signInWithEmail, signUpWithEmail } from "@/lib/firebase-auth"
 import type { User as FirebaseUser } from "firebase/auth"
-import { getUsuarios, saveUsuarios } from "@/lib/store"
-import { getAllUsuarios, createUsuarioProfile } from "@/lib/firebase-db"
+import { createUsuarioProfile, getUsuarioProfile } from "@/lib/firebase-db"
+import { signOut } from "firebase/auth"
+import { auth } from "@/lib/firebase"
 import type { UsuarioSistema } from "@/lib/types"
 
 interface FirebaseLoginFormProps {
@@ -26,26 +27,6 @@ export function FirebaseLoginForm({ onLogin }: FirebaseLoginFormProps) {
   const [success, setSuccess] = useState("")
   const [loading, setLoading] = useState(false)
   const [isSignUp, setIsSignUp] = useState(false)
-
-  // Inicializar usuarios do Firebase e localStorage quando o componente monta
-  useEffect(() => {
-    const loadUsuarios = async () => {
-      try {
-        // Carregar do localStorage primeiro
-        getUsuarios()
-        
-        // Tentar carregar do Firebase
-        const { data: firebaseUsuarios, error } = await getAllUsuarios()
-        if (!error && firebaseUsuarios && firebaseUsuarios.length > 0) {
-          // Sincronizar com localStorage
-          saveUsuarios(firebaseUsuarios)
-        }
-      } catch (err) {
-        console.error("[v0] Erro ao inicializar usuarios:", err)
-      }
-    }
-    loadUsuarios()
-  }, [])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -83,34 +64,36 @@ export function FirebaseLoginForm({ onLogin }: FirebaseLoginFormProps) {
         authError = result.error
 
         if (authError || !user) {
-          setError("Erro ao criar conta. Verifique os dados.")
+          const mensagem = authError?.toLowerCase() ?? ""
+          if (mensagem.includes("email-already-in-use")) {
+            setError("Este email já está cadastrado. Faça login ou use outro email.")
+          } else if (mensagem.includes("invalid-email")) {
+            setError("Digite um email válido.")
+          } else if (mensagem.includes("weak-password")) {
+            setError("A senha deve ter pelo menos 6 caracteres.")
+          } else if (mensagem.includes("operation-not-allowed")) {
+            setError("O cadastro por email está desativado no Firebase. Ative o provedor Email/Senha no Firebase Console.")
+          } else {
+            setError("Não foi possível criar a conta. Verifique o email e tente novamente.")
+            console.error("[v0] Erro detalhado ao criar conta Firebase:", authError)
+          }
           setLoading(false)
           return
         }
 
-        // Criar usuario pendente no sistema local e Firebase
-        const usuarios = getUsuarios()
         const displayName = user!.email?.split("@")[0] || user!.uid
-        
-        // Verificar se ja existe
-        if (!usuarios.some(u => u.email === user!.email)) {
-          const novoUsuario: UsuarioSistema = {
-            login: displayName,
-            nome: nome.trim(),
-            senha: "", // Senha gerenciada pelo Firebase
-            email: user!.email || "",
-            role: "operador",
-            permissoes: [],
-            status: "pendente",
-            dataCriacao: new Date().toLocaleString("pt-BR"),
-          }
-          usuarios.push(novoUsuario)
-          saveUsuarios(usuarios)
-          
-          // Salvar no Firebase também
-          const { login, ...userData } = novoUsuario
-          await createUsuarioProfile(login, userData)
+        const novoUsuario: UsuarioSistema = {
+          uid: user!.uid,
+          login: displayName,
+          nome: nome.trim(),
+          email: user!.email || "",
+          role: "operador",
+          permissoes: [],
+          status: "pendente",
+          ativo: false,
+          dataCriacao: new Date().toLocaleString("pt-BR"),
         }
+        await createUsuarioProfile(user!.uid, novoUsuario)
 
         // Mostrar mensagem de sucesso e aguardar aprovacao
         setSuccess("Conta criada com sucesso! Aguarde a aprovacao do administrador para acessar o sistema.")
@@ -134,116 +117,30 @@ export function FirebaseLoginForm({ onLogin }: FirebaseLoginFormProps) {
         return
       }
 
-      // Verificar se é o administrador master (sempre tem acesso)
-      const emailAdmin = "admin@domcostelo.com"
-      
-      if (user!.email === emailAdmin) {
-        console.log("[v0] Admin master detectado - acesso garantido")
-        const usuarios = getUsuarios()
-        
-        // Garantir que admin existe no sistema local e Firebase
-        let adminLocal = usuarios.find(u => u.email === emailAdmin)
-        if (!adminLocal) {
-          adminLocal = {
-            login: "admin",
-            senha: "",
-            email: emailAdmin,
-            role: "admin",
-            permissoes: ["estoque", "entrada", "financeiro", "dashboard", "lista-compras", "admin"],
-            status: "aprovado",
-            dataCriacao: new Date().toLocaleString("pt-BR"),
-          }
-          usuarios.push(adminLocal)
-          saveUsuarios(usuarios)
-          
-          // Salvar no Firebase também
-          const { login, ...userData } = adminLocal
-          await createUsuarioProfile(login, userData)
-        }
-        
-        setLoading(false)
-        onLogin("admin", "admin", ["estoque", "entrada", "financeiro", "dashboard", "lista-compras", "admin"])
-        return
-      }
-
-      // Verificar se usuario esta aprovado
-      const usuarios = getUsuarios()
       const displayName = user!.email?.split("@")[0] || user!.uid
-      
-      // Buscar por email ou por login (para usuarios antigos)
-      let usuarioSistema = usuarios.find(u => u.email === user!.email)
-      if (!usuarioSistema) {
-        usuarioSistema = usuarios.find(u => u.login.toLowerCase() === displayName.toLowerCase())
-      }
-      
-      // Verificar se existe algum admin aprovado no sistema
-      const existeAdminAprovado = usuarios.some(u => u.role === "admin" && u.status === "aprovado")
-      
-      if (!usuarioSistema) {
-        // Se nao existe nenhum admin aprovado, o primeiro usuario vira admin automaticamente
-        if (!existeAdminAprovado) {
-          console.log("[v0] Primeiro usuario - tornando admin")
-          const novoAdmin: UsuarioSistema = {
-            login: displayName,
-            senha: "",
-            email: user!.email || "",
-            role: "admin",
-            permissoes: ["estoque", "entrada", "financeiro", "dashboard", "lista-compras", "admin"],
-            status: "aprovado",
-            dataCriacao: new Date().toLocaleString("pt-BR"),
-          }
-          usuarios.push(novoAdmin)
-          saveUsuarios(usuarios)
-          
-          // Salvar no Firebase também
-          const { login, ...userData } = novoAdmin
-          await createUsuarioProfile(login, userData)
-          
-          setLoading(false)
-          onLogin(displayName, novoAdmin.role, novoAdmin.permissoes)
-          return
-        }
-        
-        // Usuario nao existe no sistema - criar como pendente
-        console.log("[v0] Novo usuario - criando como pendente")
-        const novoUsuario: UsuarioSistema = {
-          login: displayName,
-          senha: "",
-          email: user!.email || "",
-          role: "operador",
-          permissoes: [],
-          status: "pendente",
-          dataCriacao: new Date().toLocaleString("pt-BR"),
-        }
-        usuarios.push(novoUsuario)
-        saveUsuarios(usuarios)
-        
-        // Salvar no Firebase também
-        const { login, ...userData } = novoUsuario
-        await createUsuarioProfile(login, userData)
-        
-        setError("Sua conta esta pendente de aprovacao. Entre em contato com o administrador.")
+      const { data: usuarioSistema, error: profileError } = await getUsuarioProfile(user!.uid)
+      const isPrincipalOwner = user!.email?.toLowerCase() === "admin@domcostelo.com"
+
+      // O owner existente no Firebase Authentication continua sendo o fallback
+      // mesmo quando o perfil Firestore ainda não foi provisionado.
+      if ((profileError || !usuarioSistema) && isPrincipalOwner) {
         setLoading(false)
+        onLogin(displayName, "owner", ["estoque", "entrada", "financeiro", "dashboard", "lista-compras", "cmv", "admin"])
         return
       }
 
-      // Verificar status do usuario
-      console.log("[v0] Usuario encontrado:", usuarioSistema.login, "Status:", usuarioSistema.status)
-      
-      if (usuarioSistema.status === "pendente") {
-        setError("Sua conta esta aguardando aprovacao do administrador.")
+      if (profileError || !usuarioSistema) {
+        await signOut(auth)
+        setError("Seu usuário autenticado ainda não possui um perfil autorizado no Firestore.")
         setLoading(false)
         return
       }
-
-      if (usuarioSistema.status === "rejeitado") {
-        setError("Seu acesso foi negado pelo administrador.")
+      if (usuarioSistema.ativo === false || usuarioSistema.status === "pendente" || usuarioSistema.status === "rejeitado") {
+        await signOut(auth)
+        setError(usuarioSistema.ativo === false ? "Seu acesso está desativado." : "Sua conta aguarda aprovação do administrador.")
         setLoading(false)
         return
       }
-
-      // Usuario aprovado ou sem status (antigos) - fazer login
-      console.log("[v0] Login bem-sucedido para:", usuarioSistema.login)
       setLoading(false)
       onLogin(displayName, usuarioSistema.role, usuarioSistema.permissoes)
     } catch (err) {

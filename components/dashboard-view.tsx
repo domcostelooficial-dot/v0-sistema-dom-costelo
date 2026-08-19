@@ -2,6 +2,7 @@
 
 import { useMemo } from "react"
 import { Item, HistoricoEntry } from "@/lib/types"
+import { VendaFinanceira, DespesaFinanceira, FinanceConfig, percentualCmv, resumoFinanceiro, totalCustosFixosAtivos, pontoEquilibrio, diferencaPontoEquilibrio, progressoPontoEquilibrio, contarDiasAbertos, filtrarPeriodo } from "@/lib/finance-engine"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { BarChart3, PieChart, TrendingUp, Package } from "lucide-react"
 import {
@@ -20,6 +21,9 @@ import {
 interface DashboardViewProps {
   itens: Item[]
   historico: HistoricoEntry[]
+  vendasFinanceiras?: VendaFinanceira[]
+  despesasFinanceiras?: DespesaFinanceira[]
+  financeConfig?: FinanceConfig
 }
 
 const COLORS = [
@@ -30,7 +34,16 @@ const COLORS = [
   "hsl(var(--chart-5))",
 ]
 
-export function DashboardView({ itens, historico }: DashboardViewProps) {
+export function DashboardView({ itens, historico, vendasFinanceiras = [], despesasFinanceiras = [], financeConfig }: DashboardViewProps) {
+  const hoje = new Date()
+  const inicioMes = `${hoje.getFullYear()}-${String(hoje.getMonth() + 1).padStart(2, "0")}-01`
+  const fimMes = `${hoje.getFullYear()}-${String(hoje.getMonth() + 1).padStart(2, "0")}-${String(new Date(hoje.getFullYear(), hoje.getMonth() + 1, 0).getDate()).padStart(2, "0")}`
+  const dadosMesAtual = useMemo(() => filtrarPeriodo(vendasFinanceiras, despesasFinanceiras, inicioMes, fimMes), [vendasFinanceiras, despesasFinanceiras, inicioMes, fimMes])
+  const custosFixos = financeConfig ? totalCustosFixosAtivos(financeConfig) : 0
+  const resumoFinanceiroAtual = useMemo(() => resumoFinanceiro(dadosMesAtual.vendas, dadosMesAtual.despesas, custosFixos), [dadosMesAtual, custosFixos])
+  const cmvPercentual = percentualCmv(resumoFinanceiroAtual)
+  const diasAbertos = financeConfig ? contarDiasAbertos(hoje, financeConfig.diasFuncionamento) : 0
+  const equilibrio = pontoEquilibrio(custosFixos, resumoFinanceiroAtual.mcPercentual, resumoFinanceiroAtual.ticketMedio, diasAbertos)
   const gastosPorCategoria = useMemo(() => {
     const dados: Record<string, number> = {}
 
@@ -145,6 +158,25 @@ export function DashboardView({ itens, historico }: DashboardViewProps) {
           </CardContent>
         </Card>
       </div>
+
+      {vendasFinanceiras.length > 0 && (
+        <section aria-label="Indicadores financeiros" className="flex flex-col gap-4">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <h2 className="text-lg font-semibold text-foreground">Resumo financeiro</h2>
+              <p className="text-sm text-muted-foreground">Vendas ativas e despesas registradas</p>
+            </div>
+            <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Período atual</span>
+          </div>
+          <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
+            <Card className="border-border"><CardContent className="pt-6"><p className="text-xl font-bold text-foreground">R$ {resumoFinanceiroAtual.faturamentoBruto.toFixed(2)}</p><p className="text-xs text-muted-foreground">Faturamento</p></CardContent></Card>
+            <Card className="border-border"><CardContent className="pt-6"><p className="text-xl font-bold text-foreground">R$ {resumoFinanceiroAtual.receitaLiquida.toFixed(2)}</p><p className="text-xs text-muted-foreground">Receita líquida</p></CardContent></Card>
+            <Card className="border-border"><CardContent className="pt-6"><p className="text-xl font-bold text-foreground">{cmvPercentual.toFixed(1)}%</p><p className="text-xs text-muted-foreground">CMV</p></CardContent></Card>
+            <Card className="border-border"><CardContent className="pt-6"><p className="text-xl font-bold text-foreground">{resumoFinanceiroAtual.numeroVendas}</p><p className="text-xs text-muted-foreground">Vendas</p></CardContent></Card>
+          </div>
+          <Card className="border-border"><CardContent className="grid gap-4 pt-6 sm:grid-cols-3"><div><p className="text-sm text-muted-foreground">Margem contribuição</p><p className="text-lg font-semibold text-foreground">{resumoFinanceiroAtual.mcPercentual.toFixed(1)}%</p></div><div><p className="text-sm text-muted-foreground">Resultado operacional</p><p className="text-lg font-semibold text-foreground">R$ {resumoFinanceiroAtual.lucroOperacional.toFixed(2)}</p></div><div><p className="text-sm text-muted-foreground">Ponto de equilíbrio</p><p className="text-lg font-semibold text-foreground">{equilibrio.faturamento > 0 ? `R$ ${equilibrio.faturamento.toFixed(2)}` : "Sem dados suficientes"}</p><p className="text-xs text-muted-foreground">Falta: R$ {diferencaPontoEquilibrio(equilibrio.faturamento, resumoFinanceiroAtual.faturamentoBruto).toFixed(2)} · {progressoPontoEquilibrio(equilibrio.faturamento, resumoFinanceiroAtual.faturamentoBruto).toFixed(0)}%</p></div></CardContent></Card>
+        </section>
+      )}
 
       {/* Charts */}
       <div className="grid gap-6 md:grid-cols-2">

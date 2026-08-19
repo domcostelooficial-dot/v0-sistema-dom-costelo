@@ -1,13 +1,18 @@
-export type UnidadeInsumo = "un" | "g" | "kg" | "ml" | "l" | "pacote" | "caixa" | "bobina" | "maço" | "pct"
-export type CategoriaInsumo = "Carnes" | "Pães" | "Queijos" | "Molhos" | "Batatas/congelados" | "Bebidas" | "Embalagens" | "Mercearia"
+export type UnidadeInsumo = "un" | "g" | "kg" | "ml" | "l" | "m" | "pacote" | "caixa" | "bobina" | "maço" | "fardo" | "saco" | "garrafa" | "lata" | "pct" | "aplicação"
+export type CategoriaInsumo = "Carnes" | "Pães" | "Queijos" | "Molhos" | "Batatas/congelados" | "Bebidas" | "Embalagens" | "Mercearia" | "Laticínios" | "Padaria" | "Congelados" | "Temperos" | "Higiene/Limpeza" | "Outros"
 
 export interface Item {
+  id?: string
+  insumoId?: string
   nome: string
   min: number
   atual: number
   categoria: string
   preco?: number
   unidade?: UnidadeInsumo
+  unidadeEstoque?: string
+  quantidadePorEmbalagem?: number
+  unidadeConteudo?: string
   precoCompra?: number
   quantidadeEmbalagem?: number
   unidadeEmbalagem?: UnidadeInsumo
@@ -16,6 +21,9 @@ export interface Item {
   precoReferencia?: number
   unidadeReferencia?: string
   ultimaAtualizacaoPreco?: string
+  ativo?: boolean
+  naoVinculado?: boolean
+  origem?: "estoque" | "central"
   ultimaAlteracao?: {
     usuario: string
     data: string
@@ -25,13 +33,20 @@ export interface Item {
 export interface Insumo extends Item {
   categoria: CategoriaInsumo
   unidade: UnidadeInsumo
+  unidadeCompra?: UnidadeInsumo
+  unidadeBase?: "g" | "kg" | "ml" | "l" | "un"
+  unidadeConteudo?: UnidadeInsumo
   precoCompra: number
   quantidadeEmbalagem: number
+  quantidadeConteudo?: number
   unidadeEmbalagem: UnidadeInsumo
   custoUnitario: number
+  aliases?: string[]
+  revisaoUnidade?: boolean
 }
 
 export interface IngredienteFicha {
+  insumoId?: string
   insumoNome: string
   quantidade: number
   unidade: UnidadeInsumo
@@ -42,7 +57,35 @@ export interface FichaTecnica {
   nome: string
   precoVenda: number
   ingredientes: IngredienteFicha[]
+  embalagem?: number
+  categoria?: string
+  ativo?: boolean
   metaCmv?: number
+}
+
+export interface HistoricoPrecoInsumo {
+  id: string
+  insumoNome: string
+  precoAnterior: number
+  precoNovo: number
+  data: string
+  usuario?: string
+}
+
+export interface ComboItem {
+  tipo: "produto" | "insumo"
+  referenciaId: string
+  nome: string
+  quantidade: number
+  unidade?: UnidadeInsumo
+}
+
+export interface Combo {
+  id: string
+  nome: string
+  precoVenda: number
+  itens: ComboItem[]
+  ativo: boolean
 }
 
 export interface VendaProduto {
@@ -55,6 +98,40 @@ export interface VendaProduto {
 export interface PrevisaoVenda {
   produtoNome: string
   quantidade: number
+}
+
+export type TipoMovimentacaoEstoque = "entrada" | "estorno_entrada" | "saida" | "ajuste"
+
+export interface MovimentacaoEstoque {
+  id: string
+  tipo: TipoMovimentacaoEstoque
+  insumoId: string
+  insumoNomeSnapshot: string
+  quantidade: number
+  unidadeSnapshot: UnidadeInsumo
+  quantidadeBase: number
+  unidadeBase: UnidadeInsumo
+  precoUnitarioSnapshot: number
+  valorTotal: number
+  fornecedor?: string
+  observacao?: string
+  motivo?: "consumo" | "perda" | "vencimento" | "ajuste_manual" | "outro"
+  origem: "compras" | "estoque"
+  movimentacaoOrigemId?: string
+  movimentacaoOriginalId?: string
+  status: "efetivada" | "estornada" | "ativa"
+  usuarioId: string
+  usuarioEmail: string
+  criadoEm: string
+  dataMovimentacao?: string
+  criadoPorUid?: string
+  criadoPorEmail?: string
+  criadoPorNome?: string
+  estornadoEm?: string
+  estornadoPor?: string
+  estornadaPorUid?: string
+  precoTotal?: number
+  unidade?: UnidadeInsumo
 }
 
 export interface CompraRegistro {
@@ -95,25 +172,21 @@ export interface HistoricoEntry {
   data: string
 }
 
-export interface Usuario {
-  user: string
-  pass: string
-}
+export type UserRole = "owner" | "admin" | "operador"
 
-export type UserRole = "admin" | "operador"
-
-export type TabPermissao = "estoque" | "entrada" | "financeiro" | "dashboard" | "lista-compras" | "admin"
+export type TabPermissao = "estoque" | "entrada" | "financeiro" | "dashboard" | "lista-compras" | "cmv" | "admin"
 
 export type UserStatus = "pendente" | "aprovado" | "rejeitado"
 
 export interface UsuarioSistema {
+  uid?: string
   login: string
-  senha: string
   nome?: string
   email?: string
   role: UserRole
   permissoes: TabPermissao[]
   status: UserStatus
+  ativo?: boolean
   dataCriacao?: string
 }
 
@@ -126,20 +199,21 @@ export interface Receita {
   outputQtd: number
 }
 
-const defaultInsumoRows: Array<[string, UnidadeInsumo, number, number, UnidadeInsumo, CategoriaInsumo]> = [
-  ["Pão brioche", "un", 2.07, 1, "un", "Pães"], ["Pão australiano", "un", 2.53, 1, "un", "Pães"], ["Blend bovino 180g", "un", 6.35, 1, "un", "Carnes"],
-  ["Cheddar cremoso", "g", 50, 1500, "g", "Queijos"], ["Cream cheese", "g", 60, 1500, "g", "Queijos"], ["Bacon", "g", 32, 1000, "g", "Carnes"], ["Bacon Fatiado", "g", 32, 1000, "g", "Carnes"], ["Barbecue", "g", 40, 3500, "g", "Molhos"], ["Costela bovina desfiada", "g", 80, 1000, "g", "Carnes"], ["Mussarela", "g", 43, 1000, "g", "Queijos"], ["Batata frita", "g", 10, 1000, "g", "Batatas/congelados"], ["Anel de cebola", "g", 22, 1000, "g", "Batatas/congelados"], ["Farofa de bacon", "g", 55, 1000, "g", "Mercearia"], ["Cebolinha", "g", 30, 1000, "g", "Mercearia"], ["Embalagem H7", "un", 50, 100, "un", "Embalagens"], ["Saco Kraft", "un", 70, 100, "un", "Embalagens"], ["Papel acoplado", "un", 35, 200, "un", "Embalagens"], ["Sacola para Refrigerante", "un", 0, 1, "un", "Embalagens"]
-]
-export const defaultInsumos: Insumo[] = defaultInsumoRows.map(([nome, unidade, precoCompra, quantidadeEmbalagem, unidadeEmbalagem, categoria]) => ({ nome, unidade, precoCompra, quantidadeEmbalagem, unidadeEmbalagem, categoria, custoUnitario: precoCompra / quantidadeEmbalagem, min: 0, atual: 0 }))
+export type { CanalVenda, FinanceConfig, VendaFinanceira, DespesaFinanceira } from "./finance-engine"
 
-export const defaultFichasTecnicas: FichaTecnica[] = [
-  { id: "super-bacon-bbq", nome: "SUPER BACON BBQ", precoVenda: 35, ingredientes: [{ insumoNome: "Pão brioche", quantidade: 1, unidade: "un" }, { insumoNome: "Blend bovino 180g", quantidade: 1, unidade: "un" }, { insumoNome: "Cheddar cremoso", quantidade: 30, unidade: "g" }, { insumoNome: "Bacon", quantidade: 40, unidade: "g" }, { insumoNome: "Barbecue", quantidade: 20, unidade: "g" }, { insumoNome: "Saco Kraft", quantidade: 1, unidade: "un" }, { insumoNome: "Papel acoplado", quantidade: 1, unidade: "un" }] },
-  { id: "costeloburguer", nome: "COSTELOBURGUER", precoVenda: 35, ingredientes: [{ insumoNome: "Pão australiano", quantidade: 1, unidade: "un" }, { insumoNome: "Blend bovino 180g", quantidade: 1, unidade: "un" }, { insumoNome: "Mussarela", quantidade: 25, unidade: "g" }, { insumoNome: "Cream cheese", quantidade: 30, unidade: "g" }, { insumoNome: "Costela bovina desfiada", quantidade: 40, unidade: "g" }, { insumoNome: "Anel de cebola", quantidade: 40, unidade: "g" }, { insumoNome: "Barbecue", quantidade: 20, unidade: "g" }, { insumoNome: "Saco Kraft", quantidade: 1, unidade: "un" }, { insumoNome: "Papel acoplado", quantidade: 1, unidade: "un" }] },
-  { id: "dom-supreme", nome: "DOM SUPREME", precoVenda: 35, ingredientes: [{ insumoNome: "Pão australiano", quantidade: 1, unidade: "un" }, { insumoNome: "Blend bovino 180g", quantidade: 1, unidade: "un" }, { insumoNome: "Cheddar cremoso", quantidade: 30, unidade: "g" }, { insumoNome: "Farofa de bacon", quantidade: 40, unidade: "g" }, { insumoNome: "Anel de cebola", quantidade: 40, unidade: "g" }, { insumoNome: "Saco Kraft", quantidade: 1, unidade: "un" }, { insumoNome: "Papel acoplado", quantidade: 1, unidade: "un" }] },
-  { id: "dom-cheddar", nome: "DOM CHEDDAR", precoVenda: 35, ingredientes: [{ insumoNome: "Pão brioche", quantidade: 1, unidade: "un" }, { insumoNome: "Blend bovino 180g", quantidade: 1, unidade: "un" }, { insumoNome: "Cheddar cremoso", quantidade: 30, unidade: "g" }, { insumoNome: "Farofa de bacon", quantidade: 40, unidade: "g" }, { insumoNome: "Anel de cebola", quantidade: 40, unidade: "g" }, { insumoNome: "Saco Kraft", quantidade: 1, unidade: "un" }, { insumoNome: "Papel acoplado", quantidade: 1, unidade: "un" }] },
-  { id: "batata-dom-costelo", nome: "BATATA DOM COSTELO", precoVenda: 35, ingredientes: [{ insumoNome: "Batata frita", quantidade: 400, unidade: "g" }, { insumoNome: "Cream cheese", quantidade: 100, unidade: "g" }, { insumoNome: "Costela bovina desfiada", quantidade: 80, unidade: "g" }, { insumoNome: "Barbecue", quantidade: 50, unidade: "g" }, { insumoNome: "Embalagem H7", quantidade: 1, unidade: "un" }, { insumoNome: "Saco Kraft", quantidade: 1, unidade: "un" }] },
-  { id: "batata-cheddar-bacon", nome: "BATATA CHEDDAR E BACON", precoVenda: 32, ingredientes: [{ insumoNome: "Batata frita", quantidade: 400, unidade: "g" }, { insumoNome: "Cheddar cremoso", quantidade: 100, unidade: "g" }, { insumoNome: "Farofa de bacon", quantidade: 80, unidade: "g" }, { insumoNome: "Embalagem H7", quantidade: 1, unidade: "un" }, { insumoNome: "Saco Kraft", quantidade: 1, unidade: "un" }] }
+const defaultInsumoRows: Array<[string, UnidadeInsumo, number, number, UnidadeInsumo, CategoriaInsumo]> = [
+  ["Pão brioche 4CT", "un", 2.07, 1, "un", "Pães"], ["Pão Australiano Aussie", "un", 2.53, 1, "un", "Pães"], ["Carne de hambúrguer / Blend 180g", "un", 6.35, 180, "g", "Carnes"],
+  ["Cheddar Polenghi profissional", "pacote", 60, 1.5, "kg", "Queijos"], ["Cream cheese", "pacote", 60, 1.5, "kg", "Queijos"], ["Bacon em cubos", "kg", 32, 1, "kg", "Carnes"], ["Bacon fatiado", "kg", 32, 1, "kg", "Carnes"], ["Barbecue", "kg", 40, 3.5, "kg", "Molhos"], ["Costela Desfiada", "kg", 80, 1, "kg", "Carnes"], ["Mussarela", "kg", 43, 1, "kg", "Queijos"], ["Batata frita", "pacote", 20, 2, "kg", "Batatas/congelados"], ["Anel de cebola", "kg", 22, 1, "kg", "Batatas/congelados"], ["Farofa", "kg", 55, 1, "kg", "Mercearia"], ["Cebolinha", "maço", 3, 100, "g", "Mercearia"], ["Embalagem H7", "un", 50, 100, "un", "Embalagens"], ["Saco Kraft", "un", 70, 100, "un", "Embalagens"], ["Papel acoplado", "un", 35, 200, "un", "Embalagens"], ["Sacola para Refrigerante", "un", 0, 1, "un", "Embalagens"]
 ]
+const aliasesPorInsumo: Record<string, string[]> = {
+  "Carne de hambúrguer / Blend 180g": ["Carne de hambúrguer", "Blend bovino 180g", "Blend 180g"],
+  "Pão Australiano Aussie": ["Pão australiano", "Pão de Australiano Aussie", "Pão Australiano"],
+  "Pão brioche 4CT": ["Pão brioche", "Pão Brioche"],
+  "Bacon em cubos": ["Bacon", "Bacon cubos"],
+  "Costela Desfiada": ["Costela bovina desfiada", "Costela desfiada"],
+  "Cheddar Polenghi profissional": ["Cheddar cremoso", "Cheddar Polengui profissional"],
+}
+export const defaultInsumos: Insumo[] = defaultInsumoRows.map(([nome, unidade, precoCompra, quantidadeEmbalagem, unidadeEmbalagem, categoria]) => ({ nome, unidade, unidadeCompra: unidade, precoCompra, quantidadeEmbalagem, quantidadeConteudo: quantidadeEmbalagem, unidadeEmbalagem, unidadeConteudo: unidadeEmbalagem, unidadeBase: ["kg", "g"].includes(unidadeEmbalagem) ? "g" : unidadeEmbalagem === "l" ? "ml" : "un", aliases: aliasesPorInsumo[nome], categoria, custoUnitario: precoCompra / quantidadeEmbalagem, min: 0, atual: 0 }))
 
 export const defaultReceitas: Receita[] = [
   {
@@ -164,6 +238,12 @@ export const categorias = [
 ] as const
 
 export type Categoria = (typeof categorias)[number]
+
+export const catalogoEmbalagens: Array<[string, string, number, string, string]> = [
+  ["Carne de hambúrguer", "Unidade", 180, "g", "Carnes"], ["Costela Pronta", "Unidade", 1, "kg", "Carnes"], ["Costela Desfiada", "Kg", 1, "kg", "Carnes"], ["Bacon em cubos", "Kg", 1, "kg", "Carnes"], ["Bacon Fatiado", "Kg", 1, "kg", "Carnes"], ["Pão Australiano Aussie", "Unidade", 1, "un", "Padaria"], ["Pão brioche 4CT", "Unidade", 1, "un", "Padaria"], ["Batata", "Pacote", 2, "kg", "Insumos"], ["Anel de cebola", "Pacote", 1, "kg", "Insumos"], ["Mussarela", "Kg", 1, "kg", "Insumos"], ["Cream cheese", "Pacote", 1.5, "kg", "Insumos"], ["Cheddar Polenghi profissional", "Pacote", 1.5, "kg", "Insumos"], ["Molho de Cheddar", "Pacote", 1.5, "kg", "Insumos"], ["Óleo", "Unidade", 800, "ml", "Insumos"], ["Sal", "Pacote", 1, "kg", "Insumos"], ["Barbecue", "Unidade", 3.5, "kg", "Insumos"], ["Alho torrado", "Pacote", 1, "kg", "Insumos"], ["Cebolinha", "Unidade/maço", 100, "g", "Insumos"], ["Temperos", "Pacote", 1.9, "kg", "Insumos"], ["Pimenta Biquinho", "Pacote", 2, "kg", "Insumos"],
+  ["Embalagem H7", "Unidade", 1, "un", "Embalagens"], ["Embalagem H2", "Unidade", 1, "un", "Embalagens"], ["Embalagem de prato feito", "Unidade", 1, "un", "Embalagens"], ["Embalagem para talher", "Pacote", 100, "un", "Embalagens"], ["Embalagem de farofa", "Unidade", 1, "un", "Embalagens"], ["Lacre para delivery", "Bobina", 500, "un", "Embalagens"], ["Lacre para o forno", "Pacote", 100, "un", "Embalagens"], ["Guardanapo", "Pacote", 100, "un", "Embalagens"], ["Saco Kraft G", "Unidade", 1, "un", "Embalagens"], ["Saco Kraft GG (extra)", "Unidade", 1, "un", "Embalagens"], ["Papel acoplado metalizado", "Pacote", 200, "un", "Embalagens"], ["Papel acoplado (comum)", "Pacote", 200, "un", "Embalagens"], ["Palito para hambúrguer", "Pacote", 200, "un", "Embalagens"], ["Grampo da embalagem", "Pacote", 1000, "un", "Embalagens"], ["Copo descartável", "Pacote", 100, "un", "Embalagens"], ["Garfo descartável", "Pacote", 50, "un", "Embalagens"], ["Saco de embalar batata", "Bobina", 500, "un", "Embalagens"], ["Papel Celofane", "Bobina", 65, "metro", "Embalagens"], ["Sacola para Refrigerante", "Bobina", 100, "un", "Embalagens"],
+  ["Água para consumo", "Unidade", 1.5, "L", "Bebidas"], ["Água com gás", "Unidade", 500, "ml", "Bebidas"], ["Água normal", "Unidade", 500, "ml", "Bebidas"], ["Coca Zero 1,5L", "Unidade", 1.5, "L", "Bebidas"], ["Coca-Cola 1,5L", "Unidade", 1.5, "L", "Bebidas"], ["Del Valle 1,5L", "Unidade", 1.5, "L", "Bebidas"], ["Guaraná 1L", "Unidade", 1, "L", "Bebidas"], ["Coca Lata 350ml", "Unidade", 350, "ml", "Bebidas"], ["Guaraná lata 350ml", "Unidade", 350, "ml", "Bebidas"], ["Arroz", "Pacote", 5, "kg", "Cozinha"], ["Farofa", "Pacote", 900, "g", "Cozinha"], ["Veja multiuso", "Unidade", 500, "ml", "Limpeza"], ["Perfex", "Pacote", 100, "un", "Limpeza"], ["Detergente", "Unidade", 5, "L", "Limpeza"], ["Esponja de louça", "Pacote", 4, "un", "Limpeza"], ["Saco de lixo 30L", "Bobina", 25, "sacos", "Limpeza"], ["Saco de lixo 100L", "Bobina", 25, "sacos", "Limpeza"], ["Desinfetante", "Unidade", 1, "L", "Limpeza"], ["Touca", "Pacote", 100, "un", "Operacional"], ["Gás 13kg", "Unidade", 13, "kg", "Operacional"], ["Gás de maçarico", "Unidade", 300, "g", "Operacional"], ["Bobina térmica 80mm", "Bobina", 30, "metro", "Operacional"],
+]
 
 export const defaultItens: Item[] = [
   { nome: "Carne de hambúrguer", min: 12, atual: 12, categoria: "Carnes" },

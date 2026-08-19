@@ -12,9 +12,11 @@ import {
   where,
   Timestamp,
   onSnapshot,
+  runTransaction,
 } from "firebase/firestore"
 import { db } from "./firebase"
-import type { Item, HistoricoEntry, Receita, UsuarioSistema, Insumo, FichaTecnica, VendaProduto, CompraRegistro } from "./types"
+import type { Item, HistoricoEntry, Receita, UsuarioSistema, Insumo, FichaTecnica, VendaProduto, CompraRegistro, FinanceConfig, VendaFinanceira, DespesaFinanceira, MovimentacaoEstoque } from "./types"
+import type { FinanceAuditSnapshot } from "./finance-engine"
 
 // Collections - dados globais compartilhados
 const USUARIOS_COLLECTION = "usuarios"
@@ -27,10 +29,14 @@ export async function createUsuarioProfile(
   data: Omit<UsuarioSistema, "login">
 ) {
   try {
+    const safeRole = data.role === "owner" || data.role === "admin" ? "operador" : data.role
     await setDoc(doc(db, USUARIOS_COLLECTION, userId), {
       ...data,
-      login: userId,
+      uid: userId,
+      role: safeRole,
+      login: data.email || userId,
       createdAt: Timestamp.now(),
+      updatedAt: Timestamp.now(),
     })
     return { error: null }
   } catch (error: any) {
@@ -263,10 +269,116 @@ export async function getInsumos() { return getComprasData<Insumo>("insumos") }
 export async function saveInsumos(data: Insumo[]) { return saveComprasData("insumos", data) }
 export async function getFichasTecnicas() { return getComprasData<FichaTecnica>("fichas-tecnicas") }
 export async function saveFichasTecnicas(data: FichaTecnica[]) { return saveComprasData("fichas-tecnicas", data) }
+
+export async function getFinanceConfig() { const rows = await getComprasData<FinanceConfig>("finance-config"); return rows[0] }
+export async function saveFinanceConfig(data: FinanceConfig) { return saveComprasData("finance-config", [data]) }
+export async function getVendasFinanceiras() { return getComprasData<VendaFinanceira>("finance-vendas") }
+export async function saveVendasFinanceiras(data: VendaFinanceira[]) { return saveComprasData("finance-vendas", data) }
+export async function getDespesasFinanceiras() { return getComprasData<DespesaFinanceira>("finance-despesas") }
+export async function saveDespesasFinanceiras(data: DespesaFinanceira[]) { return saveComprasData("finance-despesas", data) }
+export async function getFinanceAuditSnapshots() { return getComprasData<FinanceAuditSnapshot>("finance-auditoria") }
+export async function saveFinanceAuditSnapshot(data: FinanceAuditSnapshot) { const existentes = await getFinanceAuditSnapshots(); return saveComprasData("finance-auditoria", [...existentes.filter(item => item.competencia !== data.competencia), data]) }
+
+export async function initializeFichasTecnicas(seed: FichaTecnica[], seedVersion = 1) {
+  const existing = await getFichasTecnicas()
+  if (existing.length > 0) return { data: existing, seeded: false }
+  await saveFichasTecnicas(seed)
+  await setDoc(doc(db, "settings", "system"), { seedVersion, updatedAt: Timestamp.now() }, { merge: true })
+  return { data: seed, seeded: true }
+}
 export async function getVendasProdutos() { return getComprasData<VendaProduto>("vendas") }
 export async function saveVendasProdutos(data: VendaProduto[]) { return saveComprasData("vendas", data) }
 export async function getComprasHistorico() { return getComprasData<CompraRegistro>("historico") }
 export async function saveComprasHistorico(data: CompraRegistro[]) { return saveComprasData("historico", data) }
+const MOVIMENTACOES_COLLECTION = "movimentacoesEstoque"
+
+export async function getMovimentacoesEstoque() {
+  const snapshot = await getDocs(collection(db, MOVIMENTACOES_COLLECTION))
+  const novas = snapshot.docs.map((item) => ({ id: item.id, ...item.data() }) as MovimentacaoEstoque)
+  const legado = await getComprasData<MovimentacaoEstoque>("movimentacoes-estoque")
+  return [...novas, ...legado.filter((item) => !novas.some((novo) => novo.id === item.id))]
+}
+
+export async function saveMovimentacoesEstoque(data: MovimentacaoEstoque[]) {
+  for (const item of data) {
+    const id = item.id || crypto.randomUUID()
+    await setDoc(doc(db, MOVIMENTACOES_COLLECTION, id), { ...item, id })
+  }
+}
+
+export async function registrarEntradaAtomica(params: { movimento: MovimentacaoEstoque; itemNome: string; userId: string }) {
+  const movimentoRef = doc(db, MOVIMENTACOES_COLLECTION, params.movimento.id)
+  const estoqueRef = doc(db, "estoque", "global")
+  return runTransaction(db, async (transaction) => {
+    const estoqueSnap = await transaction.get(estoqueRef)
+    const itens = (estoqueSnap.exists() ? estoqueSnap.data().itens : []) as Item[]
+    const index = itens.findIndex((item) => item.nome === params.itemNome || item.insumoId === params.movimento.insumoId)
+    if (index < 0) throw new Error("Insumo não encontrado no estoque")
+    const item = itens[index]
+    const quantidade = params.movimento.quantidade
+    if (!Number.isFinite(quantidade) || quantidade <= 0) throw new Error("A quantidade deve ser maior que zero")
+    const atualizados = itens.map((row, rowIndex) => rowIndex === index ? { ...row, atual: row.atual + quantidade } : row)
+    transaction.set(estoqueRef, { itens: atualizados, updatedAt: Timestamp.now(), lastModifiedBy: params.userId })
+    transaction.set(movimentoRef, params.movimento)
+    return atualizados
+  })
+}
+
+export async function registrarSaidaAtomica(params: { movimento: MovimentacaoEstoque; itemNome: string; userId: string }) {
+  const movimentoRef = doc(db, MOVIMENTACOES_COLLECTION, params.movimento.id)
+  const estoqueRef = doc(db, "estoque", "global")
+  return runTransaction(db, async (transaction) => {
+    const estoqueSnap = await transaction.get(estoqueRef)
+    const itens = (estoqueSnap.exists() ? estoqueSnap.data().itens : []) as Item[]
+    const index = itens.findIndex((item) => item.nome === params.itemNome || item.insumoId === params.movimento.insumoId)
+    if (index < 0) throw new Error("Insumo não encontrado no estoque")
+    const item = itens[index]
+    const quantidade = Math.abs(params.movimento.quantidade)
+    if (!Number.isFinite(quantidade) || quantidade <= 0) throw new Error("A quantidade deve ser maior que zero")
+    if (item.atual < quantidade) throw new Error("Estoque insuficiente para esta saída")
+    const atualizados = itens.map((row, rowIndex) => rowIndex === index ? { ...row, atual: row.atual - quantidade } : row)
+    transaction.set(estoqueRef, { itens: atualizados, updatedAt: Timestamp.now(), lastModifiedBy: params.userId })
+    transaction.set(movimentoRef, { ...params.movimento, quantidade: -quantidade, quantidadeBase: -Math.abs(params.movimento.quantidadeBase) })
+    return atualizados
+  })
+}
+
+export async function ajustarEstoqueAtomico(params: { itemNome: string; quantidadeAtual: number; movimento: MovimentacaoEstoque; userId: string }) {
+  const movimentoRef = doc(db, MOVIMENTACOES_COLLECTION, params.movimento.id)
+  const estoqueRef = doc(db, "estoque", "global")
+  return runTransaction(db, async (transaction) => {
+    const estoqueSnap = await transaction.get(estoqueRef)
+    const itens = (estoqueSnap.exists() ? estoqueSnap.data().itens : []) as Item[]
+    const index = itens.findIndex((item) => item.nome === params.itemNome)
+    if (index < 0) throw new Error("Item não encontrado no estoque")
+    if (!Number.isFinite(params.quantidadeAtual) || params.quantidadeAtual < 0) throw new Error("Quantidade inválida")
+    const atualizados = itens.map((row, rowIndex) => rowIndex === index ? { ...row, atual: params.quantidadeAtual } : row)
+    transaction.set(estoqueRef, { itens: atualizados, updatedAt: Timestamp.now(), lastModifiedBy: params.userId })
+    transaction.set(movimentoRef, params.movimento)
+    return atualizados
+  })
+}
+
+export async function estornarMovimentacaoAtomica(params: { movimentoId: string; usuario: { uid: string; email?: string; nome?: string } }) {
+  const movimentoRef = doc(db, MOVIMENTACOES_COLLECTION, params.movimentoId)
+  const estoqueRef = doc(db, "estoque", "global")
+  return runTransaction(db, async (transaction) => {
+    const movimentoSnap = await transaction.get(movimentoRef)
+    const estoqueSnap = await transaction.get(estoqueRef)
+    if (!movimentoSnap.exists()) throw new Error("Movimentação não encontrada")
+    const original = { id: movimentoSnap.id, ...movimentoSnap.data() } as MovimentacaoEstoque
+    if (original.tipo !== "entrada" || original.status === "estornada") throw new Error("Esta entrada já foi estornada.")
+    const itens = (estoqueSnap.exists() ? estoqueSnap.data().itens : []) as Item[]
+    const index = itens.findIndex((item) => item.insumoId === original.insumoId || item.nome === original.insumoNomeSnapshot)
+    if (index < 0 || itens[index].atual < original.quantidade) throw new Error("Não é possível estornar esta entrada porque o estoque atual é insuficiente.")
+    const agora = new Date().toISOString()
+    const inversa: MovimentacaoEstoque = { ...original, id: crypto.randomUUID(), tipo: "estorno_entrada", quantidade: -Math.abs(original.quantidade), quantidadeBase: -Math.abs(original.quantidadeBase), valorTotal: -Math.abs(original.valorTotal), precoTotal: -Math.abs(original.precoTotal ?? original.valorTotal), movimentacaoOrigemId: original.id, movimentacaoOriginalId: original.id, unidade: original.unidadeSnapshot, status: "ativa", usuarioId: params.usuario.uid, insumoNomeSnapshot: original.insumoNomeSnapshot, dataMovimentacao: agora, usuarioEmail: params.usuario.email ?? "", criadoPorUid: params.usuario.uid, criadoPorEmail: params.usuario.email, criadoPorNome: params.usuario.nome, criadoEm: agora }
+    transaction.update(movimentoRef, { status: "estornada", estornadoEm: agora, estornadoPor: params.usuario.uid, estornadaPorUid: params.usuario.uid })
+    transaction.update(estoqueRef, { itens: itens.map((item, itemIndex) => itemIndex === index ? { ...item, atual: item.atual - original.quantidade } : item), updatedAt: Timestamp.now(), lastModifiedBy: params.usuario.uid })
+    transaction.set(doc(db, MOVIMENTACOES_COLLECTION, inversa.id), inversa)
+    return inversa
+  })
+}
 
 export function subscribeToReceitas(callback: (receitas: Receita[]) => void) {
   return onSnapshot(

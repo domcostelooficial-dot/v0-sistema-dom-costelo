@@ -1,15 +1,12 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
-import { Item, HistoricoEntry, Receita, Insumo, CompraRegistro, defaultInsumos } from "@/lib/types"
+import { Item, HistoricoEntry, Receita, Insumo, CompraRegistro, VendaFinanceira, DespesaFinanceira, FinanceConfig, MovimentacaoEstoque, defaultInsumos } from "@/lib/types"
 import {
   saveEstoque as saveEstoqueLocal,
   getEstoque as getEstoqueLocal,
   saveHistorico as saveHistoricoLocal,
   getHistorico as getHistoricoLocal,
-  getUser,
-  saveUser,
-  clearUser,
   getReceitas as getReceitasLocal,
   saveReceitas as saveReceitasLocal,
 } from "@/lib/store"
@@ -25,21 +22,46 @@ import {
   subscribeToReceitas,
   getInsumos,
   saveInsumos,
+  getFichasTecnicas,
+  initializeFichasTecnicas,
+  saveFichasTecnicas,
   getComprasHistorico,
   saveComprasHistorico,
+  getFinanceConfig,
+  saveFinanceConfig,
+  getVendasFinanceiras,
+  saveVendasFinanceiras,
+  getDespesasFinanceiras,
+  saveDespesasFinanceiras,
+  getFinanceAuditSnapshots,
+  saveFinanceAuditSnapshot,
+  getMovimentacoesEstoque,
+  saveMovimentacoesEstoque,
+  registrarEntradaAtomica,
+  registrarSaidaAtomica,
+  ajustarEstoqueAtomico,
+  estornarMovimentacaoAtomica,
 } from "@/lib/firebase-db"
+import { criarEntrada, criarSaida } from "@/lib/estoque-movements"
+import { SaidaEstoqueView } from "@/components/saida-estoque-view"
+import { toast } from "sonner"
+import type { FinanceAuditSnapshot } from "@/lib/finance-engine"
 import { FirebaseLoginForm } from "@/components/firebase-login-form"
 import { AppSidebar } from "@/components/app-sidebar"
 import { EstoqueView } from "@/components/estoque-view"
 import { EntradaView } from "@/components/entrada-view"
-import { FinanceiroView } from "@/components/financeiro-view"
+import { FinanceiroCentral } from "@/components/financeiro-central"
 import { DashboardView } from "@/components/dashboard-view"
 import { ListaComprasView } from "@/components/lista-compras-view"
 import { AdminView } from "@/components/admin-view"
+import { CmvView } from "@/components/cmv-view"
+import { seedFichas } from "@/lib/cmv-engine"
 import { Menu, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { signOut } from "firebase/auth"
+import { auth } from "@/lib/firebase"
 
-type Tab = "estoque" | "entrada" | "financeiro" | "dashboard" | "lista-compras" | "admin"
+type Tab = "estoque" | "entrada" | "saida" | "financeiro" | "dashboard" | "lista-compras" | "cmv" | "admin"
 
 const ITENS_REMOVIDOS = new Set(["Costela Crua", "Contra filé", "Manteiga de Garrafa", "Limoneto"])
 
@@ -146,29 +168,55 @@ export default function Home() {
   const [receitas, setReceitas] = useState<Receita[]>([])
   const [insumos, setInsumos] = useState<Insumo[]>(defaultInsumos)
   const [comprasHistorico, setComprasHistorico] = useState<CompraRegistro[]>([])
+  const [movimentacoes, setMovimentacoes] = useState<MovimentacaoEstoque[]>([])
+  const [fichasTecnicas, setFichasTecnicas] = useState<typeof seedFichas>([])
+  const [fichasLoading, setFichasLoading] = useState(true)
+  const [financeConfig, setFinanceConfig] = useState<FinanceConfig | undefined>(undefined)
+  const [vendasFinanceiras, setVendasFinanceiras] = useState<VendaFinanceira[]>([])
+  const [despesasFinanceiras, setDespesasFinanceiras] = useState<DespesaFinanceira[]>([])
+ const [auditoriaJulho, setAuditoriaJulho] = useState<FinanceAuditSnapshot | undefined>(undefined)
+  const persistirFichas = (data: typeof seedFichas) => { if (userRole !== "owner" && userRole !== "admin") return false; setFichasTecnicas(data); saveFichasTecnicas(data).catch((err) => console.error("[v0] Erro ao salvar fichas:", err)); return true }
 
   const getComprasHybrid = async () => {
     try {
-      const [insumosResult, historicoResult] = await Promise.all([getInsumos(), getComprasHistorico()])
-      if (insumosResult.length > 0) setInsumos(insumosResult)
-      if (historicoResult.length > 0) setComprasHistorico(historicoResult)
+  const [insumosResult, historicoResult, fichasResult, movimentacoesResult] = await Promise.all([getInsumos(), getComprasHistorico(), getFichasTecnicas(), getMovimentacoesEstoque()])
+  if (insumosResult.length > 0) setInsumos(insumosResult)
+  if (historicoResult.length > 0) setComprasHistorico(historicoResult)
+  if (fichasResult.length > 0) setFichasTecnicas(fichasResult)
+  if (movimentacoesResult.length > 0) setMovimentacoes(movimentacoesResult)
     } catch (err) {
       console.error("[v0] Erro ao carregar dados financeiros do estoque:", err)
     }
   }
-  const persistirInsumos = (data: Insumo[]) => { setInsumos(data); saveInsumos(data).catch((err) => console.error("[v0] Erro ao salvar preços:", err)) }
+  const persistirInsumos = (data: Insumo[]) => { if (userRole !== "owner" && userRole !== "admin") return; setInsumos(data); saveInsumos(data).catch((err) => console.error("[v0] Erro ao salvar insumos:", err)) }
   const persistirCompras = (data: CompraRegistro[]) => { setComprasHistorico(data); saveComprasHistorico(data).catch((err) => console.error("[v0] Erro ao salvar compras:", err)) }
+  const estornarMovimentacao = async (movimentacao: MovimentacaoEstoque) => {
+    if (userRole !== "owner" && userRole !== "admin") { toast.error("Você não tem permissão para estornar entradas."); return }
+    try {
+      await estornarMovimentacaoAtomica({ movimentoId: movimentacao.id, usuario: { uid: auth.currentUser?.uid ?? "unknown", email: auth.currentUser?.email ?? undefined, nome: auth.currentUser?.displayName ?? undefined } })
+      const next = await getMovimentacoesEstoque(); setMovimentacoes(next); setItens(await getEstoqueHybrid(user)); toast.success("Entrada estornada com sucesso.")
+    } catch (error) { toast.error(error instanceof Error ? error.message : "Não foi possível estornar a entrada.") }
+  }
+
+  const registrarEntradaRastreavel = async (nome: string, qtd: number, custo: number, fornecedor?: string, observacao?: string, dataMovimentacao?: string) => {
+    const item = itens.find((row) => row.nome === nome)
+    const insumo = insumos.find((row) => row.id === item?.insumoId || row.nome === nome)
+    if (!userPermissoes.includes("entrada") && userRole !== "owner" && userRole !== "admin") throw new Error("Você não tem permissão para registrar entrada.")
+    if (!item || !insumo || item.ativo === false || item.naoVinculado === true) throw new Error("Este item não está disponível para entrada.")
+    const currentUser = auth.currentUser
+    if (!currentUser) throw new Error("Usuário autenticado não encontrado.")
+    const unidade = (item.unidadeEstoque === "Unidade" ? "un" : item.unidadeEstoque) as Insumo["unidade"]
+    const movimento = { ...criarEntrada({ insumo: { ...insumo, id: item.insumoId ?? insumo.id }, quantidade: qtd, unidade, precoUnitario: qtd > 0 ? custo / qtd : 0, fornecedor, observacao, dataMovimentacao, usuario: { id: currentUser.uid, email: currentUser.email ?? undefined, nome: currentUser.displayName ?? undefined } }), status: "ativa" as const }
+    const atualizados = await registrarEntradaAtomica({ movimento, itemNome: nome, userId: currentUser.uid })
+    setItens(atualizados); setMovimentacoes(await getMovimentacoesEstoque()); toast.success("Entrada registrada com sucesso.")
+  }
 
   // Load data on mount
   useEffect(() => {
     const loadData = async () => {
-      const storedUser = getUser()
-      const storedItens = await getEstoqueHybrid(storedUser)
-      const storedHistorico = await getHistoricoHybrid(storedUser)
-      const storedReceitas = await getReceitasHybrid(storedUser)
-      await getComprasHybrid()
-
-      setUser(storedUser)
+      const storedItens = await getEstoqueHybrid(null)
+      const storedHistorico = await getHistoricoHybrid(null)
+      const storedReceitas = await getReceitasHybrid(null)
       setItens(storedItens)
       setHistorico(storedHistorico)
       setReceitas(storedReceitas)
@@ -214,7 +262,6 @@ export default function Home() {
   }, [user])
 
   const handleLogin = (username: string, role: string, permissoes: string[]) => {
-    saveUser(username)
     setUser(username)
     setUserRole(role)
     setUserPermissoes(permissoes)
@@ -224,6 +271,14 @@ export default function Home() {
       const itens = await getEstoqueHybrid(username)
       const historico = await getHistoricoHybrid(username)
       const receitas = await getReceitasHybrid(username)
+      const fichas = await initializeFichasTecnicas(seedFichas)
+      const [config, vendas, despesas, auditorias] = await Promise.all([getFinanceConfig(), getVendasFinanceiras(), getDespesasFinanceiras(), getFinanceAuditSnapshots()])
+      setFinanceConfig(config)
+      setAuditoriaJulho(auditorias.find(item => item.competencia === "2026-07"))
+      setVendasFinanceiras(vendas)
+      setDespesasFinanceiras(despesas)
+      setFichasTecnicas(fichas.data)
+      setFichasLoading(false)
       await getComprasHybrid()
       
       setItens(itens)
@@ -237,8 +292,8 @@ export default function Home() {
     setActiveTab(firstAllowedTab || "estoque")
   }
 
-  const handleLogout = () => {
-    clearUser()
+  const handleLogout = async () => {
+    await signOut(auth)
     setUser(null)
     setUserRole("")
     setUserPermissoes([])
@@ -302,41 +357,24 @@ export default function Home() {
   }
 
   const handleDeleteItem = (nome: string) => {
+    if (userRole !== "admin") return
     const updated = itens.filter((item) => item.nome !== nome)
     setItens(updated)
     saveEstoqueHybrid(user, updated)
   }
 
-  const handleEntrada = (nome: string, qtd: number, custo: number) => {
-    const now = new Date()
-    const dataHora = `${now.toLocaleDateString("pt-BR")} às ${now.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}`
-    
-    // Update estoque
-    const updated = itens.map((item) =>
-      item.nome === nome
-        ? {
-            ...item,
-            atual: item.atual + qtd,
-            ultimaAlteracao: {
-              usuario: user || "Desconhecido",
-              data: dataHora,
-            },
-          }
-        : item
-    )
-    setItens(updated)
-    saveEstoqueHybrid(user, updated)
+  const handleEntrada = (nome: string, qtd: number, custo: number, fornecedor?: string, observacao?: string, dataMovimentacao?: string) => registrarEntradaRastreavel(nome, qtd, custo, fornecedor, observacao, dataMovimentacao)
 
-    // Add to historico
-    const entry: HistoricoEntry = {
-      nome,
-      qtd,
-      custo,
-      data: new Date().toLocaleDateString("pt-BR"),
-    }
-    const newHistorico = [...historico, entry]
-    setHistorico(newHistorico)
-    saveHistoricoHybrid(user, newHistorico)
+  const registrarSaida = async (nome: string, quantidade: number, motivo: NonNullable<MovimentacaoEstoque["motivo"]>, observacao?: string) => {
+    if (!userPermissoes.includes("saida") && userRole !== "owner" && userRole !== "admin") throw new Error("Você não tem permissão para registrar saídas.")
+    const item = itens.find((row) => row.nome === nome)
+    const insumo = insumos.find((row) => row.id === item?.insumoId || row.nome === nome)
+    const currentUser = auth.currentUser
+    if (!item || !insumo || !currentUser || item.ativo === false || item.naoVinculado === true) throw new Error("Este item não está disponível para saída.")
+    const unidade = (item.unidadeEstoque === "Unidade" ? "un" : item.unidadeEstoque) as Insumo["unidade"]
+    const movimento = criarSaida({ insumo: { ...insumo, id: item.insumoId ?? insumo.id }, quantidade, unidade, motivo, observacao, usuario: { id: currentUser.uid, email: currentUser.email ?? undefined, nome: currentUser.displayName ?? undefined } })
+    const atualizados = await registrarSaidaAtomica({ movimento, itemNome: nome, userId: currentUser.uid })
+    setItens(atualizados); setMovimentacoes(await getMovimentacoesEstoque()); toast.success("Saída registrada com sucesso.")
   }
 
   const handleProduzir = (receita: Receita) => {
@@ -411,23 +449,27 @@ export default function Home() {
             <h1 className="text-3xl font-bold tracking-tight text-foreground capitalize">
               {activeTab === "estoque" && "Controle de Estoque"}
               {activeTab === "entrada" && "Entrada de Mercadoria"}
+              {activeTab === "saida" && "Saída de Estoque"}
               {activeTab === "financeiro" && "Financeiro"}
               {activeTab === "dashboard" && "Dashboard"}
-              {activeTab === "lista-compras" && "Lista de Compras"}
-              {activeTab === "admin" && "Administração"}
+ {activeTab === "lista-compras" && "Lista de Compras"}
+ {activeTab === "cmv" && "Ficha Técnica e CMV"}
+ {activeTab === "admin" && "Administração"}
             </h1>
             <p className="text-muted-foreground">
               {activeTab === "estoque" &&
                 "Gerencie os itens do seu estoque"}
               {activeTab === "entrada" &&
                 "Registre novas entradas de mercadoria"}
+              {activeTab === "saida" && "Registre saídas, perdas e consumos do estoque"}
               {activeTab === "financeiro" &&
                 "Acompanhe seus gastos e histórico"}
               {activeTab === "dashboard" &&
                 "Visualize as métricas do seu negócio"}
-              {activeTab === "lista-compras" &&
-                "Itens com estoque baixo, quantidades e valor total da compra"}
-              {activeTab === "admin" &&
+ {activeTab === "lista-compras" &&
+  "Itens com estoque baixo, quantidades e valor total da compra"}
+ {activeTab === "cmv" && "Custos centralizados, fichas técnicas e margens"}
+ {activeTab === "admin" &&
                 "Gerenciamento de usuários, permissões e configurações"}
             </p>
           </div>
@@ -440,21 +482,39 @@ export default function Home() {
               onAddItem={handleAddItem}
               onEditItem={handleEditItem}
               onDeleteItem={handleDeleteItem}
+              userRole={userRole as "admin" | "operador" | "owner"}
+              movimentacoes={movimentacoes}
+              onEstornarMovimentacao={estornarMovimentacao}
             />
           )}
           {activeTab === "entrada" && (
-            <EntradaView itens={itens} onEntrada={handleEntrada} />
+            <EntradaView itens={itens} onEntrada={handleEntrada} canRegister={userPermissoes.includes("entrada") || userRole === "owner" || userRole === "admin"} />
           )}
+          {activeTab === "saida" && <SaidaEstoqueView itens={itens} canRegister={userPermissoes.includes("saida") || userRole === "owner" || userRole === "admin"} onSaida={registrarSaida} />}
           {activeTab === "financeiro" && (
-            <FinanceiroView historico={historico} />
+            <FinanceiroCentral
+              fichas={fichasTecnicas}
+              insumos={insumos}
+              vendas={vendasFinanceiras}
+              despesas={despesasFinanceiras}
+              config={financeConfig}
+              userRole={userRole}
+              onSaveConfig={(nextConfig) => { setFinanceConfig(nextConfig); saveFinanceConfig(nextConfig).catch((error) => console.error("[v0] Erro ao salvar configuração financeira:", error)) }}
+              onAddVenda={(venda) => { const next = [...vendasFinanceiras, venda]; setVendasFinanceiras(next); saveVendasFinanceiras(next).catch((error) => console.error("[v0] Erro ao salvar venda:", error)) }}
+              onAddDespesa={(despesa) => { const next = [...despesasFinanceiras, despesa]; setDespesasFinanceiras(next); saveDespesasFinanceiras(next).catch((error) => console.error("[v0] Erro ao salvar despesa:", error)) }}
+  auditoriaJulho={auditoriaJulho}
+  onSaveAuditoria={(snapshot) => { setAuditoriaJulho(snapshot); saveFinanceAuditSnapshot(snapshot).catch((error) => console.error("[v0] Erro ao salvar auditoria financeira:", error)) }}
+            />
           )}
           {activeTab === "dashboard" && (
-            <DashboardView itens={itens} historico={historico} />
+            <DashboardView itens={itens} historico={historico} vendasFinanceiras={vendasFinanceiras} despesasFinanceiras={despesasFinanceiras} financeConfig={financeConfig} />
           )}
           {activeTab === "lista-compras" && (
             <ListaComprasView
               itens={itens}
               user={user}
+              userRole={userRole}
+              fichas={fichasTecnicas}
               insumos={insumos}
               historico={comprasHistorico}
               onSaveInsumos={persistirInsumos}
@@ -465,9 +525,12 @@ export default function Home() {
               }}
             />
           )}
-          {activeTab === "admin" && userRole === "admin" && (
-            <AdminView currentUser={user} onPasswordChange={handlePasswordChange} />
-          )}
+  {activeTab === "cmv" && (
+  <CmvView insumos={insumos} fichas={fichasTecnicas} userRole={userRole} onSaveInsumos={persistirInsumos} onSaveFichas={persistirFichas} />
+  )}
+  {activeTab === "admin" && userRole === "admin" && (
+  <AdminView currentUser={user} onPasswordChange={handlePasswordChange} />
+  )}
         </div>
       </main>
     </div>
