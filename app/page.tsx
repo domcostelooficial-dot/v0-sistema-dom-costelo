@@ -643,7 +643,7 @@ export default function Home() {
   {activeTab === "cmv" && (
   <CmvView insumos={insumos} fichas={fichasTecnicas} combos={combos} userRole={userRole} onSaveInsumos={persistirInsumos} onSaveFichas={persistirFichas} onSaveCombos={(data) => { setCombos(data); saveCombos(data).catch((error) => console.error("[v0] Erro ao salvar combos:", error)) }} />
   )}
-  {activeTab === "admin" && userRole === "admin" && (
+  {activeTab === "admin" && (userRole === "admin" || userRole === "owner") && (
   <AdminView currentUser={user} onPasswordChange={handlePasswordChange} />
   )}
         </div>
