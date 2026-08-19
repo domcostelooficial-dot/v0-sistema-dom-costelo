@@ -482,7 +482,7 @@ export default function Home() {
             />
           )}
           {activeTab === "dashboard" && (
-            <DashboardView itens={itens} historico={historico} />
+            <DashboardView itens={itens} historico={historico} vendasFinanceiras={vendasFinanceiras} despesasFinanceiras={despesasFinanceiras} financeConfig={financeConfig} />
           )}
           {activeTab === "lista-compras" && (
             <ListaComprasView

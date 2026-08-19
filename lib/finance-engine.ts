@@ -44,7 +44,7 @@ export const defaultFinanceConfig: FinanceConfig = {
   diasFuncionamento: { segunda: true, terca: true, quarta: false, quinta: false, sexta: true, sabado: true, domingo: true },
   despesasFixas: [],
 }
-const n = (v: number) => Number.isFinite(v) ? v : 0
+const n = (v: number | undefined) => Number.isFinite(v) ? v as number : 0
 export const calcularTaxa = (valor: number, percentual: number, fixa = 0) => Math.max(0, valor) * Math.max(0, percentual) / 100 + Math.max(0, fixa)
 export const custoFichaOficial = (ficha: FichaTecnica, insumos: Insumo[]) => calcularFicha(ficha, insumos).cmv
 
@@ -121,3 +121,29 @@ export const dataCompetencia = (d: string) => d.slice(0, 7)
 export const atualizarStatusVenda = (v: VendaFinanceira, status: StatusVenda) => ({ ...v, status })
 export const canaisFinanceiros: Array<[CanalVenda, string]> = [["salao", "Salão"], ["retirada", "Retirada"], ["delivery_proprio", "Delivery próprio / Link próprio"], ["99food", "99Food"], ["outro", "Outro"]]
 export const formasPagamento: Array<[FormaPagamento, string]> = [["dinheiro", "Dinheiro"], ["pix", "Pix"], ["debito", "Débito"], ["credito", "Crédito"]]
+
+export interface RentabilidadeProduto {
+  produtoId: string; produtoNome: string; quantidade: number; faturamento: number; cmvTotal: number; taxas: number; margemContribuicao: number; mcPercentual: number
+}
+
+export function rentabilidadePorProduto(vendas: VendaFinanceira[]): RentabilidadeProduto[] {
+  const grupos = new Map<string, RentabilidadeProduto>()
+  vendas.filter(isVendaAtiva).forEach((venda) => {
+    const atual = grupos.get(venda.produtoId) ?? { produtoId: venda.produtoId, produtoNome: venda.produtoNome, quantidade: 0, faturamento: 0, cmvTotal: 0, taxas: 0, margemContribuicao: 0, mcPercentual: 0 }
+    atual.quantidade += n(venda.quantidade)
+    atual.faturamento += n(venda.valorBruto)
+    atual.cmvTotal += n(venda.cmvTotalNaVenda)
+    atual.taxas += n(venda.taxaTotalValor)
+    atual.margemContribuicao += n(venda.margemContribuicao)
+    grupos.set(venda.produtoId, atual)
+  })
+  return Array.from(grupos.values()).map((produto) => ({ ...produto, mcPercentual: produto.faturamento > 0 ? produto.margemContribuicao / produto.faturamento * 100 : 0 }))
+}
+
+export function totalCustosFixos(config: FinanceConfig, despesas: DespesaFinanceira[] = []) {
+  const detalhadas = (config.despesasFixas ?? []).reduce((total, despesa) => total + n(despesa.valor), 0)
+  const registradas = despesas.filter((despesa) => despesa.tipo === "fixa").reduce((total, despesa) => total + n(despesa.valor), 0)
+  return detalhadas || registradas || n(config.custosFixosMensais)
+}
+
+export function percentualCmv(resumo: ReturnType<typeof resumoFinanceiro>) { return resumo.faturamentoBruto > 0 ? resumo.cmv / resumo.faturamentoBruto * 100 : 0 }
