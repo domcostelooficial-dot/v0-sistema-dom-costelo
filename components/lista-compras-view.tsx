@@ -28,7 +28,7 @@ interface Props {
   historico?: CompraRegistro[]
   onSaveInsumos?: (data: Insumo[]) => void | Promise<void>
   onSaveHistorico?: (data: CompraRegistro[]) => void | Promise<void>
-  onConfirmarCompra: (itens: Array<{ insumoId?: string; nome: string; quantidade: number; unitario: number; unidade: UnidadeInsumo; fornecedor?: string; data: string }>) => void | Promise<void>
+  onConfirmarCompra: (compraId: string, itens: Array<{ insumoId?: string; nome: string; quantidade: number; unitario: number; unidade: UnidadeInsumo; fornecedor?: string; data: string }>) => void | Promise<void>
   }
 
   export function ListaComprasView({ itens, userRole = "operador", fichas = [], insumos: initialInsumos = [], historico: initialHistorico = [], onSaveInsumos, onSaveHistorico, onConfirmarCompra }: Props) {
@@ -42,6 +42,7 @@ interface Props {
   const [carrinho, setCarrinho] = useState<{ id: string; insumoId?: string; nome: string; quantidade: number; unitario: number; unidade: UnidadeInsumo }[]>([])
   const [draftInsumo, setDraftInsumo] = useState<Insumo | null>(null)
   const [compraProcessando, setCompraProcessando] = useState(false)
+  const [compraId, setCompraId] = useState(() => crypto.randomUUID())
   const canManage = userRole === "owner" || userRole === "admin"
   const estoque = useMemo(() => new Map(itens.map((item) => [item.nome, item])), [itens])
   const rows = useMemo(() => insumos.map((i) => {
@@ -70,7 +71,7 @@ interface Props {
     if (linhas.some((linha) => !linha.insumoId || !Number.isFinite(linha.quantidade) || linha.quantidade <= 0 || !Number.isFinite(linha.unitario) || linha.unitario <= 0)) return
     setCompraProcessando(true)
     try {
-    await onConfirmarCompra(linhas)
+    await onConfirmarCompra(compraId, linhas)
     } catch (error) {
       setCompraProcessando(false)
       throw error
@@ -84,6 +85,7 @@ interface Props {
     await onSaveHistorico?.(novoHistorico)
     setHistorico(novoHistorico)
     setCarrinho([])
+    setCompraId(crypto.randomUUID())
     setCompra({ nome: "", quantidade: "", unitario: "", data: hoje() })
     setCompraProcessando(false)
   }

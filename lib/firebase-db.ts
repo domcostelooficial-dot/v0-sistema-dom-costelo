@@ -454,6 +454,32 @@ export async function registrarEntradaAtomica(params: { movimento: MovimentacaoE
   })
 }
 
+export async function registrarEntradasAtomica(params: { compraId: string; movimentos: Array<{ movimento: MovimentacaoEstoque; itemNome: string }>; userId: string }) {
+  const estoqueRef = doc(db, "estoque", "global")
+  const compraRef = doc(db, "comprasProcessadas", params.compraId)
+  return runTransaction(db, async (transaction) => {
+    const compraSnap = await transaction.get(compraRef)
+    const estoqueSnap = await transaction.get(estoqueRef)
+    if (compraSnap.exists()) return { idempotente: true, itens: (estoqueSnap.data()?.itens ?? []) as Item[] }
+    const itens = (estoqueSnap.exists() ? estoqueSnap.data().itens : []) as Item[]
+    const atualizados = [...itens]
+    const movimentos = params.movimentos.map(({ movimento, itemNome }) => {
+      const index = atualizados.findIndex((item) => item.nome === itemNome || item.insumoId === movimento.insumoId)
+      if (index < 0) throw new Error(`Insumo não encontrado no estoque: ${itemNome}`)
+      if (!Number.isFinite(movimento.quantidade) || movimento.quantidade <= 0) throw new Error(`Quantidade inválida: ${itemNome}`)
+      const unidadeEstoque = atualizados[index].unidadeEstoque ?? atualizados[index].unidade ?? movimento.unidadeSnapshot
+      const familia = (unidade: string) => ["g", "kg"].includes(unidade) ? "massa" : ["ml", "l"].includes(unidade) ? "volume" : ["un", "unidade", "pacote", "caixa", "bobina", "maço", "pct"].includes(unidade) ? "unidade" : unidade
+      if (familia(movimento.unidadeSnapshot) !== familia(unidadeEstoque)) throw new Error(`UNIDADE_INCOMPATIVEL: ${itemNome} usa ${unidadeEstoque}, mas a entrada está em ${movimento.unidadeSnapshot}`)
+      atualizados[index] = { ...atualizados[index], atual: atualizados[index].atual + movimento.quantidade }
+      return { ...movimento, compraId: params.compraId, saldoAnterior: atualizados[index].atual - movimento.quantidade, saldoPosterior: atualizados[index].atual }
+    })
+    transaction.set(estoqueRef, { itens: atualizados, updatedAt: Timestamp.now(), lastModifiedBy: params.userId })
+    for (const movimento of movimentos) transaction.set(doc(db, MOVIMENTACOES_COLLECTION, movimento.id), movimento)
+    transaction.set(compraRef, { id: params.compraId, movimentoIds: movimentos.map((movimento) => movimento.id), criadoPorUid: params.userId, criadoEm: Timestamp.now() })
+    return { idempotente: false, itens: atualizados, movimentos }
+  })
+}
+
 export async function registrarSaidaAtomica(params: { movimento: MovimentacaoEstoque; itemNome: string; userId: string }) {
   const movimentoRef = doc(db, MOVIMENTACOES_COLLECTION, params.movimento.id)
   const estoqueRef = doc(db, "estoque", "global")

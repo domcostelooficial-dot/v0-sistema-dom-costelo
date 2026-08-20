@@ -43,6 +43,7 @@ import {
   getMovimentacoesEstoque,
   saveMovimentacoesEstoque,
   registrarEntradaAtomica,
+  registrarEntradasAtomica,
   registrarSaidaAtomica,
   ajustarEstoqueAtomico,
   ajustarInventarioAtomico,
@@ -607,10 +608,20 @@ export default function Home() {
               historico={comprasHistorico}
               onSaveInsumos={persistirInsumos}
               onSaveHistorico={persistirCompras}
-  onConfirmarCompra={async (linhas) => {
-  for (const linha of linhas) {
-  await registrarEntradaRastreavel(linha.nome, linha.quantidade, linha.quantidade * linha.unitario, linha.fornecedor, `Compra confirmada · ${linha.data}` , linha.data)
-  }
+  onConfirmarCompra={async (compraId, linhas) => {
+  const currentUser = auth.currentUser
+  if (!currentUser) throw new Error("Usuário autenticado não encontrado.")
+  const movimentos = linhas.map((linha) => {
+    const item = itens.find((row) => row.nome === linha.nome || row.insumoId === linha.insumoId)
+    const insumo = insumos.find((row) => row.id === item?.insumoId || row.nome === linha.nome)
+    if (!item || !insumo) throw new Error(`Insumo não encontrado: ${linha.nome}`)
+    const unidade = (item.unidadeEstoque === "Unidade" ? "un" : item.unidadeEstoque) as Insumo["unidade"]
+    return { itemNome: linha.nome, movimento: { ...criarEntrada({ insumo: { ...insumo, id: item.insumoId ?? insumo.id }, quantidade: linha.quantidade, unidade, precoUnitario: linha.unitario, fornecedor: linha.fornecedor, observacao: `Compra confirmada · ${linha.data}`, dataMovimentacao: linha.data, usuario: { id: currentUser.uid, email: currentUser.email ?? undefined, nome: currentUser.displayName ?? undefined } }), status: "ativa" as const } }
+  })
+  const result = await registrarEntradasAtomica({ compraId, movimentos, userId: currentUser.uid })
+  setItens(result.itens)
+  setMovimentacoes(await getMovimentacoesEstoque())
+  toast.success(result.idempotente ? "Compra já registrada anteriormente." : "Compra registrada com sucesso.")
   }}
             />
           )}
