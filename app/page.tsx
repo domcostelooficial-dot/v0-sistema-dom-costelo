@@ -505,8 +505,17 @@ export default function Home() {
     saveReceitasHybrid(user, filtered)
   }
 
+  const movimentarRapido = async (item: Item, delta: number, motivo: string) => {
+    const quantidade = Math.abs(delta)
+    if (delta > 0) {
+      await registrarEntradaRastreavel(item.nome, quantidade, 0, "", motivo)
+    } else {
+      await registrarSaida(item.nome, quantidade, motivo as NonNullable<MovimentacaoEstoque["motivo"]>, motivo)
+    }
+  }
+
   if (isLoading) {
-    return (
+  return (
       <div className="flex min-h-screen items-center justify-center bg-background">
         <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
       </div>
@@ -572,6 +581,7 @@ export default function Home() {
   onDeleteItem={handleDeleteItem}
   onOpenEntrada={() => setActiveTab("entrada")}
   onOpenSaida={() => setActiveTab("saida")}
+  onQuickMovement={movimentarRapido}
   userRole={userRole as "admin" | "operador" | "owner"}
               movimentacoes={movimentacoes}
               onEstornarMovimentacao={estornarMovimentacao}
