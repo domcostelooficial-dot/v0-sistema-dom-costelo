@@ -480,6 +480,26 @@ export async function registrarEntradasAtomica(params: { compraId: string; movim
   })
 }
 
+export async function registrarMovimentacaoRapidaAtomica(params: { movimento: MovimentacaoEstoque; itemNome: string; userId: string; delta: number }) {
+  const movimentoRef = doc(db, MOVIMENTACOES_COLLECTION, params.movimento.id)
+  const estoqueRef = doc(db, "estoque", "global")
+  return runTransaction(db, async (transaction) => {
+    const estoqueSnap = await transaction.get(estoqueRef)
+    const itens = (estoqueSnap.exists() ? estoqueSnap.data().itens : []) as Item[]
+    const index = itens.findIndex((item) => item.nome === params.itemNome || item.insumoId === params.movimento.insumoId)
+    if (index < 0) throw new Error("Insumo não encontrado no estoque")
+    if (!Number.isFinite(params.delta) || params.delta === 0) throw new Error("Quantidade inválida")
+    const item = itens[index]
+    const novoAtual = item.atual + params.delta
+    if (!Number.isFinite(novoAtual) || novoAtual < 0) throw new Error("Estoque insuficiente para esta saída")
+    const atualizados = itens.map((row, rowIndex) => rowIndex === index ? { ...row, atual: novoAtual } : row)
+    const movimento = { ...params.movimento, estoqueAnterior: item.atual, estoquePosterior: novoAtual, saldoAnterior: item.atual, saldoPosterior: novoAtual, quantidade: params.delta, quantidadeBase: params.delta }
+    transaction.set(estoqueRef, { itens: atualizados, updatedAt: Timestamp.now(), lastModifiedBy: params.userId })
+    transaction.set(movimentoRef, movimento)
+    return { itens: atualizados, movimento }
+  })
+}
+
 export async function registrarSaidaAtomica(params: { movimento: MovimentacaoEstoque; itemNome: string; userId: string }) {
   const movimentoRef = doc(db, MOVIMENTACOES_COLLECTION, params.movimento.id)
   const estoqueRef = doc(db, "estoque", "global")

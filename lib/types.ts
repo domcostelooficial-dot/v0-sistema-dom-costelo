@@ -125,6 +125,7 @@ export type TipoMovimentacaoEstoque = "entrada" | "estorno_entrada" | "saida" | 
 export interface MovimentacaoEstoque {
   id: string
   tipo: TipoMovimentacaoEstoque
+  origemDetalhada?: "ajuste_rapido" | "compras" | "venda_automatica"
   insumoId: string
   insumoNomeSnapshot: string
   quantidade: number
