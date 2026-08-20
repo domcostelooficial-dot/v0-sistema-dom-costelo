@@ -52,6 +52,9 @@ import {
   registrarBaixaVendaAtomica,
   registrarBaixaBloqueada,
   estornarMovimentacaoAtomica,
+  adicionarItemAtomico,
+  atualizarCadastroItemAtomico,
+  removerItemAtomico,
 } from "@/lib/firebase-db"
 import { criarEntrada, criarSaida } from "@/lib/estoque-movements"
 import { SaidaEstoqueView } from "@/components/saida-estoque-view"
@@ -384,47 +387,69 @@ export default function Home() {
   }
 
   const handleAddItem = async (newItem: Item) => {
+    const currentUser = auth.currentUser
+    if (!currentUser) {
+      toast.error("Sessão expirada. Entre novamente para continuar.")
+      return
+    }
     const now = new Date()
     const dataHora = `${now.toLocaleDateString("pt-BR")} às ${now.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}`
     const itemWithTimestamp = {
       ...newItem,
-      ultimaAlteracao: {
-        usuario: user || "Desconhecido",
-        data: dataHora,
-      },
+      ultimaAlteracao: { usuario: user || "Desconhecido", data: dataHora },
     }
-    const updated = [...itens, itemWithTimestamp]
     try {
-      await saveEstoqueHybrid(user, updated)
-      setItens(updated)
+      const atualizados = await adicionarItemAtomico({ userId: currentUser.uid, novoItem: itemWithTimestamp })
+      setItens(atualizados)
+      toast.success("Item adicionado ao estoque.")
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Não foi possível salvar o novo item na nuvem.")
+      console.error("[v0] Falha ao adicionar item:", error)
+      toast.error(error instanceof Error && error.message.startsWith("Já existe") ? error.message : traduzirErroFirebase(error))
     }
   }
 
-  const handleEditItem = (oldNome: string, updatedItem: Item) => {
+  const handleEditItem = async (oldNome: string, updatedItem: Item) => {
+    const currentUser = auth.currentUser
+    if (!currentUser) {
+      toast.error("Sessão expirada. Entre novamente para continuar.")
+      return
+    }
     const now = new Date()
     const dataHora = `${now.toLocaleDateString("pt-BR")} às ${now.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}`
-    const updated = itens.map((item) =>
-      item.nome === oldNome
-        ? {
-            ...updatedItem,
-            ultimaAlteracao: {
-              usuario: user || "Desconhecido",
-              data: dataHora,
-            },
-          }
-        : item
-    )
-    setItens(updated)
-    saveEstoqueHybrid(user, updated)
+    const itemOriginal = itens.find((item) => item.nome === oldNome)
+    // Envia apenas dados cadastrais; "atual" é ignorado pela transação e preservado do Firestore.
+    const { atual: _atual, ...dadosCadastrais } = updatedItem
+    try {
+      const atualizados = await atualizarCadastroItemAtomico({
+        userId: currentUser.uid,
+        nomeOriginal: oldNome,
+        insumoIdOriginal: itemOriginal?.insumoId,
+        dadosCadastrais: { ...dadosCadastrais, ultimaAlteracao: { usuario: user || "Desconhecido", data: dataHora } },
+      })
+      setItens(atualizados)
+      toast.success("Cadastro atualizado.")
+    } catch (error) {
+      console.error("[v0] Falha ao editar item:", error)
+      toast.error(error instanceof Error && error.message.startsWith("Já existe") ? error.message : traduzirErroFirebase(error))
+    }
   }
 
-  const handleDeleteItem = (nome: string) => {
+  const handleDeleteItem = async (nome: string) => {
     if (userRole !== "owner" && userRole !== "admin") return
-    const updated = itens.filter((item) => item.nome !== nome)
-    setItens(updated)
-    saveEstoqueHybrid(user, updated)
+    const currentUser = auth.currentUser
+    if (!currentUser) {
+      toast.error("Sessão expirada. Entre novamente para continuar.")
+      return
+    }
+    const itemOriginal = itens.find((item) => item.nome === nome)
+    try {
+      const atualizados = await removerItemAtomico({ userId: currentUser.uid, nome, insumoId: itemOriginal?.insumoId })
+      setItens(atualizados)
+      toast.success("Item removido do estoque.")
+    } catch (error) {
+      console.error("[v0] Falha ao remover item:", error)
+      toast.error(traduzirErroFirebase(error))
+    }
   }
 
   const handleEntrada = async (nome: string, qtd: number, custo: number, fornecedor?: string, observacao?: string, dataMovimentacao?: string) => {

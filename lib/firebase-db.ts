@@ -634,6 +634,61 @@ export async function registrarProducaoAtomica(params: {
   })
 }
 
+// Campos puramente cadastrais. "atual" NUNCA está aqui: o saldo só muda por operação de quantidade.
+const CAMPOS_CADASTRAIS: (keyof Item)[] = [
+  "nome", "categoria", "min", "estoqueIdeal", "preco", "unidade", "unidadeEstoque",
+  "quantidadePorEmbalagem", "unidadeConteudo", "precoCompra", "quantidadeEmbalagem",
+  "unidadeEmbalagem", "custoUnitario", "fornecedor", "precoReferencia", "unidadeReferencia",
+  "ultimaAtualizacaoPreco", "ativo", "naoVinculado", "origem", "insumoId", "id", "ultimaAlteracao",
+]
+
+export async function adicionarItemAtomico(params: { userId: string; novoItem: Item }) {
+  const estoqueRef = doc(db, "estoque", "global")
+  return runTransaction(db, async (transaction) => {
+    const estoqueSnap = await transaction.get(estoqueRef)
+    const itens = (estoqueSnap.exists() ? estoqueSnap.data().itens : []) as Item[]
+    if (itens.some((item) => item.nome === params.novoItem.nome || (params.novoItem.insumoId && item.insumoId === params.novoItem.insumoId))) {
+      throw new Error(`Já existe um item chamado "${params.novoItem.nome}".`)
+    }
+    const novo = removerUndefinedFirestore({ ...params.novoItem, atual: Number.isFinite(params.novoItem.atual) ? params.novoItem.atual : 0 })
+    const atualizados = [...itens, novo]
+    transaction.set(estoqueRef, { itens: atualizados, updatedAt: Timestamp.now(), lastModifiedBy: params.userId })
+    return atualizados
+  })
+}
+
+export async function atualizarCadastroItemAtomico(params: { userId: string; nomeOriginal: string; insumoIdOriginal?: string; dadosCadastrais: Partial<Item> }) {
+  const estoqueRef = doc(db, "estoque", "global")
+  return runTransaction(db, async (transaction) => {
+    const estoqueSnap = await transaction.get(estoqueRef)
+    const itens = (estoqueSnap.exists() ? estoqueSnap.data().itens : []) as Item[]
+    const index = itens.findIndex((item) => (params.insumoIdOriginal && item.insumoId === params.insumoIdOriginal) || item.nome === params.nomeOriginal)
+    if (index < 0) throw new Error("Item não encontrado no estoque.")
+    if (params.dadosCadastrais.nome && params.dadosCadastrais.nome !== itens[index].nome && itens.some((item, i) => i !== index && item.nome === params.dadosCadastrais.nome)) {
+      throw new Error(`Já existe um item chamado "${params.dadosCadastrais.nome}".`)
+    }
+    // Aplica somente campos cadastrais; "atual" vem SEMPRE do snapshot oficial, nunca do cliente.
+    const cadastroFiltrado: Partial<Item> = {}
+    for (const chave of CAMPOS_CADASTRAIS) {
+      if (params.dadosCadastrais[chave] !== undefined) (cadastroFiltrado as Record<string, unknown>)[chave] = params.dadosCadastrais[chave]
+    }
+    const atualizados = itens.map((item, i) => i === index ? removerUndefinedFirestore({ ...item, ...cadastroFiltrado, atual: item.atual }) : item)
+    transaction.set(estoqueRef, { itens: atualizados, updatedAt: Timestamp.now(), lastModifiedBy: params.userId })
+    return atualizados
+  })
+}
+
+export async function removerItemAtomico(params: { userId: string; nome: string; insumoId?: string }) {
+  const estoqueRef = doc(db, "estoque", "global")
+  return runTransaction(db, async (transaction) => {
+    const estoqueSnap = await transaction.get(estoqueRef)
+    const itens = (estoqueSnap.exists() ? estoqueSnap.data().itens : []) as Item[]
+    const atualizados = itens.filter((item) => params.insumoId ? item.insumoId !== params.insumoId && item.nome !== params.nome : item.nome !== params.nome)
+    transaction.set(estoqueRef, { itens: atualizados, updatedAt: Timestamp.now(), lastModifiedBy: params.userId })
+    return atualizados
+  })
+}
+
 export function subscribeToReceitas(callback: (receitas: Receita[]) => void) {
   return onSnapshot(
 doc(db, "receitas", "global"),
