@@ -15,7 +15,7 @@ import {
   runTransaction,
 } from "firebase/firestore"
 import { db } from "./firebase"
-import type { Item, HistoricoEntry, Receita, UsuarioSistema, Insumo, FichaTecnica, VendaProduto, CompraRegistro, FinanceConfig, VendaFinanceira, DespesaFinanceira, MovimentacaoEstoque, Combo } from "./types"
+import type { Item, HistoricoEntry, Receita, UsuarioSistema, Insumo, FichaTecnica, VendaProduto, CompraRegistro, FinanceConfig, VendaFinanceira, DespesaFinanceira, MovimentacaoEstoque, Combo, UnidadeInsumo } from "./types"
 import type { FinanceAuditSnapshot } from "./finance-engine"
 import { resolverIngredientesFicha, normalizarNomeInsumo } from "./cmv-engine"
 
@@ -586,6 +586,51 @@ export async function estornarMovimentacaoAtomica(params: { movimentoId: string;
     transaction.update(estoqueRef, { itens: itens.map((item, itemIndex) => itemIndex === index ? { ...item, atual: item.atual - original.quantidade } : item), updatedAt: Timestamp.now(), lastModifiedBy: params.usuario.uid })
     transaction.set(doc(db, MOVIMENTACOES_COLLECTION, inversa.id), inversa)
     return inversa
+  })
+}
+
+export async function registrarProducaoAtomica(params: {
+  producaoId: string
+  inputNome: string
+  inputInsumoId?: string
+  inputQtd: number
+  outputNome: string
+  outputInsumoId?: string
+  outputQtd: number
+  usuario: { uid: string; email?: string; nome?: string }
+  agora: string
+}) {
+  const estoqueRef = doc(db, "estoque", "global")
+  const producaoRef = doc(db, "producoesProcessadas", params.producaoId)
+  return runTransaction(db, async (transaction) => {
+    const producaoSnap = await transaction.get(producaoRef)
+    const estoqueSnap = await transaction.get(estoqueRef)
+    if (producaoSnap.exists()) return { idempotente: true, itens: (estoqueSnap.data()?.itens ?? []) as Item[] }
+    const itens = (estoqueSnap.exists() ? estoqueSnap.data().itens : []) as Item[]
+    if (!Number.isFinite(params.inputQtd) || params.inputQtd <= 0) throw new Error("Quantidade de entrada inválida")
+    if (!Number.isFinite(params.outputQtd) || params.outputQtd <= 0) throw new Error("Quantidade de saída inválida")
+    const inputIndex = itens.findIndex((item) => item.nome === params.inputNome || (params.inputInsumoId && item.insumoId === params.inputInsumoId))
+    if (inputIndex < 0) throw new Error(`Insumo não encontrado no estoque: ${params.inputNome}`)
+    const outputIndex = itens.findIndex((item) => item.nome === params.outputNome || (params.outputInsumoId && item.insumoId === params.outputInsumoId))
+    if (outputIndex < 0) throw new Error(`Produto produzido não encontrado no estoque: ${params.outputNome}`)
+    const inputItem = itens[inputIndex]
+    if (inputItem.atual < params.inputQtd) throw new Error(`Estoque insuficiente de ${params.inputNome}. Disponível: ${inputItem.atual}. Necessário: ${params.inputQtd}.`)
+    const atualizados = itens.map((item, index) => {
+      if (index === inputIndex) return { ...item, atual: item.atual - params.inputQtd }
+      if (index === outputIndex) return { ...item, atual: item.atual + params.outputQtd }
+      return item
+    })
+    const inputUnidade = (inputItem.unidadeEstoque === "Unidade" ? "un" : inputItem.unidadeEstoque ?? inputItem.unidade ?? "un") as UnidadeInsumo
+    const outputItem = itens[outputIndex]
+    const outputUnidade = (outputItem.unidadeEstoque === "Unidade" ? "un" : outputItem.unidadeEstoque ?? outputItem.unidade ?? "un") as UnidadeInsumo
+    const baseMov = { origem: "estoque" as const, status: "efetivada" as const, motivo: "producao" as const, usuarioId: params.usuario.uid, usuarioEmail: params.usuario.email ?? "", criadoPorUid: params.usuario.uid, criadoPorEmail: params.usuario.email, criadoPorNome: params.usuario.nome, dataMovimentacao: params.agora, criadoEm: params.agora, referenciaId: params.producaoId, precoUnitarioSnapshot: 0, valorTotal: 0 }
+    const movSaida = removerUndefinedFirestore({ id: crypto.randomUUID(), tipo: "producao", insumoId: inputItem.insumoId ?? inputItem.id ?? inputItem.nome, insumoNomeSnapshot: inputItem.nome, quantidade: -params.inputQtd, quantidadeBase: -params.inputQtd, unidadeSnapshot: inputUnidade, unidadeBase: inputUnidade, saldoAnterior: inputItem.atual, saldoPosterior: inputItem.atual - params.inputQtd, estoqueAnterior: inputItem.atual, estoquePosterior: inputItem.atual - params.inputQtd, ...baseMov })
+    const movEntrada = removerUndefinedFirestore({ id: crypto.randomUUID(), tipo: "producao", insumoId: outputItem.insumoId ?? outputItem.id ?? outputItem.nome, insumoNomeSnapshot: outputItem.nome, quantidade: params.outputQtd, quantidadeBase: params.outputQtd, unidadeSnapshot: outputUnidade, unidadeBase: outputUnidade, saldoAnterior: outputItem.atual, saldoPosterior: outputItem.atual + params.outputQtd, estoqueAnterior: outputItem.atual, estoquePosterior: outputItem.atual + params.outputQtd, ...baseMov })
+    transaction.set(estoqueRef, { itens: atualizados, updatedAt: Timestamp.now(), lastModifiedBy: params.usuario.uid })
+    transaction.set(doc(db, MOVIMENTACOES_COLLECTION, movSaida.id), movSaida)
+    transaction.set(doc(db, MOVIMENTACOES_COLLECTION, movEntrada.id), movEntrada)
+    transaction.set(producaoRef, { id: params.producaoId, inputNome: params.inputNome, outputNome: params.outputNome, movimentoIds: [movSaida.id, movEntrada.id], criadoPorUid: params.usuario.uid, criadoEm: params.agora })
+    return { idempotente: false, itens: atualizados }
   })
 }
 

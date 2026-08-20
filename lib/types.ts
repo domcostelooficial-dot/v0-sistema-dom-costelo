@@ -6,6 +6,7 @@ export interface Item {
   insumoId?: string
   nome: string
   min: number
+  estoqueIdeal?: number
   atual: number
   categoria: string
   preco?: number
@@ -120,7 +121,7 @@ export interface PrevisaoVenda {
   quantidade: number
 }
 
-export type TipoMovimentacaoEstoque = "entrada" | "estorno_entrada" | "saida" | "saida_venda" | "ajuste" | "ajuste_inventario"
+export type TipoMovimentacaoEstoque = "entrada" | "estorno_entrada" | "saida" | "saida_venda" | "ajuste" | "ajuste_inventario" | "producao"
 
 export interface MovimentacaoEstoque {
   id: string
@@ -149,13 +150,14 @@ export interface MovimentacaoEstoque {
   produtoNomeSnapshot?: string
   saldoAnterior?: number
   saldoPosterior?: number
-  motivo?: "consumo" | "consumo_interno" | "perda" | "descarte" | "vencimento" | "avaria" | "uso_operacional" | "cortesia" | "contagem_fisica" | "correcao_cadastro" | "perda_nao_registrada" | "entrada_nao_registrada" | "erro_operacional" | "ajuste_manual" | "outro"
+  motivo?: "reposicao" | "aumento_capacidade" | "venda" | "venda_nao_registrada" | "desperdicio" | "compra" | "inventario" | "producao" | "saida_venda_automatica" | "consumo" | "consumo_interno" | "perda" | "descarte" | "vencimento" | "avaria" | "uso_operacional" | "cortesia" | "contagem_fisica" | "correcao_cadastro" | "perda_nao_registrada" | "entrada_nao_registrada" | "erro_operacional" | "ajuste_manual" | "outro"
   estoqueAnterior?: number
   estoqueContado?: number
   diferenca?: number
   origem: "compras" | "estoque" | "venda_automatica"
   movimentacaoOrigemId?: string
   movimentacaoOriginalId?: string
+  referenciaId?: string
   status: "efetivada" | "estornada" | "ativa"
   usuarioId: string
   usuarioEmail: string

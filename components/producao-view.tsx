@@ -49,6 +49,7 @@ export function ProducaoView({
   onDeleteReceita,
 }: ProducaoViewProps) {
   const [dialogOpen, setDialogOpen] = useState(false)
+  const [produzindoId, setProduzindoId] = useState<string | null>(null)
   const [editingReceita, setEditingReceita] = useState<Receita | null>(null)
   const [formData, setFormData] = useState({
     nome: "",
@@ -328,12 +329,20 @@ export function ProducaoView({
 
                 <div className="mt-4 flex justify-center">
                   <Button
-                    onClick={() => onProduzir(receita)}
-                    disabled={!canProduce(receita)}
+                    onClick={async () => {
+                      if (produzindoId) return
+                      setProduzindoId(receita.id)
+                      try {
+                        await onProduzir(receita)
+                      } finally {
+                        setProduzindoId(null)
+                      }
+                    }}
+                    disabled={!canProduce(receita) || produzindoId !== null}
                     className="gap-2"
                   >
                     <PlayCircle className="h-5 w-5" />
-                    Produzir
+                    {produzindoId === receita.id ? "Produzindo..." : "Produzir"}
                   </Button>
                 </div>
 

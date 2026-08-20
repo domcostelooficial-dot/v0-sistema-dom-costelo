@@ -95,13 +95,14 @@ export function EstoqueView({ itens, onEditItem, onDeleteItem, onOpenEntrada, on
   const deltaRapido = movimentoRapido ? movimentoRapido.novoAtual - movimentoRapido.item.atual : 0
   const motivosRapidos = deltaRapido > 0
     ? ["Reposição", "Aumento de capacidade"]
-    : ["Venda", "Desperdício", "Consumo interno"]
+    : ["Venda não registrada", "Desperdício", "Consumo interno"]
   const [historicoDe, setHistoricoDe] = useState("")
   const [historicoAte, setHistoricoAte] = useState("")
   const [formData, setFormData] = useState({
     nome: "",
     categoria: "Carnes",
     min: 1,
+    estoqueIdeal: 0,
     atual: 0,
     unidadeEstoque: "Unidade",
     quantidadePorEmbalagem: 1,
@@ -177,6 +178,7 @@ export function EstoqueView({ itens, onEditItem, onDeleteItem, onOpenEntrada, on
       nome: formData.nome.trim(),
       categoria: formData.categoria,
       min: formData.min,
+      estoqueIdeal: formData.estoqueIdeal > 0 ? formData.estoqueIdeal : undefined,
       atual: selectedItem.atual,
       unidadeEstoque: formData.unidadeEstoque,
       quantidadePorEmbalagem: formData.quantidadePorEmbalagem,
@@ -205,6 +207,7 @@ export function EstoqueView({ itens, onEditItem, onDeleteItem, onOpenEntrada, on
       nome: item.nome,
       categoria: item.categoria,
       min: item.min,
+      estoqueIdeal: item.estoqueIdeal ?? 0,
       atual: item.atual,
       unidadeEstoque: item.unidadeEstoque ?? "Unidade",
       quantidadePorEmbalagem: item.quantidadePorEmbalagem ?? 1,
@@ -484,10 +487,25 @@ export function EstoqueView({ itens, onEditItem, onDeleteItem, onOpenEntrada, on
                     setFormData({ ...formData, min: Number(e.target.value) })
                   }
                 />
+                <p className="text-xs text-muted-foreground">Dispara o alerta de compra.</p>
               </div>
-              <div className="rounded-md border border-dashed p-3 text-sm text-muted-foreground">
-                Estoque atual não é cadastral. Corrija o saldo pelo módulo Inventário.
+              <div className="space-y-2">
+                <Label htmlFor="edit-ideal">Estoque Ideal</Label>
+                <Input
+                  id="edit-ideal"
+                  type="number"
+                  min="0"
+                  value={formData.estoqueIdeal}
+                  onChange={(e) =>
+                    setFormData({ ...formData, estoqueIdeal: Number(e.target.value) })
+                  }
+                  placeholder="Quantidade após reposição"
+                />
+                <p className="text-xs text-muted-foreground">Quantidade desejada após comprar. Se vazio, usa o mínimo.</p>
               </div>
+            </div>
+            <div className="rounded-md border border-dashed p-3 text-sm text-muted-foreground">
+              Estoque atual não é cadastral. Corrija o saldo pelo módulo Inventário.
             </div>
           </div>
           <DialogFooter>

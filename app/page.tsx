@@ -46,6 +46,7 @@ import {
   registrarEntradasAtomica,
   registrarSaidaAtomica,
   registrarMovimentacaoRapidaAtomica,
+  registrarProducaoAtomica,
   ajustarEstoqueAtomico,
   ajustarInventarioAtomico,
   registrarBaixaVendaAtomica,
@@ -59,7 +60,8 @@ import { BaixasPendentesView } from "@/components/baixas-pendentes-view"
 import { toast } from "sonner"
 import type { FinanceAuditSnapshot } from "@/lib/finance-engine"
 import { FirebaseLoginForm } from "@/components/firebase-login-form"
-import { AppSidebar } from "@/components/app-sidebar"
+ import { AppSidebar } from "@/components/app-sidebar"
+import { SyncIndicator } from "@/components/sync-indicator"
 import { EstoqueView } from "@/components/estoque-view"
 import { EntradaView } from "@/components/entrada-view"
 import { FinanceiroCentral } from "@/components/financeiro-central"
@@ -429,13 +431,9 @@ export default function Home() {
     try {
       await registrarEntradaRastreavel(nome, qtd, custo, fornecedor, observacao, dataMovimentacao)
     } catch (error) {
-      const item = itens.find((row) => row.nome === nome)
-      if (!item) throw error
-      const atualizados = itens.map((row) => row.nome === nome ? { ...row, atual: row.atual + qtd } : row)
-      saveEstoqueLocal(atualizados)
-      setItens(atualizados)
-      toast.warning("Entrada salva neste dispositivo, mas não foi sincronizada com o banco de dados.")
       console.error("[v0] Falha ao sincronizar entrada:", error)
+      toast.error(traduzirErroFirebase(error))
+      throw error
     }
   }
 
@@ -468,25 +466,33 @@ export default function Home() {
     setItens(atualizados); setMovimentacoes(await getMovimentacoesEstoque()); toast.success("Saída registrada com sucesso.")
   }
 
-  const handleProduzir = (receita: Receita) => {
-    const now = new Date()
-    const dataHora = `${now.toLocaleDateString("pt-BR")} às ${now.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}`
-    
-    const alteracao = {
-      usuario: user || "Desconhecido",
-      data: dataHora,
+  const handleProduzir = async (receita: Receita) => {
+    const currentUser = auth.currentUser
+    if (!currentUser) {
+      toast.error("Usuário autenticado não encontrado.")
+      return
     }
-    const updated = itens.map((item) => {
-      if (item.nome === receita.inputItem) {
-        return { ...item, atual: item.atual - receita.inputQtd, ultimaAlteracao: alteracao }
-      }
-      if (item.nome === receita.outputItem) {
-        return { ...item, atual: item.atual + receita.outputQtd, ultimaAlteracao: alteracao }
-      }
-      return item
-    })
-    setItens(updated)
-    saveEstoqueHybrid(user, updated)
+    const inputItem = itens.find((row) => row.nome === receita.inputItem)
+    const outputItem = itens.find((row) => row.nome === receita.outputItem)
+    try {
+      const result = await registrarProducaoAtomica({
+        producaoId: crypto.randomUUID(),
+        inputNome: receita.inputItem,
+        inputInsumoId: inputItem?.insumoId,
+        inputQtd: receita.inputQtd,
+        outputNome: receita.outputItem,
+        outputInsumoId: outputItem?.insumoId,
+        outputQtd: receita.outputQtd,
+        usuario: { uid: currentUser.uid, email: currentUser.email ?? undefined, nome: currentUser.displayName ?? undefined },
+        agora: new Date().toISOString(),
+      })
+      setItens(result.itens)
+      setMovimentacoes(await getMovimentacoesEstoque())
+      toast.success(result.idempotente ? "Esta produção já havia sido registrada." : "Produção registrada com sucesso.")
+    } catch (error) {
+      console.error("[v0] Falha na produção:", error)
+      toast.error(error instanceof Error && (error.message.startsWith("Estoque insuficiente") || error.message.startsWith("Insumo") || error.message.startsWith("Produto") || error.message.startsWith("Quantidade")) ? error.message : traduzirErroFirebase(error))
+    }
   }
 
   const handleAddReceita = (receita: Receita) => {
@@ -513,10 +519,19 @@ export default function Home() {
     const insumo = insumos.find((row) => row.id === item.insumoId || row.nome === item.nome)
     if (!insumo) throw new Error("Não foi possível localizar este item no estoque.")
     const unidade = (item.unidadeEstoque ?? item.unidade ?? insumo.unidade) as Insumo["unidade"]
+    const motivosEstruturados: Record<string, NonNullable<MovimentacaoEstoque["motivo"]>> = {
+      "Reposição": "reposicao",
+      "Aumento de capacidade": "aumento_capacidade",
+      "Venda": "venda_nao_registrada",
+      "Venda não registrada": "venda_nao_registrada",
+      "Desperdício": "desperdicio",
+      "Consumo interno": "consumo_interno",
+    }
+    const motivoEstruturado = motivosEstruturados[motivo] ?? (delta > 0 ? "reposicao" : "consumo_interno")
     const movimento: MovimentacaoEstoque = {
       id: crypto.randomUUID(), tipo: "ajuste", origemDetalhada: "ajuste_rapido", insumoId: item.insumoId ?? insumo.id ?? item.nome,
       insumoNomeSnapshot: item.nome, quantidade: delta, unidadeSnapshot: unidade, quantidadeBase: delta, unidadeBase: unidade,
-      precoUnitarioSnapshot: 0, valorTotal: 0, precoTotal: 0, origem: "estoque", motivo: delta > 0 ? "ajuste_manual" : motivo === "Consumo interno" ? "consumo_interno" : "outro",
+      precoUnitarioSnapshot: 0, valorTotal: 0, precoTotal: 0, origem: "estoque", motivo: motivoEstruturado,
       observacao: motivo, status: "ativa", usuarioId: currentUser.uid, usuarioEmail: currentUser.email ?? "", criadoPorUid: currentUser.uid,
       criadoPorEmail: currentUser.email ?? undefined, criadoPorNome: currentUser.displayName ?? undefined, criadoEm: new Date().toISOString(), dataMovimentacao: new Date().toISOString(), unidade,
     }
@@ -558,7 +573,10 @@ export default function Home() {
         <div className="p-4 pt-16 md:p-10 md:pt-10">
           {/* Header */}
           <div className="mb-8 flex flex-col gap-2 border-b border-border/70 pb-7">
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">Dom Costelo · Gestão</p>
+            <div className="flex items-center justify-between gap-3">
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">Dom Costelo · Gestão</p>
+              <SyncIndicator />
+            </div>
             <h1 className="text-3xl font-bold tracking-tight text-foreground capitalize">
               {activeTab === "estoque" && "Controle de Estoque"}
               {activeTab === "entrada" && "Entrada de Mercadoria"}
