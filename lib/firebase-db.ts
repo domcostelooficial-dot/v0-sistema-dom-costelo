@@ -468,7 +468,7 @@ export async function registrarEntradasAtomica(params: { compraId: string; movim
       if (index < 0) throw new Error(`Insumo não encontrado no estoque: ${itemNome}`)
       if (!Number.isFinite(movimento.quantidade) || movimento.quantidade <= 0) throw new Error(`Quantidade inválida: ${itemNome}`)
       const unidadeEstoque = atualizados[index].unidadeEstoque ?? atualizados[index].unidade ?? movimento.unidadeSnapshot
-      const familia = (unidade: string) => ["g", "kg"].includes(unidade) ? "massa" : ["ml", "l"].includes(unidade) ? "volume" : ["un", "unidade", "pacote", "caixa", "bobina", "maço", "pct"].includes(unidade) ? "unidade" : unidade
+      const familia = (unidade: string) => { const normalizada = unidade.trim().toLowerCase(); return ["g", "kg"].includes(normalizada) ? "massa" : ["ml", "l"].includes(normalizada) ? "volume" : ["un", "unidade", "pacote", "caixa", "bobina", "maço", "pct"].includes(normalizada) ? "unidade" : normalizada }
       if (familia(movimento.unidadeSnapshot) !== familia(unidadeEstoque)) throw new Error(`UNIDADE_INCOMPATIVEL: ${itemNome} usa ${unidadeEstoque}, mas a entrada está em ${movimento.unidadeSnapshot}`)
       atualizados[index] = { ...atualizados[index], atual: atualizados[index].atual + movimento.quantidade }
       return { ...movimento, compraId: params.compraId, saldoAnterior: atualizados[index].atual - movimento.quantidade, saldoPosterior: atualizados[index].atual }
