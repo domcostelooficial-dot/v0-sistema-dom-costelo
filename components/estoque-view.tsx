@@ -51,6 +51,7 @@ import {
   Minus,
   Pencil,
   Trash2,
+  Check,
 } from "lucide-react"
 import dynamic from "next/dynamic"
 import { toast } from "sonner"
@@ -346,7 +347,7 @@ export function EstoqueView({ itens, onEditItem, onDeleteItem, onOpenEntrada, on
                         <Button variant="outline" size="icon" className="size-10" aria-label={`Diminuir estoque de ${item.nome}`} onClick={() => item.atual > 0 && setMovimentoRapido((atual) => ({ item, novoAtual: Math.max(0, (atual?.item.nome === item.nome ? atual.novoAtual : item.atual) - 1) }))} disabled={item.atual <= 0}>
                           <Minus data-icon="inline-start" />
                         </Button>
-                        <Input type="number" min="0" step="1" className="h-10 w-20 text-center text-lg font-bold tabular-nums" aria-label={`Alterar quantidade de ${item.nome}`} value={movimentoRapido?.item.nome === item.nome ? movimentoRapido.novoAtual : item.atual} onChange={(event) => { const novoAtual = Math.max(0, Number(event.target.value)); setMovimentoRapido({ item, novoAtual }) }} onBlur={() => { if (movimentoRapido?.item.nome === item.nome && movimentoRapido.novoAtual !== item.atual) setMotivoAberto(true) }} />
+                        <div className="flex items-center justify-center gap-1"><Input type="number" min="0" step="1" className="h-10 w-20 text-center text-lg font-bold tabular-nums" aria-label={`Alterar quantidade de ${item.nome}`} value={movimentoRapido?.item.nome === item.nome ? movimentoRapido.novoAtual : item.atual} onChange={(event) => { const novoAtual = Math.max(0, Number(event.target.value)); setMovimentoRapido({ item, novoAtual }) }} onBlur={() => { if (movimentoRapido?.item.nome === item.nome && movimentoRapido.novoAtual !== item.atual) setMotivoAberto(true) }} />{movimentoRapido?.item.nome === item.nome && movimentoRapido.novoAtual !== item.atual && <Button type="button" variant="default" size="icon" className="size-10" aria-label={`Confirmar quantidade de ${item.nome}`} title="Confirmar quantidade" onMouseDown={(event) => event.preventDefault()} onClick={() => setMotivoAberto(true)}><Check data-icon="inline-start" /></Button>}</div>
                         <Button variant="outline" size="icon" className="size-10" aria-label={`Aumentar estoque de ${item.nome}`} onClick={() => setMovimentoRapido((atual) => ({ item, novoAtual: (atual?.item.nome === item.nome ? atual.novoAtual : item.atual) + 1 }))}>
                           <Plus data-icon="inline-start" />
                         </Button>
