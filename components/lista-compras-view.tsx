@@ -28,10 +28,10 @@ interface Props {
   historico?: CompraRegistro[]
   onSaveInsumos?: (data: Insumo[]) => void | Promise<void>
   onSaveHistorico?: (data: CompraRegistro[]) => void | Promise<void>
-  onUpdateEstoque: (nome: string, qtd: number) => void | Promise<void>
-}
+  onConfirmarCompra: (itens: Array<{ insumoId?: string; nome: string; quantidade: number; unitario: number; unidade: UnidadeInsumo; fornecedor?: string; data: string }>) => void | Promise<void>
+  }
 
-export function ListaComprasView({ itens, userRole = "operador", fichas = [], insumos: initialInsumos = [], historico: initialHistorico = [], onSaveInsumos, onSaveHistorico, onUpdateEstoque }: Props) {
+  export function ListaComprasView({ itens, userRole = "operador", fichas = [], insumos: initialInsumos = [], historico: initialHistorico = [], onSaveInsumos, onSaveHistorico, onConfirmarCompra }: Props) {
   const [insumos, setInsumos] = useState(() => catalogoCompletoCompras(itens, initialInsumos))
   const [historico, setHistorico] = useState(initialHistorico)
   useEffect(() => { setInsumos(catalogoCompletoCompras(itens, initialInsumos)) }, [itens, initialInsumos])
@@ -39,8 +39,9 @@ export function ListaComprasView({ itens, userRole = "operador", fichas = [], in
   const [categoria, setCategoria] = useState<string>("todas")
   const [fornecedor, setFornecedor] = useState("")
   const [compra, setCompra] = useState({ nome: "", quantidade: "", unitario: "", data: hoje() })
-  const [carrinho, setCarrinho] = useState<{ id: string; nome: string; quantidade: number; unitario: number; unidade: UnidadeInsumo }[]>([])
+  const [carrinho, setCarrinho] = useState<{ id: string; insumoId?: string; nome: string; quantidade: number; unitario: number; unidade: UnidadeInsumo }[]>([])
   const [draftInsumo, setDraftInsumo] = useState<Insumo | null>(null)
+  const [compraProcessando, setCompraProcessando] = useState(false)
   const canManage = userRole === "owner" || userRole === "admin"
   const estoque = useMemo(() => new Map(itens.map((item) => [item.nome, item])), [itens])
   const rows = useMemo(() => insumos.map((i) => {
@@ -59,23 +60,32 @@ export function ListaComprasView({ itens, userRole = "operador", fichas = [], in
     const quantidade = Number(compra.quantidade)
     const unitario = Number(compra.unitario)
     if (!item || !Number.isFinite(quantidade) || quantidade <= 0 || !Number.isFinite(unitario) || unitario <= 0) return
-    setCarrinho((atual) => [...atual.filter((linha) => linha.id !== (item.id ?? item.nome)), { id: item.id ?? item.nome, nome: item.nome, quantidade, unitario, unidade: (item.unidadeReferencia ?? item.unidade) as UnidadeInsumo }])
+    setCarrinho((atual) => [...atual.filter((linha) => linha.id !== (item.id ?? item.nome)), { id: item.id ?? item.nome, insumoId: item.insumoId ?? item.id, nome: item.nome, quantidade, unitario, unidade: (item.unidadeReferencia ?? item.unidade) as UnidadeInsumo }])
   }
 
   const salvarInsumo = async (data: Insumo) => { const atualizados = insumos.some((item) => item.id === data.id) ? insumos.map((item) => item.id === data.id ? data : item) : [...insumos, data]; await onSaveInsumos?.(apenasInsumosCentrais(atualizados)); setInsumos(atualizados); setDraftInsumo(null) }
   const registrarCompra = async () => {
-    const item = insumos.find((i) => i.nome === compra.nome && i.naoVinculado !== true)
-    const quantidade = Number(compra.quantidade)
-    const unitario = Number(compra.unitario)
-    if (!item || quantidade <= 0 || unitario <= 0) return
-    const anterior = item.precoReferencia ?? item.precoCompra
-    const registro: CompraRegistro = { id: crypto.randomUUID(), data: compra.data, fornecedor, insumoNome: item.nome, quantidade, unidade: (item.unidadeReferencia ?? item.unidade) as UnidadeInsumo, precoUnitario: unitario, valorTotal: quantidade * unitario, precoAnterior: anterior, variacao: anterior ? ((unitario - anterior) / anterior) * 100 : 0, adicionadaAoEstoque: true }
-    const novoHistorico = [registro, ...historico]
+    if (carrinho.length === 0) return
+    const linhas = carrinho.map((linha) => ({ ...linha, fornecedor, data: compra.data }))
+    if (linhas.some((linha) => !linha.insumoId || !Number.isFinite(linha.quantidade) || linha.quantidade <= 0 || !Number.isFinite(linha.unitario) || linha.unitario <= 0)) return
+    setCompraProcessando(true)
+    try {
+    await onConfirmarCompra(linhas)
+    } catch (error) {
+      setCompraProcessando(false)
+      throw error
+    }
+    const registros = linhas.map((linha) => {
+      const item = insumos.find((i) => i.insumoId === linha.insumoId || i.id === linha.insumoId || i.nome === linha.nome)
+      const anterior = item?.precoReferencia ?? item?.precoCompra ?? 0
+      return { id: crypto.randomUUID(), data: linha.data, fornecedor: linha.fornecedor ?? "", insumoNome: linha.nome, quantidade: linha.quantidade, unidade: linha.unidade, precoUnitario: linha.unitario, valorTotal: linha.quantidade * linha.unitario, precoAnterior: anterior, variacao: anterior ? ((linha.unitario - anterior) / anterior) * 100 : 0, adicionadaAoEstoque: true } satisfies CompraRegistro
+    })
+    const novoHistorico = [...registros, ...historico]
     await onSaveHistorico?.(novoHistorico)
-    await onUpdateEstoque(item.nome, quantidade)
-    await salvarInsumo({ ...item, precoReferencia: unitario, precoCompra: unitario, ultimaAtualizacaoPreco: compra.data })
     setHistorico(novoHistorico)
+    setCarrinho([])
     setCompra({ nome: "", quantidade: "", unitario: "", data: hoje() })
+    setCompraProcessando(false)
   }
   return <div className="flex flex-col gap-6">
     <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">

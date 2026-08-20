@@ -378,31 +378,6 @@ export default function Home() {
     handleLogout()
   }
 
-  const handleUpdateItem = async (nome: string, novoAtual: number) => {
-    if (!Number.isFinite(novoAtual) || novoAtual < 0) { toast.error("Quantidade de estoque inválida."); return }
-    const now = new Date()
-    const dataHora = `${now.toLocaleDateString("pt-BR")} às ${now.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}`
-    const updated = itens.map((item) =>
-      item.nome === nome
-        ? {
-            ...item,
-            atual: novoAtual,
-            ultimaAlteracao: {
-              usuario: user || "Desconhecido",
-              data: dataHora,
-            },
-          }
-        : item
-    )
-    try {
-      const result = await saveEstoqueHybrid(user, updated)
-      if (result?.error) throw new Error(result.error)
-      setItens(updated)
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Não foi possível salvar o estoque.")
-    }
-  }
-
   const handleAddItem = async (newItem: Item) => {
     const now = new Date()
     const dataHora = `${now.toLocaleDateString("pt-BR")} às ${now.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}`
@@ -592,9 +567,7 @@ export default function Home() {
           {/* Content */}
           {activeTab === "estoque" && <div className="flex flex-col gap-6"><EstoqueView
               itens={itens}
-              onUpdateItem={handleUpdateItem}
-              onAddItem={handleAddItem}
-              onEditItem={handleEditItem}
+  onEditItem={handleEditItem}
               onDeleteItem={handleDeleteItem}
               userRole={userRole as "admin" | "operador" | "owner"}
               movimentacoes={movimentacoes}
@@ -634,10 +607,11 @@ export default function Home() {
               historico={comprasHistorico}
               onSaveInsumos={persistirInsumos}
               onSaveHistorico={persistirCompras}
-              onUpdateEstoque={(nome, qtd) => {
-                const item = itens.find((current) => current.nome === nome)
-                if (item) handleUpdateItem(nome, item.atual + qtd)
-              }}
+  onConfirmarCompra={async (linhas) => {
+  for (const linha of linhas) {
+  await registrarEntradaRastreavel(linha.nome, linha.quantidade, linha.quantidade * linha.unitario, linha.fornecedor, `Compra confirmada · ${linha.data}` , linha.data)
+  }
+  }}
             />
           )}
   {activeTab === "cmv" && (

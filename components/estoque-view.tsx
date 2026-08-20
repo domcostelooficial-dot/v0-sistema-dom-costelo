@@ -62,8 +62,6 @@ const ExportPDFButton = dynamic(
 
 interface EstoqueViewProps {
   itens: Item[]
-  onUpdateItem: (nome: string, novoAtual: number) => void
-  onAddItem: (item: Item) => void
   onEditItem: (oldNome: string, item: Item) => void
   onDeleteItem: (nome: string) => void
   userRole: "admin" | "operador" | "owner"
@@ -71,7 +69,7 @@ interface EstoqueViewProps {
   onEstornarMovimentacao?: (movimentacao: MovimentacaoEstoque) => void
 }
 
-export function EstoqueView({ itens, onUpdateItem, onAddItem, onEditItem, onDeleteItem, userRole, movimentacoes = [], onEstornarMovimentacao }: EstoqueViewProps) {
+export function EstoqueView({ itens, onEditItem, onDeleteItem, userRole, movimentacoes = [], onEstornarMovimentacao }: EstoqueViewProps) {
   const isAdmin = userRole === "admin" || userRole === "owner"
   const [search, setSearch] = useState("")
   const [categoriaFilter, setCategoriaFilter] = useState<string>("todas")
@@ -144,35 +142,6 @@ export function EstoqueView({ itens, onUpdateItem, onAddItem, onEditItem, onDele
         OK
       </Badge>
     )
-  }
-
-  const handleAddItem = () => {
-    if (!formData.nome.trim()) {
-      toast.error("Digite um nome para o item")
-      return
-    }
-    
-    if (itens.some((item) => item.nome.toLowerCase() === formData.nome.trim().toLowerCase())) {
-      toast.error("Já existe um item com este nome")
-      return
-    }
-
-    const newItem: Item = {
-      nome: formData.nome.trim(),
-      categoria: formData.categoria,
-      min: formData.min,
-      atual: formData.atual,
-      unidadeEstoque: formData.unidadeEstoque,
-      quantidadePorEmbalagem: formData.quantidadePorEmbalagem,
-      unidadeConteudo: formData.unidadeConteudo,
-      precoCompra: formData.precoCompra,
-      ultimaAlteracao: undefined,
-    }
-
-    onAddItem(newItem)
-    setIsAddDialogOpen(false)
-    setFormData({ nome: "", categoria: "Carnes", min: 1, atual: 0, unidadeEstoque: "Unidade", quantidadePorEmbalagem: 1, unidadeConteudo: "un", precoCompra: 0 })
-    toast.success(`Item "${newItem.nome}" adicionado com sucesso!`)
   }
 
   const handleEditItem = () => {
@@ -301,111 +270,6 @@ export function EstoqueView({ itens, onUpdateItem, onAddItem, onEditItem, onDele
         <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle className="text-lg text-foreground">Controle de Estoque</CardTitle>
           <div className="flex items-center gap-2">
-            <Dialog open={false} onOpenChange={setIsAddDialogOpen}>
-              <DialogTrigger asChild>
-                <Button className="hidden gap-2">
-                  <PlusCircle className="h-4 w-4" />
-                  Adicionar Item
-                </Button>
-              </DialogTrigger>
-              <DialogContent>
-                <DialogHeader>
-                  <DialogTitle>Adicionar Novo Item</DialogTitle>
-                  <DialogDescription>
-                    Preencha as informações do novo item do estoque.
-                  </DialogDescription>
-                </DialogHeader>
-                <div className="space-y-4 py-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="add-nome">Nome do Item</Label>
-                    <Input
-                      id="add-nome"
-                      value={formData.nome}
-                      onChange={(e) =>
-                        setFormData({ ...formData, nome: e.target.value })
-                      }
-                      placeholder="Ex: Contra filé"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="add-categoria">Categoria</Label>
-                    <Select
-                      value={formData.categoria}
-                      onValueChange={(value) =>
-                        setFormData({ ...formData, categoria: value })
-                      }
-                    >
-                      <SelectTrigger id="add-categoria">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {categorias.map((cat) => (
-                          <SelectItem key={cat} value={cat}>
-                            {cat}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="grid grid-cols-3 gap-3">
-                    <div className="space-y-2">
-                      <Label htmlFor="add-unidade">Unidade de estoque</Label>
-                      <Input id="add-unidade" value={formData.unidadeEstoque} onChange={(e) => setFormData({ ...formData, unidadeEstoque: e.target.value })} placeholder="Pacote" />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="add-conteudo">Qtd. embalagem</Label>
-                      <Input id="add-conteudo" type="number" min="0" value={formData.quantidadePorEmbalagem} onChange={(e) => setFormData({ ...formData, quantidadePorEmbalagem: Number(e.target.value) })} />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="add-unidade-conteudo">Unidade conteúdo</Label>
-                      <Input id="add-unidade-conteudo" value={formData.unidadeConteudo} onChange={(e) => setFormData({ ...formData, unidadeConteudo: e.target.value })} placeholder="kg" />
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="add-preco">Preço unitário</Label>
-                    <Input id="add-preco" type="number" min="0" step="0.01" value={formData.precoCompra} onChange={(e) => setFormData({ ...formData, precoCompra: Number(e.target.value) })} placeholder="0,00" />
-                  </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="add-min">Estoque Mínimo</Label>
-                      <Input
-                        id="add-min"
-                        type="number"
-                        min="0"
-                        value={formData.min}
-                        onChange={(e) =>
-                          setFormData({ ...formData, min: Number(e.target.value) })
-                        }
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="add-atual">Estoque Atual</Label>
-                      <Input
-                        id="add-atual"
-                        type="number"
-                        min="0"
-                        value={formData.atual}
-                        onChange={(e) =>
-                          setFormData({ ...formData, atual: Number(e.target.value) })
-                        }
-                      />
-                    </div>
-                  </div>
-                </div>
-                <DialogFooter>
-                  <Button
-                    variant="outline"
-                    onClick={() => {
-                      setIsAddDialogOpen(false)
-                      setFormData({ nome: "", categoria: "Carnes", min: 1, atual: 0, unidadeEstoque: "Unidade", quantidadePorEmbalagem: 1, unidadeConteudo: "un", precoCompra: 0 })
-                    }}
-                  >
-                    Cancelar
-                  </Button>
-                  <Button onClick={handleAddItem}>Adicionar Item</Button>
-                </DialogFooter>
-              </DialogContent>
-            </Dialog>
             <ExportPDFButton itensEmFalta={itensEmFalta} />
           </div>
         </CardHeader>
@@ -490,8 +354,6 @@ export function EstoqueView({ itens, onUpdateItem, onAddItem, onEditItem, onDele
                     </TableCell>
                     <TableCell className="text-center">
                       <div className="flex items-center justify-center gap-1">
-                        <Button variant="outline" size="icon" className="size-8" aria-label={`Diminuir ${item.nome}`} onClick={() => onUpdateItem(item.nome, Math.max(0, item.atual - 1))}><Minus /></Button>
-                        <Button variant="outline" size="icon" className="size-8" aria-label={`Adicionar ${item.nome}`} onClick={() => onUpdateItem(item.nome, item.atual + 1)}><Plus /></Button>
                         <Button variant="outline" size="icon" className="size-8" aria-label={`Editar ${item.nome}`} onClick={() => openEditDialog(item)}><Pencil className="h-3 w-3" /></Button>
                         {isAdmin && (
                           <Button
@@ -591,17 +453,8 @@ export function EstoqueView({ itens, onUpdateItem, onAddItem, onEditItem, onDele
                   }
                 />
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="edit-atual">Estoque Atual</Label>
-                <Input
-                  id="edit-atual"
-                  type="number"
-                  min="0"
-                  value={formData.atual}
-                  onChange={(e) =>
-                    setFormData({ ...formData, atual: Number(e.target.value) })
-                  }
-                />
+              <div className="rounded-md border border-dashed p-3 text-sm text-muted-foreground">
+                Estoque atual não é cadastral. Corrija o saldo pelo módulo Inventário.
               </div>
             </div>
           </div>
