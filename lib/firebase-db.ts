@@ -366,6 +366,19 @@ export async function getComprasHistorico() { return getComprasData<CompraRegist
 export async function saveComprasHistorico(data: CompraRegistro[]) { return saveComprasData("historico", data) }
 const MOVIMENTACOES_COLLECTION = "movimentacoesEstoque"
 
+export function removerUndefinedFirestore<T>(value: T): T {
+  if (value instanceof Timestamp) return value
+  if (Array.isArray(value)) return value.map((item) => removerUndefinedFirestore(item)).filter((item) => item !== undefined) as T
+  if (value && typeof value === "object") {
+    const resultado: Record<string, unknown> = {}
+    for (const [chave, item] of Object.entries(value as Record<string, unknown>)) {
+      if (item !== undefined) resultado[chave] = removerUndefinedFirestore(item)
+    }
+    return resultado as T
+  }
+  return value
+}
+
 export async function getMovimentacoesEstoque() {
   const snapshot = await getDocs(collection(db, MOVIMENTACOES_COLLECTION))
   const novas = snapshot.docs.map((item) => ({ id: item.id, ...item.data() }) as MovimentacaoEstoque)
@@ -493,7 +506,7 @@ export async function registrarMovimentacaoRapidaAtomica(params: { movimento: Mo
     const novoAtual = item.atual + params.delta
     if (!Number.isFinite(novoAtual) || novoAtual < 0) throw new Error("Estoque insuficiente para esta saída")
     const atualizados = itens.map((row, rowIndex) => rowIndex === index ? { ...row, atual: novoAtual } : row)
-    const movimento = { ...params.movimento, estoqueAnterior: item.atual, estoquePosterior: novoAtual, saldoAnterior: item.atual, saldoPosterior: novoAtual, quantidade: params.delta, quantidadeBase: params.delta }
+    const movimento = removerUndefinedFirestore({ ...params.movimento, estoqueAnterior: item.atual, estoquePosterior: novoAtual, saldoAnterior: item.atual, saldoPosterior: novoAtual, quantidade: params.delta, quantidadeBase: params.delta })
     transaction.set(estoqueRef, { itens: atualizados, updatedAt: Timestamp.now(), lastModifiedBy: params.userId })
     transaction.set(movimentoRef, movimento)
     return { itens: atualizados, movimento }
