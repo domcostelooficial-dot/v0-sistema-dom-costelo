@@ -64,12 +64,14 @@ interface EstoqueViewProps {
   itens: Item[]
   onEditItem: (oldNome: string, item: Item) => void
   onDeleteItem: (nome: string) => void
+  onOpenEntrada?: (item: Item) => void
+  onOpenSaida?: (item: Item) => void
   userRole: "admin" | "operador" | "owner"
   movimentacoes?: MovimentacaoEstoque[]
   onEstornarMovimentacao?: (movimentacao: MovimentacaoEstoque) => void
 }
 
-export function EstoqueView({ itens, onEditItem, onDeleteItem, userRole, movimentacoes = [], onEstornarMovimentacao }: EstoqueViewProps) {
+export function EstoqueView({ itens, onEditItem, onDeleteItem, onOpenEntrada, onOpenSaida, userRole, movimentacoes = [], onEstornarMovimentacao }: EstoqueViewProps) {
   const isAdmin = userRole === "admin" || userRole === "owner"
   const [search, setSearch] = useState("")
   const [categoriaFilter, setCategoriaFilter] = useState<string>("todas")
@@ -165,7 +167,7 @@ export function EstoqueView({ itens, onEditItem, onDeleteItem, userRole, movimen
       nome: formData.nome.trim(),
       categoria: formData.categoria,
       min: formData.min,
-      atual: formData.atual,
+      atual: selectedItem.atual,
       unidadeEstoque: formData.unidadeEstoque,
       quantidadePorEmbalagem: formData.quantidadePorEmbalagem,
       unidadeConteudo: formData.unidadeConteudo,
@@ -353,7 +355,9 @@ export function EstoqueView({ itens, onEditItem, onDeleteItem, userRole, movimen
                       )}
                     </TableCell>
                     <TableCell className="text-center">
-                      <div className="flex items-center justify-center gap-1">
+                      <div className="flex flex-wrap items-center justify-center gap-1">
+                        <Button variant="outline" size="sm" className="h-8 px-2" onClick={() => onOpenEntrada?.(item)}>Entrada</Button>
+                        <Button variant="outline" size="sm" className="h-8 px-2" onClick={() => onOpenSaida?.(item)}>Saída</Button>
                         <Button variant="outline" size="icon" className="size-8" aria-label={`Editar ${item.nome}`} onClick={() => openEditDialog(item)}><Pencil className="h-3 w-3" /></Button>
                         {isAdmin && (
                           <Button

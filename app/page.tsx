@@ -569,8 +569,10 @@ export default function Home() {
           {activeTab === "estoque" && <div className="flex flex-col gap-6"><EstoqueView
               itens={itens}
   onEditItem={handleEditItem}
-              onDeleteItem={handleDeleteItem}
-              userRole={userRole as "admin" | "operador" | "owner"}
+  onDeleteItem={handleDeleteItem}
+  onOpenEntrada={() => setActiveTab("entrada")}
+  onOpenSaida={() => setActiveTab("saida")}
+  userRole={userRole as "admin" | "operador" | "owner"}
               movimentacoes={movimentacoes}
               onEstornarMovimentacao={estornarMovimentacao}
             /><BaixasPendentesView vendas={vendasFinanceiras} onProcessar={async (venda) => { try { await processarBaixaVenda(venda) } catch (error) { toast.error(error instanceof Error ? error.message : "Não foi possível processar a baixa.") } }} /></div>}
