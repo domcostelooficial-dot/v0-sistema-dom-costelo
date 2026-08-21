@@ -6,6 +6,7 @@ export interface Item {
   insumoId?: string
   nome: string
   min: number
+  estoqueIdeal?: number
   atual: number
   categoria: string
   preco?: number
@@ -120,11 +121,12 @@ export interface PrevisaoVenda {
   quantidade: number
 }
 
-export type TipoMovimentacaoEstoque = "entrada" | "estorno_entrada" | "saida" | "saida_venda" | "ajuste" | "ajuste_inventario"
+export type TipoMovimentacaoEstoque = "entrada" | "estorno_entrada" | "saida" | "saida_venda" | "ajuste" | "ajuste_inventario" | "producao"
 
 export interface MovimentacaoEstoque {
   id: string
   tipo: TipoMovimentacaoEstoque
+  origemDetalhada?: "ajuste_rapido" | "compras" | "venda_automatica"
   insumoId: string
   insumoNomeSnapshot: string
   quantidade: number
@@ -148,13 +150,20 @@ export interface MovimentacaoEstoque {
   produtoNomeSnapshot?: string
   saldoAnterior?: number
   saldoPosterior?: number
-  motivo?: "consumo" | "consumo_interno" | "perda" | "descarte" | "vencimento" | "avaria" | "uso_operacional" | "cortesia" | "contagem_fisica" | "correcao_cadastro" | "perda_nao_registrada" | "entrada_nao_registrada" | "erro_operacional" | "ajuste_manual" | "outro"
+  motivo?: "reposicao" | "aumento_capacidade" | "venda" | "venda_nao_registrada" | "desperdicio" | "compra" | "inventario" | "producao" | "saida_venda_automatica" | "consumo" | "consumo_interno" | "perda" | "descarte" | "vencimento" | "avaria" | "uso_operacional" | "cortesia" | "contagem_fisica" | "correcao_cadastro" | "perda_nao_registrada" | "entrada_nao_registrada" | "erro_operacional" | "ajuste_manual" | "outro"
   estoqueAnterior?: number
   estoqueContado?: number
   diferenca?: number
   origem: "compras" | "estoque" | "venda_automatica"
   movimentacaoOrigemId?: string
   movimentacaoOriginalId?: string
+  referenciaId?: string
+  itemId?: string
+  itemNome?: string
+  quantidadeAnterior?: number
+  quantidadeNova?: number
+  usuarioUid?: string
+  createdAt?: unknown
   status: "efetivada" | "estornada" | "ativa"
   usuarioId: string
   usuarioEmail: string
@@ -208,9 +217,9 @@ export interface HistoricoEntry {
   data: string
 }
 
-export type UserRole = "owner" | "admin" | "operador"
+export type UserRole = "owner" | "admin" | "operador" | "analista"
 
-export type TabPermissao = "estoque" | "entrada" | "saida" | "inventario" | "financeiro" | "dashboard" | "lista-compras" | "cmv" | "admin"
+export type TabPermissao = "estoque" | "entrada" | "saida" | "inventario" | "financeiro" | "dashboard" | "listaCompras" | "fichaTecnica" | "admin" | "lista-compras" | "cmv"
 
 export type UserStatus = "pendente" | "aprovado" | "rejeitado"
 
@@ -288,34 +297,34 @@ export const catalogoEmbalagens: Array<[string, string, number, string, string]>
 ]
 
 export const defaultItens: Item[] = [
-  { id: "carne-hamburguer-kg", insumoId: "carne-hamburguer-kg", nome: "Carne de hambúrguer", min: 30, atual: 0, categoria: "Carnes", unidade: "kg", unidadeEstoque: "kg", precoCompra: 37, quantidadeEmbalagem: 1, unidadeEmbalagem: "kg", ativo: true },
-  { nome: "Costela Pronta", min: 18, atual: 2, categoria: "Carnes" },
+  { id: "carne-hamburguer-kg", insumoId: "carne-hamburguer-kg", nome: "Carne de hambúrguer", min: 2, atual: 0, categoria: "Carnes", unidade: "kg", unidadeEstoque: "kg", precoCompra: 37, quantidadeEmbalagem: 1, unidadeEmbalagem: "kg", ativo: true },
+  { nome: "Costela Pronta", min: 2, atual: 2, categoria: "Carnes" },
   { nome: "Costela Desfiada", min: 2, atual: 2, categoria: "Carnes" },
   { nome: "Bacon em cubos", min: 2, atual: 2, categoria: "Carnes" },
   { nome: "Bacon Fatiado", min: 2, atual: 2, categoria: "Carnes" },
 
-  { nome: "Pão de Australiano Aussie", min: 30, atual: 12, categoria: "Padaria" },
-  { nome: "Pão brioche 4CT", min: 30, atual: 12, categoria: "Padaria" },
+  { nome: "Pão de Australiano Aussie", min: 12, atual: 12, categoria: "Padaria" },
+  { nome: "Pão brioche 4CT", min: 12, atual: 12, categoria: "Padaria" },
 
-  { nome: "Batata", min: 8, atual: 7, categoria: "Insumos" },
+  { nome: "Batata", min: 7, atual: 7, categoria: "Insumos" },
   { nome: "Anel de cebola", min: 2, atual: 2, categoria: "Insumos" },
-  { nome: "Mussarela", min: 2, atual: 1, categoria: "Insumos" },
-  { nome: "Cream cheese", min: 2, atual: 1, categoria: "Insumos" },
-  { nome: "Cheddar Polengui profissional", min: 2, atual: 1, categoria: "Insumos" },
-  { nome: "Molho de Cheddar", min: 2, atual: 1, categoria: "Insumos" },
-  { nome: "Óleo", min: 6, atual: 3, categoria: "Insumos" },
+  { nome: "Mussarela", min: 1, atual: 1, categoria: "Insumos" },
+  { nome: "Cream cheese", min: 1, atual: 1, categoria: "Insumos" },
+  { nome: "Cheddar Polengui profissional", min: 1, atual: 1, categoria: "Insumos" },
+  { nome: "Molho de Cheddar", min: 1, atual: 1, categoria: "Insumos" },
+  { nome: "Óleo", min: 3, atual: 3, categoria: "Insumos" },
   { nome: "Sal", min: 1, atual: 1, categoria: "Insumos" },
   { nome: "Barbecue", min: 2, atual: 2, categoria: "Insumos" },
   { nome: "Alho torrado", min: 1, atual: 1, categoria: "Insumos" },
-  { nome: "Cebolinha", min: 2, atual: 1, categoria: "Insumos" },
+  { nome: "Cebolinha", min: 1, atual: 1, categoria: "Insumos" },
   { nome: "Temperos", min: 1, atual: 1, categoria: "Insumos" },
-  { nome: "Pimenta Biquinho", min: 2, atual: 1, categoria: "Insumos" },
+  { nome: "Pimenta Biquinho", min: 1, atual: 1, categoria: "Insumos" },
 
   { nome: "Embalagem H7", min: 50, atual: 50, categoria: "Embalagens" },
-  { nome: "Embalagem H2", min: 60, atual: 50, categoria: "Embalagens" },
-  { nome: "Embalagem de prato feito", min: 30, atual: 20, categoria: "Embalagens" },
-  { nome: "Embalagem para talher", min: 2, atual: 1, categoria: "Embalagens" },
-  { nome: "Embalagem de farofa", min: 24, atual: 10, categoria: "Embalagens" },
+  { nome: "Embalagem H2", min: 50, atual: 50, categoria: "Embalagens" },
+  { nome: "Embalagem de prato feito", min: 20, atual: 20, categoria: "Embalagens" },
+  { nome: "Embalagem para talher", min: 1, atual: 1, categoria: "Embalagens" },
+  { nome: "Embalagem de farofa", min: 10, atual: 10, categoria: "Embalagens" },
   { nome: "Lacre para delivery", min: 1, atual: 1, categoria: "Embalagens" },
   { nome: "Lacre para o forno", min: 1, atual: 1, categoria: "Embalagens" },
   { nome: "Guardanapo", min: 1, atual: 1, categoria: "Embalagens" },
@@ -332,14 +341,14 @@ export const defaultItens: Item[] = [
   { nome: "Sacola para Refrigerante", min: 1, atual: 1, categoria: "Embalagens" },
 
   { nome: "Água para consumo", min: 2, atual: 2, categoria: "Bebidas" },
-  { nome: "Água com gás", min: 15, atual: 6, categoria: "Bebidas" },
-  { nome: "Água normal", min: 15, atual: 6, categoria: "Bebidas" },
-  { nome: "Coca zero 1,5L", min: 8, atual: 10, categoria: "Bebidas" },
-  { nome: "Coca cola 1,5L", min: 8, atual: 10, categoria: "Bebidas" },
-  { nome: "Dell vale 1,5L", min: 9, atual: 6, categoria: "Bebidas" },
+  { nome: "Água com gás", min: 6, atual: 6, categoria: "Bebidas" },
+  { nome: "Água normal", min: 6, atual: 6, categoria: "Bebidas" },
+  { nome: "Coca zero 1,5L", min: 10, atual: 10, categoria: "Bebidas" },
+  { nome: "Coca cola 1,5L", min: 10, atual: 10, categoria: "Bebidas" },
+  { nome: "Dell vale 1,5L", min: 6, atual: 6, categoria: "Bebidas" },
   { nome: "Guaraná 1L", min: 10, atual: 10, categoria: "Bebidas" },
-  { nome: "Coca Lata 350ml", min: 24, atual: 12, categoria: "Bebidas" },
-  { nome: "Guaraná lata 350ml", min: 29, atual: 12, categoria: "Bebidas" },
+  { nome: "Coca Lata 350ml", min: 12, atual: 12, categoria: "Bebidas" },
+  { nome: "Guaraná lata 350ml", min: 12, atual: 12, categoria: "Bebidas" },
 
   { nome: "Arroz", min: 1, atual: 1, categoria: "Cozinha" },
   { nome: "Farofa", min: 1, atual: 1, categoria: "Cozinha" },

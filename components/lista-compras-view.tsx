@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
-import { ClipboardList, History, Package, Pencil, Plus, ShoppingCart, Trash2, TrendingUp } from "lucide-react"
+import { ClipboardList, History, Package, Pencil, Plus, ShoppingCart, TrendingUp } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import type { Item, Insumo, CompraRegistro, CategoriaInsumo, UnidadeInsumo } from "@/lib/types"
 import { apenasInsumosCentrais, calcularValorEstoque, catalogoCompletoCompras } from "@/lib/compras-engine"
 import { InsumoEditor } from "@/components/insumo-editor"
@@ -25,12 +26,12 @@ interface Props {
   fichas?: { ativo?: boolean; ingredientes: { insumoId?: string }[] }[]
   insumos?: Insumo[]
   historico?: CompraRegistro[]
-  onSaveInsumos?: (data: Insumo[]) => void
-  onSaveHistorico?: (data: CompraRegistro[]) => void
-  onRegistrarEntrada: (params: { item: Insumo; quantidade: number; unidade: UnidadeInsumo; precoUnitario: number; fornecedor: string; data: string }) => Promise<void>
-}
+  onSaveInsumos?: (data: Insumo[]) => void | Promise<void>
+  onSaveHistorico?: (data: CompraRegistro[]) => void | Promise<void>
+  onConfirmarCompra: (compraId: string, itens: Array<{ insumoId?: string; nome: string; quantidade: number; unitario: number; unidade: UnidadeInsumo; fornecedor?: string; data: string }>) => void | Promise<void>
+  }
 
-export function ListaComprasView({ itens, userRole = "operador", fichas = [], insumos: initialInsumos = [], historico: initialHistorico = [], onSaveInsumos, onSaveHistorico, onRegistrarEntrada }: Props) {
+  export function ListaComprasView({ itens, userRole = "operador", fichas = [], insumos: initialInsumos = [], historico: initialHistorico = [], onSaveInsumos, onSaveHistorico, onConfirmarCompra }: Props) {
   const [insumos, setInsumos] = useState(() => catalogoCompletoCompras(itens, initialInsumos))
   const [historico, setHistorico] = useState(initialHistorico)
   useEffect(() => { setInsumos(catalogoCompletoCompras(itens, initialInsumos)) }, [itens, initialInsumos])
@@ -38,75 +39,68 @@ export function ListaComprasView({ itens, userRole = "operador", fichas = [], in
   const [categoria, setCategoria] = useState<string>("todas")
   const [fornecedor, setFornecedor] = useState("")
   const [compra, setCompra] = useState({ nome: "", quantidade: "", unitario: "", data: hoje() })
+  const [carrinho, setCarrinho] = useState<{ id: string; insumoId?: string; nome: string; quantidade: number; unitario: number; unidade: UnidadeInsumo }[]>([])
   const [draftInsumo, setDraftInsumo] = useState<Insumo | null>(null)
-  const [calculo, setCalculo] = useState<{ id: string; quantidade: string; preco: string }[]>([])
+  const [compraProcessando, setCompraProcessando] = useState(false)
+  const [compraId, setCompraId] = useState(() => crypto.randomUUID())
   const canManage = userRole === "owner" || userRole === "admin"
   const estoque = useMemo(() => new Map(itens.map((item) => [item.nome, item])), [itens])
   const rows = useMemo(() => insumos.map((i) => {
-    const atual = estoque.get(i.nome)?.atual ?? i.atual ?? 0
-    const minimo = estoque.get(i.nome)?.min ?? i.min ?? 0
-    const comprar = Math.max(0, minimo - atual)
+    const itemEstoque = estoque.get(i.nome)
+    const atual = itemEstoque?.atual ?? i.atual ?? 0
+    const minimo = itemEstoque?.min ?? i.min ?? 0
+    const ideal = itemEstoque?.estoqueIdeal && itemEstoque.estoqueIdeal > 0 ? itemEstoque.estoqueIdeal : minimo
+    // Entra na lista quando o estoque atual está no mínimo ou abaixo; a quantidade sugerida repõe até o ideal.
+    const comprar = atual <= minimo ? Math.max(0, ideal - atual) : 0
     const preco = i.precoReferencia ?? i.precoCompra ?? 0
-    return { ...i, atual, minimo, comprar, valorEstoque: calcularValorEstoque(i, atual), valorCompra: calcularValorEstoque(i, comprar) }
+    return { ...i, atual, minimo, ideal, comprar, valorEstoque: calcularValorEstoque(i, atual), valorCompra: calcularValorEstoque(i, comprar) }
   }).filter((i) => categoria === "todas" || i.categoria === categoria), [categoria, estoque, insumos])
   const valorEstoque = rows.reduce((sum, i) => sum + i.valorEstoque, 0)
   const valorCompra = rows.reduce((sum, i) => sum + i.valorCompra, 0)
   const itensComprar = rows.filter((i) => i.comprar > 0)
-  const linhasCalculo = calculo.map((linha) => ({ ...linha, insumo: insumos.find((item) => (item.id ?? item.nome) === linha.id) })).filter((linha) => linha.insumo)
-  const totalEstimado = linhasCalculo.reduce((total, linha) => {
-    const quantidade = Number(linha.quantidade)
-    const preco = Number(linha.preco)
-    return total + (Number.isFinite(quantidade) && quantidade >= 0 && Number.isFinite(preco) && preco >= 0 ? quantidade * preco : 0)
-  }, 0)
-  const itensSemPreco = linhasCalculo.filter((linha) => !Number.isFinite(Number(linha.preco)) || Number(linha.preco) <= 0).length
-  const adicionarAoCalculo = (id: string) => {
-    if (!id || calculo.some((linha) => linha.id === id)) return
-    const insumo = insumos.find((item) => (item.id ?? item.nome) === id)
-    if (!insumo) return
-    const preco = insumo.precoReferencia ?? insumo.precoCompra
-    setCalculo((atual) => [...atual, { id: insumo.id ?? insumo.nome, quantidade: "1", preco: preco > 0 ? String(preco) : "" }])
-  }
-  const atualizarLinha = (id: string, campo: "quantidade" | "preco", valor: string) => {
-    if (valor !== "" && (!Number.isFinite(Number(valor)) || Number(valor) < 0)) return
-    setCalculo((atual) => atual.map((linha) => linha.id === id ? { ...linha, [campo]: valor } : linha))
-  }
-
-  const salvarInsumo = (data: Insumo) => { const atualizados = insumos.some((item) => item.id === data.id) ? insumos.map((item) => item.id === data.id ? data : item) : [...insumos, data]; setInsumos(atualizados); onSaveInsumos?.(apenasInsumosCentrais(atualizados)); setDraftInsumo(null) }
-  const registrarCompra = async () => {
+  const totalCarrinho = carrinho.reduce((total, linha) => total + linha.quantidade * linha.unitario, 0)
+  const adicionarAoCarrinho = () => {
     const item = insumos.find((i) => i.nome === compra.nome && i.naoVinculado !== true)
     const quantidade = Number(compra.quantidade)
     const unitario = Number(compra.unitario)
-    if (!item || quantidade <= 0 || unitario <= 0) return
-    const anterior = item.precoReferencia ?? item.precoCompra
-    const registro: CompraRegistro = { id: crypto.randomUUID(), data: compra.data, fornecedor, insumoNome: item.nome, quantidade, unidade: (item.unidadeReferencia ?? item.unidade) as UnidadeInsumo, precoUnitario: unitario, valorTotal: quantidade * unitario, precoAnterior: anterior, variacao: anterior ? ((unitario - anterior) / anterior) * 100 : 0, adicionadaAoEstoque: true }
-    await onRegistrarEntrada({ item, quantidade, unidade: (item.unidadeReferencia ?? item.unidade) as UnidadeInsumo, precoUnitario: unitario, fornecedor, data: compra.data })
-    const novoHistorico = [registro, ...historico]
+    if (!item || !Number.isFinite(quantidade) || quantidade <= 0 || !Number.isFinite(unitario) || unitario <= 0) return
+    setCarrinho((atual) => [...atual.filter((linha) => linha.id !== (item.id ?? item.nome)), { id: item.id ?? item.nome, insumoId: item.insumoId ?? item.id, nome: item.nome, quantidade, unitario, unidade: (item.unidadeReferencia ?? item.unidade) as UnidadeInsumo }])
+  }
+
+  const salvarInsumo = async (data: Insumo) => { const atualizados = insumos.some((item) => item.id === data.id) ? insumos.map((item) => item.id === data.id ? data : item) : [...insumos, data]; await onSaveInsumos?.(apenasInsumosCentrais(atualizados)); setInsumos(atualizados); setDraftInsumo(null) }
+  const registrarCompra = async () => {
+    if (carrinho.length === 0) return
+    const linhas = carrinho.map((linha) => ({ ...linha, fornecedor, data: compra.data }))
+    if (linhas.some((linha) => !linha.insumoId || !Number.isFinite(linha.quantidade) || linha.quantidade <= 0 || !Number.isFinite(linha.unitario) || linha.unitario <= 0)) return
+    setCompraProcessando(true)
+    try {
+    await onConfirmarCompra(compraId, linhas)
+    } catch (error) {
+      setCompraProcessando(false)
+      throw error
+    }
+    const registros = linhas.map((linha) => {
+      const item = insumos.find((i) => i.insumoId === linha.insumoId || i.id === linha.insumoId || i.nome === linha.nome)
+      const anterior = item?.precoReferencia ?? item?.precoCompra ?? 0
+      return { id: crypto.randomUUID(), data: linha.data, fornecedor: linha.fornecedor ?? "", insumoNome: linha.nome, quantidade: linha.quantidade, unidade: linha.unidade, precoUnitario: linha.unitario, valorTotal: linha.quantidade * linha.unitario, precoAnterior: anterior, variacao: anterior ? ((linha.unitario - anterior) / anterior) * 100 : 0, adicionadaAoEstoque: true } satisfies CompraRegistro
+    })
+    const novoHistorico = [...registros, ...historico]
+    await onSaveHistorico?.(novoHistorico)
     setHistorico(novoHistorico)
-    onSaveHistorico?.(novoHistorico)
-    salvarInsumo({ ...item, precoReferencia: unitario, precoCompra: unitario, ultimaAtualizacaoPreco: compra.data })
+    setCarrinho([])
+    setCompraId(crypto.randomUUID())
     setCompra({ nome: "", quantidade: "", unitario: "", data: hoje() })
+    setCompraProcessando(false)
   }
   return <div className="flex flex-col gap-6">
     <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
       {[{ label: "Valor total em estoque", value: dinheiro(valorEstoque), note: "capital parado atualmente", icon: Package }, { label: "Valor da compra", value: dinheiro(valorCompra), note: `${itensComprar.length} itens para reposição`, icon: ShoppingCart }, { label: "Valor após reposição", value: dinheiro(valorEstoque + valorCompra), note: "estoque atual + compra planejada", icon: TrendingUp }, { label: "Itens para comprar", value: String(itensComprar.length), note: "abaixo do estoque mínimo", icon: ClipboardList }].map(({ label, value, note, icon: Icon }) => <Card key={label}><CardContent className="flex items-start justify-between gap-3 pt-6"><div><p className="text-sm text-muted-foreground">{label}</p><p className="mt-1 text-2xl font-bold text-primary">{value}</p><p className="mt-1 text-xs text-muted-foreground">{note}</p></div><Icon className="text-muted-foreground" aria-hidden="true" /></CardContent></Card>)}
     </div>
     <Tabs value={tab} onValueChange={setTab}>
-      <TabsList className="grid h-auto w-full grid-cols-3 gap-1 sm:grid-cols-4"><TabsTrigger value="lista">Lista de compras</TabsTrigger><TabsTrigger value="insumos">Produtos e preços</TabsTrigger><TabsTrigger value="compras">Registrar compra</TabsTrigger><TabsTrigger value="historico">Histórico de preços</TabsTrigger></TabsList>
-      <TabsContent value="lista" className="mt-6 flex flex-col gap-4">
-        <Card>
-          <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div><CardTitle>Planejar compra</CardTitle><p className="mt-1 text-sm text-muted-foreground">Simulação de quantidade e preço. Não altera estoque, despesas ou o DRE.</p></div>
-            <Select value="" onValueChange={adicionarAoCalculo}><SelectTrigger className="w-full sm:w-64"><SelectValue placeholder="Adicionar insumo central" /></SelectTrigger><SelectContent>{apenasInsumosCentrais(insumos).filter((item) => !calculo.some((linha) => linha.id === item.id)).map((item) => <SelectItem key={item.id ?? item.nome} value={item.id ?? item.nome}>{item.nome}</SelectItem>)}</SelectContent></Select>
-          </CardHeader>
-          <CardContent className="flex flex-col gap-4">
-            {linhasCalculo.length === 0 ? <p className="rounded-md border border-dashed p-6 text-center text-sm text-muted-foreground">Selecione um insumo para começar a simulação.</p> : <div className="overflow-x-auto rounded-md border"><Table><TableHeader><TableRow><TableHead>Produto</TableHead><TableHead>Quantidade</TableHead><TableHead>Unidade</TableHead><TableHead>Preço unitário</TableHead><TableHead>Subtotal</TableHead><TableHead><span className="sr-only">Ações</span></TableHead></TableRow></TableHeader><TableBody>{linhasCalculo.map(({ id, quantidade, preco, insumo }) => { const qtd = Number(quantidade); const valor = Number(preco); const valido = Number.isFinite(qtd) && qtd >= 0 && Number.isFinite(valor) && valor >= 0; return <TableRow key={id}><TableCell className="font-medium">{insumo!.nome}{(!preco || Number(preco) <= 0) && <Badge variant="destructive" className="ml-2">SEM PREÇO</Badge>}</TableCell><TableCell><Input aria-label={`Quantidade de ${insumo!.nome}`} type="number" min="0" step="0.01" value={quantidade} onChange={(event) => atualizarLinha(id, "quantidade", event.target.value)} className="w-28" /></TableCell><TableCell>{insumo!.unidadeCompra ?? insumo!.unidadeReferencia ?? insumo!.unidade}</TableCell><TableCell><Input aria-label={`Preço de ${insumo!.nome}`} type="number" min="0" step="0.01" value={preco} placeholder="Informe o preço" onChange={(event) => atualizarLinha(id, "preco", event.target.value)} className="w-32" /></TableCell><TableCell className="font-semibold">{valido ? dinheiro(qtd * valor) : "—"}</TableCell><TableCell><Button variant="ghost" size="icon" aria-label={`Remover ${insumo!.nome}`} onClick={() => setCalculo((atual) => atual.filter((linha) => linha.id !== id))}><Trash2 data-icon="inline-start" /></Button></TableCell></TableRow> })}</TableBody></Table></div>}
-            <div className="flex flex-col gap-3 rounded-lg border bg-muted/30 p-4 sm:flex-row sm:items-center sm:justify-between"><div><p className="text-sm text-muted-foreground">Quantidade de itens: {linhasCalculo.length}</p>{itensSemPreco > 0 && <p className="text-sm text-destructive">Itens sem preço: {itensSemPreco}</p>}</div><div className="text-left sm:text-right"><p className="text-sm text-muted-foreground">Total estimado da compra</p><p className="text-2xl font-bold text-primary">{dinheiro(totalEstimado)}</p></div></div>
-            {calculo.length > 0 && <Button variant="outline" className="self-start" onClick={() => setCalculo([])}>Limpar cálculo</Button>}
-          </CardContent>
-        </Card>
-        <Card><CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"><div><CardTitle>Controle financeiro do estoque</CardTitle><p className="mt-1 text-sm text-muted-foreground">Valores calculados pela quantidade atual, estoque mínimo e preço de referência.</p></div><Select value={categoria} onValueChange={setCategoria}><SelectTrigger className="w-full sm:w-44"><SelectValue placeholder="Categoria" /></SelectTrigger><SelectContent><SelectItem value="todas">Todas categorias</SelectItem>{Array.from(new Set(insumos.map((i) => i.categoria))).map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent></Select></CardHeader><CardContent><div className="overflow-x-auto rounded-md border"><Table><TableHeader><TableRow><TableHead>Produto</TableHead><TableHead>Categoria</TableHead><TableHead>Estoque atual</TableHead><TableHead>Mínimo</TableHead><TableHead>Comprar</TableHead><TableHead>Preço ref.</TableHead><TableHead>Valor em estoque</TableHead><TableHead>Valor da compra</TableHead></TableRow></TableHeader><TableBody>{itensComprar.length === 0 ? <TableRow><TableCell colSpan={8} className="py-8 text-center text-muted-foreground">Nenhum item abaixo do estoque mínimo.</TableCell></TableRow> : itensComprar.map((i) => <TableRow key={i.nome}><TableCell className="font-medium">{i.nome}</TableCell><TableCell><Badge variant="secondary">{i.categoria}</Badge></TableCell><TableCell>{i.atual} {i.unidadeCompra ?? i.unidadeReferencia ?? i.unidade}</TableCell><TableCell>{i.minimo}</TableCell><TableCell className={i.comprar > 0 ? "font-semibold text-destructive" : "text-muted-foreground"}>{i.comprar} {i.unidadeCompra ?? i.unidadeReferencia ?? i.unidade}</TableCell><TableCell>{dinheiro(i.precoReferencia ?? i.precoCompra)}</TableCell><TableCell>{dinheiro(i.valorEstoque)}</TableCell><TableCell>{dinheiro(i.valorCompra)}</TableCell></TableRow>)}</TableBody></Table></div></CardContent></Card></TabsContent>
-      <TabsContent value="insumos" className="mt-6"><Card><CardHeader><CardTitle className="flex items-center gap-2"><Pencil data-icon="inline-start" /> Preços de referência</CardTitle></CardHeader><CardContent><div className="overflow-x-auto rounded-md border"><Table><TableHeader><TableRow><TableHead>Produto</TableHead><TableHead>Categoria</TableHead><TableHead>Unidade de compra</TableHead><TableHead>Conteúdo</TableHead><TableHead>Preço de referência</TableHead><TableHead>Estoque mínimo</TableHead><TableHead>Atualizado em</TableHead><TableHead>Ação</TableHead></TableRow></TableHeader><TableBody>{insumos.map((i) => <TableRow key={i.nome}><TableCell className="font-medium"><div>{i.nome}</div>{i.naoVinculado && <Badge variant="destructive" className="mt-1">INSUMO NÃO VINCULADO</Badge>}</TableCell><TableCell>{i.categoria}</TableCell><TableCell>{i.unidadeCompra ?? i.unidadeReferencia ?? i.unidade}</TableCell><TableCell>{i.quantidadeConteudo ?? i.quantidadeEmbalagem ?? 1} {i.unidadeConteudo ?? i.unidade}</TableCell><TableCell>{dinheiro(i.precoReferencia ?? i.precoCompra)}</TableCell><TableCell>{i.min ?? 0}</TableCell><TableCell className="text-sm text-muted-foreground">{i.ultimaAtualizacaoPreco ?? "—"}</TableCell><TableCell><Button variant="outline" size="sm" onClick={() => setDraftInsumo(structuredClone(i))}>Editar</Button></TableCell></TableRow>)}</TableBody></Table></div></CardContent></Card>{draftInsumo && <div className="mt-4"><InsumoEditor mode="edit" insumo={draftInsumo} insumos={insumos} fichas={fichas} canManage={canManage} onSave={salvarInsumo} onClose={() => setDraftInsumo(null)} /></div>}</TabsContent>
-      <TabsContent value="compras" className="mt-6"><Card><CardHeader><CardTitle className="flex items-center gap-2"><Plus data-icon="inline-start" /> Registrar nova compra</CardTitle></CardHeader><CardContent className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5"><label className="text-sm lg:col-span-2">Produto<Select value={compra.nome} onValueChange={(nome) => setCompra((c) => ({ ...c, nome }))}><SelectTrigger><SelectValue placeholder="Selecione um produto" /></SelectTrigger><SelectContent>{apenasInsumosCentrais(insumos).map((i) => <SelectItem key={i.nome} value={i.nome}>{i.nome}</SelectItem>)}</SelectContent></Select></label><label className="text-sm">Quantidade comprada ({insumos.find((i) => i.nome === compra.nome)?.unidadeReferencia ?? "unidade"})<Input type="number" min="0" step="0.01" value={compra.quantidade} onChange={(e) => setCompra((c) => ({ ...c, quantidade: e.target.value }))} /></label><label className="text-sm">Valor unitário<Input type="number" min="0" step="0.01" value={compra.unitario} onChange={(e) => setCompra((c) => ({ ...c, unitario: e.target.value }))} /></label><label className="text-sm">Data<Input type="date" value={compra.data} onChange={(e) => setCompra((c) => ({ ...c, data: e.target.value }))} /></label><label className="text-sm sm:col-span-2">Fornecedor<Input value={fornecedor} onChange={(e) => setFornecedor(e.target.value)} /></label><Button className="sm:col-span-2 lg:col-span-3" onClick={registrarCompra}>Salvar compra e atualizar estoque</Button></CardContent></Card></TabsContent>
+      <TabsList className="grid h-auto w-full grid-cols-2 gap-2 rounded-xl bg-muted/60 p-2 sm:grid-cols-4"><TabsTrigger value="lista" className="min-h-11 whitespace-normal px-2 py-2 text-center text-xs leading-tight sm:px-3 sm:text-sm">Lista de compras</TabsTrigger><TabsTrigger value="insumos" className="min-h-11 whitespace-normal px-2 py-2 text-center text-xs leading-tight sm:px-3 sm:text-sm">Produtos e preços</TabsTrigger><TabsTrigger value="compras" className="min-h-11 whitespace-normal px-2 py-2 text-center text-xs leading-tight sm:px-3 sm:text-sm">Registrar compra</TabsTrigger><TabsTrigger value="historico" className="min-h-11 whitespace-normal px-2 py-2 text-center text-xs leading-tight sm:px-3 sm:text-sm">Histórico de preços</TabsTrigger></TabsList>
+      <TabsContent value="lista" className="mt-6 flex flex-col gap-4"><Card><CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"><div><CardTitle>Controle financeiro do estoque</CardTitle><p className="mt-1 text-sm text-muted-foreground">Valores calculados pela quantidade atual, estoque mínimo e preço de referência.</p></div><Select value={categoria} onValueChange={setCategoria}><SelectTrigger className="w-full sm:w-44"><SelectValue placeholder="Categoria" /></SelectTrigger><SelectContent><SelectItem value="todas">Todas categorias</SelectItem>{Array.from(new Set(insumos.map((i) => i.categoria))).map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent></Select></CardHeader><CardContent><div className="overflow-x-auto rounded-md border"><Table><TableHeader><TableRow><TableHead>Produto</TableHead><TableHead>Categoria</TableHead><TableHead>Estoque atual</TableHead><TableHead>Mínimo</TableHead><TableHead>Ideal</TableHead><TableHead>Comprar</TableHead><TableHead>Preço ref.</TableHead><TableHead>Valor em estoque</TableHead><TableHead>Valor da compra</TableHead></TableRow></TableHeader><TableBody>{itensComprar.length === 0 ? <TableRow><TableCell colSpan={9} className="py-8 text-center text-muted-foreground">Nenhum item abaixo do estoque mínimo.</TableCell></TableRow> : itensComprar.map((i) => <TableRow key={i.nome}><TableCell className="font-medium">{i.nome}</TableCell><TableCell><Badge variant="secondary">{i.categoria}</Badge></TableCell><TableCell>{i.atual} {i.unidadeCompra ?? i.unidadeReferencia ?? i.unidade}</TableCell><TableCell>{i.minimo}</TableCell><TableCell>{i.ideal}</TableCell><TableCell className={i.comprar > 0 ? "font-semibold text-destructive" : "text-muted-foreground"}>{i.comprar} {i.unidadeCompra ?? i.unidadeReferencia ?? i.unidade}</TableCell><TableCell>{dinheiro(i.precoReferencia ?? i.precoCompra)}</TableCell><TableCell>{dinheiro(i.valorEstoque)}</TableCell><TableCell>{dinheiro(i.valorCompra)}</TableCell></TableRow>)}</TableBody></Table></div></CardContent></Card></TabsContent>
+      <TabsContent value="insumos" className="mt-6"><Card><CardHeader><CardTitle className="flex items-center gap-2"><Pencil data-icon="inline-start" /> Preços de referência</CardTitle></CardHeader><CardContent><div className="overflow-x-auto rounded-md border"><Table><TableHeader><TableRow><TableHead>Produto</TableHead><TableHead>Categoria</TableHead><TableHead>Unidade de compra</TableHead><TableHead>Conteúdo</TableHead><TableHead>Preço de referência</TableHead><TableHead>Estoque mínimo</TableHead><TableHead>Atualizado em</TableHead><TableHead>Ação</TableHead></TableRow></TableHeader><TableBody>{insumos.map((i) => <TableRow key={i.nome}><TableCell className="font-medium"><div>{i.nome}</div>{i.naoVinculado && <Badge variant="destructive" className="mt-1">INSUMO NÃO VINCULADO</Badge>}</TableCell><TableCell>{i.categoria}</TableCell><TableCell>{i.unidadeCompra ?? i.unidadeReferencia ?? i.unidade}</TableCell><TableCell>{i.quantidadeConteudo ?? i.quantidadeEmbalagem ?? 1} {i.unidadeConteudo ?? i.unidade}</TableCell><TableCell>{dinheiro(i.precoReferencia ?? i.precoCompra)}</TableCell><TableCell>{i.min ?? 0}</TableCell><TableCell className="text-sm text-muted-foreground">{i.ultimaAtualizacaoPreco ?? "—"}</TableCell><TableCell><Button variant="outline" size="sm" onClick={() => setDraftInsumo(structuredClone(i))}>Editar</Button></TableCell></TableRow>)}</TableBody></Table></div></CardContent></Card><Dialog open={Boolean(draftInsumo)} onOpenChange={(open) => !open && setDraftInsumo(null)}><DialogContent className="max-h-[calc(100dvh-2rem)] max-w-3xl overflow-y-auto p-0 sm:max-h-[90vh]"><DialogHeader className="sr-only"><DialogTitle>Editar insumo</DialogTitle><DialogDescription>Atualize os dados e o preço de referência do insumo.</DialogDescription></DialogHeader>{draftInsumo && <InsumoEditor mode="edit" insumo={draftInsumo} insumos={insumos} fichas={fichas} canManage={canManage} onSave={salvarInsumo} onClose={() => setDraftInsumo(null)} />}</DialogContent></Dialog></TabsContent>
+      <TabsContent value="compras" className="mt-6"><Card><CardHeader><CardTitle className="flex items-center gap-2"><Plus data-icon="inline-start" /> Registrar nova compra</CardTitle></CardHeader><CardContent className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5"><label className="text-sm lg:col-span-2">Produto<Select value={compra.nome} onValueChange={(nome) => setCompra((c) => ({ ...c, nome }))}><SelectTrigger><SelectValue placeholder="Selecione um produto" /></SelectTrigger><SelectContent>{apenasInsumosCentrais(insumos).map((i) => <SelectItem key={i.nome} value={i.nome}>{i.nome}</SelectItem>)}</SelectContent></Select></label><label className="text-sm">Quantidade comprada ({insumos.find((i) => i.nome === compra.nome)?.unidadeReferencia ?? "unidade"})<Input type="number" min="0" step="0.01" value={compra.quantidade} onChange={(e) => setCompra((c) => ({ ...c, quantidade: e.target.value }))} /></label><label className="text-sm">Valor unitário<Input type="number" min="0" step="0.01" value={compra.unitario} onChange={(e) => setCompra((c) => ({ ...c, unitario: e.target.value }))} /></label><label className="text-sm">Data<Input type="date" value={compra.data} onChange={(e) => setCompra((c) => ({ ...c, data: e.target.value }))} /></label><label className="text-sm sm:col-span-2">Fornecedor<Input value={fornecedor} onChange={(e) => setFornecedor(e.target.value)} /></label><Button variant="outline" className="sm:col-span-2 lg:col-span-3" onClick={adicionarAoCarrinho}>Adicionar ao carrinho</Button>{carrinho.length > 0 && <div className="sm:col-span-2 lg:col-span-5 flex flex-col gap-2 rounded-lg border bg-muted/30 p-4"><p className="font-semibold">Carrinho da compra</p>{carrinho.map((linha) => <div key={linha.id} className="flex flex-wrap items-center justify-between gap-3 text-sm"><span className="min-w-40 font-medium">{linha.nome} ({linha.unidade})</span><label className="flex items-center gap-2">Qtd.<Input className="h-9 w-24" type="number" min="0.01" step="0.01" value={linha.quantidade} onChange={(e) => setCarrinho((atual) => atual.map((item) => item.id === linha.id ? { ...item, quantidade: Number(e.target.value) } : item))} /></label><label className="flex items-center gap-2">Preço<Input className="h-9 w-28" type="number" min="0.01" step="0.01" value={linha.unitario} onChange={(e) => setCarrinho((atual) => atual.map((item) => item.id === linha.id ? { ...item, unitario: Number(e.target.value) } : item))} /></label><span className="font-semibold">{dinheiro(linha.quantidade * linha.unitario)}</span><Button variant="ghost" size="sm" onClick={() => setCarrinho((atual) => atual.filter((item) => item.id !== linha.id))}>Remover</Button></div>)}<div className="flex items-center justify-between border-t pt-2 font-bold"><span>Total da compra</span><span>{dinheiro(totalCarrinho)}</span></div></div>}<Button className="sm:col-span-2 lg:col-span-3" onClick={registrarCompra}>Salvar compra e atualizar estoque</Button></CardContent></Card></TabsContent>
       <TabsContent value="historico" className="mt-6"><Card><CardHeader><CardTitle className="flex items-center gap-2"><History data-icon="inline-start" /> Histórico de preços</CardTitle></CardHeader><CardContent><div className="overflow-x-auto rounded-md border"><Table><TableHeader><TableRow><TableHead>Data</TableHead><TableHead>Produto</TableHead><TableHead>Quantidade</TableHead><TableHead>Preço anterior</TableHead><TableHead>Preço pago</TableHead><TableHead>Variação</TableHead></TableRow></TableHeader><TableBody>{historico.map((h) => <TableRow key={h.id}><TableCell>{h.data}</TableCell><TableCell>{h.insumoNome}</TableCell><TableCell>{h.quantidade} {h.unidade}</TableCell><TableCell>{dinheiro(h.precoAnterior)}</TableCell><TableCell>{dinheiro(h.precoUnitario)}</TableCell><TableCell><Badge variant={h.variacao > 0 ? "destructive" : "secondary"}>{h.variacao > 0 ? "+" : ""}{h.variacao.toFixed(2)}%</Badge></TableCell></TableRow>)}</TableBody></Table></div></CardContent></Card></TabsContent>
     </Tabs>
   </div>

@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
-import { Item, HistoricoEntry, Receita, Insumo, CompraRegistro, VendaFinanceira, DespesaFinanceira, FinanceConfig, MovimentacaoEstoque, defaultInsumos, defaultItens, aliasesPorInsumo } from "@/lib/types"
+import { Item, HistoricoEntry, Receita, Insumo, CompraRegistro, VendaFinanceira, DespesaFinanceira, FinanceConfig, MovimentacaoEstoque, defaultInsumos, aliasesPorInsumo } from "@/lib/types"
 import {
   saveEstoque as saveEstoqueLocal,
   getEstoque as getEstoqueLocal,
@@ -22,7 +22,6 @@ import {
   subscribeToReceitas,
   getInsumos,
   migrarCustosMestresDomCosteloV1,
-  migrarMinimosEstoqueV1,
   saveInsumos,
   getFichasTecnicas,
   initializeFichasTecnicas,
@@ -44,12 +43,18 @@ import {
   getMovimentacoesEstoque,
   saveMovimentacoesEstoque,
   registrarEntradaAtomica,
+  registrarEntradasAtomica,
   registrarSaidaAtomica,
+  registrarMovimentacaoRapidaAtomica,
+  registrarProducaoAtomica,
   ajustarEstoqueAtomico,
   ajustarInventarioAtomico,
   registrarBaixaVendaAtomica,
   registrarBaixaBloqueada,
   estornarMovimentacaoAtomica,
+  adicionarItemAtomico,
+  atualizarCadastroItemAtomico,
+  removerItemAtomico,
 } from "@/lib/firebase-db"
 import { criarEntrada, criarSaida } from "@/lib/estoque-movements"
 import { SaidaEstoqueView } from "@/components/saida-estoque-view"
@@ -58,7 +63,8 @@ import { BaixasPendentesView } from "@/components/baixas-pendentes-view"
 import { toast } from "sonner"
 import type { FinanceAuditSnapshot } from "@/lib/finance-engine"
 import { FirebaseLoginForm } from "@/components/firebase-login-form"
-import { AppSidebar } from "@/components/app-sidebar"
+ import { AppSidebar } from "@/components/app-sidebar"
+import { SyncIndicator } from "@/components/sync-indicator"
 import { EstoqueView } from "@/components/estoque-view"
 import { EntradaView } from "@/components/entrada-view"
 import { FinanceiroCentral } from "@/components/financeiro-central"
@@ -71,8 +77,10 @@ import { Menu, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { signOut } from "firebase/auth"
 import { auth } from "@/lib/firebase"
+import { traduzirErroFirebase } from "@/lib/firebase-errors"
+import { normalizarPermissoes, primeiroModuloPermitido, usuarioPodeAcessar } from "@/lib/permissions"
 
-type Tab = "estoque" | "entrada" | "saida" | "inventario" | "financeiro" | "dashboard" | "lista-compras" | "cmv" | "admin"
+type Tab = "estoque" | "entrada" | "saida" | "inventario" | "financeiro" | "dashboard" | "listaCompras" | "fichaTecnica" | "admin"
 
 const ITENS_REMOVIDOS = new Set(["Costela Crua", "Contra filé", "Manteiga de Garrafa", "Limoneto"])
 
@@ -87,22 +95,21 @@ function limparItensEstoque(itens: Item[]) {
 // Funções wrapper que salvam em Firebase e localStorage
 async function saveEstoqueHybrid(user: string | null, itens: Item[]) {
   const itensPersistidos = limparItensEstoque(itens)
-  saveEstoqueLocal(itensPersistidos)
   if (user) {
-    try {
-      await saveEstoqueFirebase(user, itensPersistidos)
-      console.log("[v0] Estoque salvo no Firebase")
-    } catch (err) {
-      console.error("[v0] Erro ao salvar no Firebase:", err)
-    }
+    const result = await saveEstoqueFirebase(user, itensPersistidos)
+    if (result?.error) throw new Error(result.error)
   }
+  saveEstoqueLocal(itensPersistidos)
+  return { error: null }
 }
 
 async function getEstoqueHybrid(user: string | null): Promise<Item[]> {
   if (user) {
     try {
-      const { data } = await getEstoqueFirebase(user)
-      if (data && data.length > 0) {
+      const result = await getEstoqueFirebase(user)
+      if (result.error) throw new Error(result.error)
+      const { data } = result
+      if (data !== null) {
         console.log("[v0] Estoque carregado do Firebase")
         return limparItensEstoque(data)
       }
@@ -114,22 +121,20 @@ async function getEstoqueHybrid(user: string | null): Promise<Item[]> {
 }
 
 async function saveHistoricoHybrid(user: string | null, historico: HistoricoEntry[]) {
-  saveHistoricoLocal(historico)
   if (user) {
-    try {
-      await saveHistoricoFirebase(user, historico)
-      console.log("[v0] Histórico salvo no Firebase")
-    } catch (err) {
-      console.error("[v0] Erro ao salvar histórico no Firebase:", err)
-    }
+    const result = await saveHistoricoFirebase(user, historico)
+    if (result?.error) throw new Error(result.error)
   }
+  saveHistoricoLocal(historico)
 }
 
 async function getHistoricoHybrid(user: string | null): Promise<HistoricoEntry[]> {
   if (user) {
     try {
-      const { data } = await getHistoricoFirebase(user)
-      if (data && data.length > 0) {
+      const result = await getHistoricoFirebase(user)
+      if (result.error) throw new Error(result.error)
+      const { data } = result
+      if (data !== null) {
         console.log("[v0] Histórico carregado do Firebase")
         return data
       }
@@ -141,22 +146,20 @@ async function getHistoricoHybrid(user: string | null): Promise<HistoricoEntry[]
 }
 
 async function saveReceitasHybrid(user: string | null, receitas: Receita[]) {
-  saveReceitasLocal(receitas)
   if (user) {
-    try {
-      await saveReceitasFirebase(user, receitas)
-      console.log("[v0] Receitas salvas no Firebase")
-    } catch (err) {
-      console.error("[v0] Erro ao salvar receitas no Firebase:", err)
-    }
+    const result = await saveReceitasFirebase(user, receitas)
+    if (result?.error) throw new Error(result.error)
   }
+  saveReceitasLocal(receitas)
 }
 
 async function getReceitasHybrid(user: string | null): Promise<Receita[]> {
   if (user) {
     try {
-      const { data } = await getReceitasFirebase(user)
-      if (data && data.length > 0) {
+      const result = await getReceitasFirebase(user)
+      if (result.error) throw new Error(result.error)
+      const { data } = result
+      if (data !== null) {
         console.log("[v0] Receitas carregadas do Firebase")
         return data
       }
@@ -187,7 +190,18 @@ export default function Home() {
   const [vendasFinanceiras, setVendasFinanceiras] = useState<VendaFinanceira[]>([])
   const [despesasFinanceiras, setDespesasFinanceiras] = useState<DespesaFinanceira[]>([])
  const [auditoriaJulho, setAuditoriaJulho] = useState<FinanceAuditSnapshot | undefined>(undefined)
-  const persistirFichas = (data: typeof seedFichas) => { if (userRole !== "owner" && userRole !== "admin") return false; setFichasTecnicas(data); saveFichasTecnicas(data).catch((err) => console.error("[v0] Erro ao salvar fichas:", err)); return true }
+  const persistirFichas = async (data: typeof seedFichas) => {
+    if (userRole !== "owner" && userRole !== "admin") return false
+    try {
+      await saveFichasTecnicas(data)
+      setFichasTecnicas(data)
+      toast.success("Ficha técnica sincronizada na nuvem.")
+      return true
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Não foi possível sincronizar a ficha técnica.")
+      return false
+    }
+  }
 
   const getComprasHybrid = async (roleOverride?: string) => {
     const roleAtual = roleOverride ?? userRole
@@ -216,8 +230,15 @@ export default function Home() {
       console.error("[v0] Erro ao carregar dados financeiros do estoque:", err)
     }
   }
-  const persistirInsumos = (data: Insumo[]) => { if (userRole !== "owner" && userRole !== "admin") return; setInsumos(data); saveInsumos(data).catch((err) => console.error("[v0] Erro ao salvar insumos:", err)) }
-  const persistirCompras = (data: CompraRegistro[]) => { setComprasHistorico(data); saveComprasHistorico(data).catch((err) => console.error("[v0] Erro ao salvar compras:", err)) }
+  const persistirInsumos = async (data: Insumo[]) => {
+    if (userRole !== "owner" && userRole !== "admin") return
+    try { await saveInsumos(data); setInsumos(data); toast.success("Produtos sincronizados na nuvem.") }
+    catch (error) { toast.error(error instanceof Error ? error.message : "Não foi possível sincronizar os produtos."); throw error }
+  }
+  const persistirCompras = async (data: CompraRegistro[]) => {
+    try { await saveComprasHistorico(data); setComprasHistorico(data); toast.success("Compra sincronizada na nuvem.") }
+    catch (error) { toast.error(error instanceof Error ? error.message : "Não foi possível sincronizar a compra."); throw error }
+  }
   const estornarMovimentacao = async (movimentacao: MovimentacaoEstoque) => {
     if (userRole !== "owner" && userRole !== "admin") { toast.error("Você não tem permissão para estornar entradas."); return }
     try {
@@ -226,25 +247,17 @@ export default function Home() {
     } catch (error) { toast.error(error instanceof Error ? error.message : "Não foi possível estornar a entrada.") }
   }
 
-  const registrarEntradaRastreavel = async (nome: string, qtd: number, custo: number, fornecedor?: string, observacao?: string, dataMovimentacao?: string, insumoId?: string, unidadeInformada?: Insumo["unidade"]) => {
-    const item = itens.find((row) => (insumoId && row.insumoId === insumoId) || row.nome === nome)
-    const insumo = insumos.find((row) => row.id === insumoId || row.id === item?.insumoId || row.nome === nome)
+  const registrarEntradaRastreavel = async (itemId: string, qtd: number, custo: number, fornecedor?: string, observacao?: string, dataMovimentacao?: string) => {
+    const item = itens.find((row) => (row.id ?? row.insumoId ?? row.nome) === itemId)
+    const insumo = item ? insumos.find((row) => row.id === item.insumoId) : undefined
     if (!userPermissoes.includes("entrada") && userRole !== "owner" && userRole !== "admin") throw new Error("Você não tem permissão para registrar entrada.")
     if (!item || !insumo || item.ativo === false || item.naoVinculado === true) throw new Error("Este item não está disponível para entrada.")
     const currentUser = auth.currentUser
     if (!currentUser) throw new Error("Usuário autenticado não encontrado.")
-    const unidade = unidadeInformada ?? ((item.unidadeEstoque === "Unidade" ? "un" : item.unidadeEstoque) as Insumo["unidade"])
+    const unidade = (item.unidadeEstoque === "Unidade" ? "un" : item.unidadeEstoque) as Insumo["unidade"]
     const movimento = { ...criarEntrada({ insumo: { ...insumo, id: item.insumoId ?? insumo.id }, quantidade: qtd, unidade, precoUnitario: qtd > 0 ? custo / qtd : 0, fornecedor, observacao, dataMovimentacao, usuario: { id: currentUser.uid, email: currentUser.email ?? undefined, nome: currentUser.displayName ?? undefined } }), status: "ativa" as const }
-    const atualizados = await registrarEntradaAtomica({ movimento, itemNome: nome, userId: currentUser.uid })
-    setItens(atualizados)
-    setMovimentacoes(await getMovimentacoesEstoque())
-    if (insumo && custo > 0) {
-      const precoAtualizado = { ...insumo, precoReferencia: custo / qtd, precoCompra: custo / qtd, ultimaAtualizacaoPreco: dataMovimentacao ?? new Date().toISOString().slice(0, 10) }
-      const novosInsumos = insumos.map((row) => row.id === precoAtualizado.id ? precoAtualizado : row)
-      setInsumos(novosInsumos)
-      await saveInsumos(novosInsumos)
-    }
-    toast.success("Entrada registrada com sucesso.")
+    const atualizados = await registrarEntradaAtomica({ movimento, itemId, userId: currentUser.uid })
+    setItens(atualizados); setMovimentacoes(await getMovimentacoesEstoque()); toast.success("Entrada registrada com sucesso.")
   }
 
   const processarBaixaVenda = async (venda: VendaFinanceira) => {
@@ -297,7 +310,7 @@ export default function Home() {
     
     // Configurar listeners em tempo real para sincronização (apenas quando logado)
     const unsubscribeEstoque = subscribeToEstoque((firebaseItens) => {
-      if (firebaseItens && firebaseItens.length > 0) {
+      if (firebaseItens) {
         const itensLimpos = limparItensEstoque(firebaseItens)
         setItens(itensLimpos)
         saveEstoqueLocal(itensLimpos)
@@ -312,7 +325,7 @@ export default function Home() {
     })
     
     const unsubscribeReceitas = subscribeToReceitas((firebaseReceitas) => {
-      if (firebaseReceitas && firebaseReceitas.length > 0) {
+      if (firebaseReceitas) {
         setReceitas(firebaseReceitas)
         saveReceitasLocal(firebaseReceitas)
       }
@@ -328,16 +341,14 @@ export default function Home() {
 
   const handleLogin = (username: string, role: string, permissoes: string[]) => {
     setUser(username)
+    const permissoesNormalizadas = normalizarPermissoes(permissoes)
     setUserRole(role)
-    setUserPermissoes(permissoes)
+    setUserPermissoes(permissoesNormalizadas)
     
     // Recarregar dados do Firebase do novo usuario
     const loadUserData = async () => {
-  let itens = await getEstoqueHybrid(username)
-  if (role === "owner" || role === "admin") {
-    try { itens = (await migrarMinimosEstoqueV1(username, defaultItens)).data } catch (error) { console.error("[v0] Falha ao aplicar mínimos de estoque:", error) }
-  }
-  const historico = await getHistoricoHybrid(username)
+      const itens = await getEstoqueHybrid(username)
+      const historico = await getHistoricoHybrid(username)
       const receitas = await getReceitasHybrid(username)
       let fichas = { data: seedFichas, seeded: false }
       try {
@@ -361,7 +372,8 @@ export default function Home() {
     loadUserData()
     
     // Set first allowed tab as active
-    const firstAllowedTab = permissoes[0] as Tab
+    const perfil = { role: role as "owner" | "admin" | "operador" | "analista", status: "aprovado" as const, ativo: true, permissoes: permissoesNormalizadas as never[] }
+    const firstAllowedTab = primeiroModuloPermitido(perfil) as Tab | null
     setActiveTab(firstAllowedTab || "estoque")
   }
 
@@ -377,74 +389,79 @@ export default function Home() {
     handleLogout()
   }
 
-  const handleUpdateItem = (nome: string, novoAtual: number) => {
-    const now = new Date()
-    const dataHora = `${now.toLocaleDateString("pt-BR")} às ${now.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}`
-    const updated = itens.map((item) =>
-      item.nome === nome
-        ? {
-            ...item,
-            atual: novoAtual,
-            ultimaAlteracao: {
-              usuario: user || "Desconhecido",
-              data: dataHora,
-            },
-          }
-        : item
-    )
-    setItens(updated)
-    saveEstoqueHybrid(user, updated)
-  }
-
-  const handleAddItem = (newItem: Item) => {
+  const handleAddItem = async (newItem: Item) => {
+    const currentUser = auth.currentUser
+    if (!currentUser) {
+      toast.error("Sessão expirada. Entre novamente para continuar.")
+      return
+    }
     const now = new Date()
     const dataHora = `${now.toLocaleDateString("pt-BR")} às ${now.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}`
     const itemWithTimestamp = {
       ...newItem,
-      ultimaAlteracao: {
-        usuario: user || "Desconhecido",
-        data: dataHora,
-      },
+      ultimaAlteracao: { usuario: user || "Desconhecido", data: dataHora },
     }
-    const updated = [...itens, itemWithTimestamp]
-    setItens(updated)
-    saveEstoqueHybrid(user, updated)
+    try {
+      const atualizados = await adicionarItemAtomico({ userId: currentUser.uid, novoItem: itemWithTimestamp })
+      setItens(atualizados)
+      toast.success("Item adicionado ao estoque.")
+    } catch (error) {
+      console.error("[v0] Falha ao adicionar item:", error)
+      toast.error(error instanceof Error && error.message.startsWith("Já existe") ? error.message : traduzirErroFirebase(error))
+    }
   }
 
-  const handleEditItem = (oldNome: string, updatedItem: Item) => {
+  const handleEditItem = async (oldNome: string, updatedItem: Item) => {
+    const currentUser = auth.currentUser
+    if (!currentUser) {
+      toast.error("Sessão expirada. Entre novamente para continuar.")
+      return
+    }
     const now = new Date()
     const dataHora = `${now.toLocaleDateString("pt-BR")} às ${now.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}`
-    const updated = itens.map((item) =>
-      item.nome === oldNome
-        ? {
-            ...updatedItem,
-            ultimaAlteracao: {
-              usuario: user || "Desconhecido",
-              data: dataHora,
-            },
-          }
-        : item
-    )
-    setItens(updated)
-    saveEstoqueHybrid(user, updated)
-  }
-
-  const handleDeleteItem = (nome: string) => {
-    if (userRole !== "owner" && userRole !== "admin") return
-    const updated = itens.filter((item) => item.nome !== nome)
-    setItens(updated)
-    saveEstoqueHybrid(user, updated)
-  }
-
-  const handleEntrada = async (nome: string, qtd: number, custo: number, fornecedor?: string, observacao?: string, dataMovimentacao?: string) => {
+    const itemOriginal = itens.find((item) => item.nome === oldNome)
+    // Envia apenas dados cadastrais; "atual" é ignorado pela transação e preservado do Firestore.
+    const { atual: _atual, ...dadosCadastrais } = updatedItem
     try {
-      await registrarEntradaRastreavel(nome, qtd, custo, fornecedor, observacao, dataMovimentacao)
+      const atualizados = await atualizarCadastroItemAtomico({
+        userId: currentUser.uid,
+        nomeOriginal: oldNome,
+        insumoIdOriginal: itemOriginal?.insumoId,
+        dadosCadastrais: { ...dadosCadastrais, ultimaAlteracao: { usuario: user || "Desconhecido", data: dataHora } },
+      })
+      setItens(atualizados)
+      toast.success("Cadastro atualizado.")
     } catch (error) {
-      const fallback = itens.map((item) => item.nome === nome ? { ...item, atual: item.atual + qtd } : item)
-      setItens(fallback)
-      await saveEstoqueHybrid(user, fallback)
-      toast.warning("Entrada aplicada localmente. O Firebase não está disponível para sincronizar agora.")
-      console.error("[v0] Falha na entrada rastreável:", error)
+      console.error("[v0] Falha ao editar item:", error)
+      toast.error(error instanceof Error && error.message.startsWith("Já existe") ? error.message : traduzirErroFirebase(error))
+    }
+  }
+
+  const handleDeleteItem = async (nome: string) => {
+    if (userRole !== "owner" && userRole !== "admin") return
+    const currentUser = auth.currentUser
+    if (!currentUser) {
+      toast.error("Sessão expirada. Entre novamente para continuar.")
+      return
+    }
+    const itemOriginal = itens.find((item) => item.nome === nome)
+    try {
+      const atualizados = await removerItemAtomico({ userId: currentUser.uid, nome, insumoId: itemOriginal?.insumoId })
+      setItens(atualizados)
+      toast.success("Item removido do estoque.")
+    } catch (error) {
+      console.error("[v0] Falha ao remover item:", error)
+      toast.error(traduzirErroFirebase(error))
+    }
+  }
+
+  const handleEntrada = async (itemId: string, qtd: number, custo: number, fornecedor?: string, observacao?: string, dataMovimentacao?: string) => {
+    try {
+      await registrarEntradaRastreavel(itemId, qtd, custo, fornecedor, observacao, dataMovimentacao)
+    } catch (error) {
+      console.error("[v0] Falha ao sincronizar entrada:", error)
+      toast.error(traduzirErroFirebase(error))
+      throw error
     }
   }
 
@@ -477,25 +494,33 @@ export default function Home() {
     setItens(atualizados); setMovimentacoes(await getMovimentacoesEstoque()); toast.success("Saída registrada com sucesso.")
   }
 
-  const handleProduzir = (receita: Receita) => {
-    const now = new Date()
-    const dataHora = `${now.toLocaleDateString("pt-BR")} às ${now.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}`
-    
-    const alteracao = {
-      usuario: user || "Desconhecido",
-      data: dataHora,
+  const handleProduzir = async (receita: Receita) => {
+    const currentUser = auth.currentUser
+    if (!currentUser) {
+      toast.error("Usuário autenticado não encontrado.")
+      return
     }
-    const updated = itens.map((item) => {
-      if (item.nome === receita.inputItem) {
-        return { ...item, atual: item.atual - receita.inputQtd, ultimaAlteracao: alteracao }
-      }
-      if (item.nome === receita.outputItem) {
-        return { ...item, atual: item.atual + receita.outputQtd, ultimaAlteracao: alteracao }
-      }
-      return item
-    })
-    setItens(updated)
-    saveEstoqueHybrid(user, updated)
+    const inputItem = itens.find((row) => row.nome === receita.inputItem)
+    const outputItem = itens.find((row) => row.nome === receita.outputItem)
+    try {
+      const result = await registrarProducaoAtomica({
+        producaoId: crypto.randomUUID(),
+        inputNome: receita.inputItem,
+        inputInsumoId: inputItem?.insumoId,
+        inputQtd: receita.inputQtd,
+        outputNome: receita.outputItem,
+        outputInsumoId: outputItem?.insumoId,
+        outputQtd: receita.outputQtd,
+        usuario: { uid: currentUser.uid, email: currentUser.email ?? undefined, nome: currentUser.displayName ?? undefined },
+        agora: new Date().toISOString(),
+      })
+      setItens(result.itens)
+      setMovimentacoes(await getMovimentacoesEstoque())
+      toast.success(result.idempotente ? "Esta produção já havia sido registrada." : "Produção registrada com sucesso.")
+    } catch (error) {
+      console.error("[v0] Falha na produção:", error)
+      toast.error(error instanceof Error && (error.message.startsWith("Estoque insuficiente") || error.message.startsWith("Insumo") || error.message.startsWith("Produto") || error.message.startsWith("Quantidade")) ? error.message : traduzirErroFirebase(error))
+    }
   }
 
   const handleAddReceita = (receita: Receita) => {
@@ -516,8 +541,38 @@ export default function Home() {
     saveReceitasHybrid(user, filtered)
   }
 
+  const movimentarRapido = async (item: Item, delta: number, motivo: string) => {
+    const currentUser = auth.currentUser
+    if (!currentUser) throw new Error("Sessão expirada. Entre novamente para continuar.")
+    const itemId = item.id ?? item.insumoId ?? item.nome
+    const unidade = (item.unidadeEstoque ?? item.unidade ?? "un") as Insumo["unidade"]
+    const motivosEstruturados: Record<string, NonNullable<MovimentacaoEstoque["motivo"]>> = {
+      "Reposição": "reposicao",
+      "Aumento de capacidade": "aumento_capacidade",
+      "Venda": "venda_nao_registrada",
+      "Venda não registrada": "venda_nao_registrada",
+      "Desperdício": "desperdicio",
+      "Consumo interno": "consumo_interno",
+    }
+    const motivoEstruturado = motivosEstruturados[motivo] ?? (delta > 0 ? "reposicao" : "consumo_interno")
+    const movimento: MovimentacaoEstoque = {
+      id: crypto.randomUUID(), tipo: delta > 0 ? "entrada" : "saida", origemDetalhada: "ajuste_rapido", itemId, itemNome: item.nome, insumoId: item.insumoId ?? itemId,
+      insumoNomeSnapshot: item.nome, quantidade: delta, quantidadeAnterior: item.atual, quantidadeNova: item.atual + delta, diferenca: delta, unidadeSnapshot: unidade, quantidadeBase: delta, unidadeBase: unidade,
+      precoUnitarioSnapshot: 0, valorTotal: 0, precoTotal: 0, origem: "estoque", motivo: motivoEstruturado,
+      observacao: motivo, status: "ativa", usuarioId: currentUser.uid, usuarioEmail: currentUser.email ?? "", criadoPorUid: currentUser.uid,
+      criadoPorEmail: currentUser.email ?? undefined, criadoPorNome: currentUser.displayName ?? undefined, criadoEm: new Date().toISOString(), dataMovimentacao: new Date().toISOString(), unidade,
+    }
+    try {
+      const result = await registrarMovimentacaoRapidaAtomica({ movimento, itemId, itemNome: item.nome, userId: currentUser.uid, delta })
+      setItens(result.itens)
+      setMovimentacoes(await getMovimentacoesEstoque())
+    } catch (error) {
+      throw new Error(traduzirErroFirebase(error))
+    }
+  }
+
   if (isLoading) {
-    return (
+  return (
       <div className="flex min-h-screen items-center justify-center bg-background">
         <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
       </div>
@@ -530,9 +585,12 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-background">
-      <AppSidebar
-        activeTab={activeTab}
-        onTabChange={setActiveTab}
+  <AppSidebar
+  activeTab={activeTab}
+  onTabChange={(tab) => {
+    const perfil = { role: userRole as "owner" | "admin" | "operador" | "analista", status: "aprovado" as const, ativo: true, permissoes: userPermissoes as never[] }
+    if (usuarioPodeAcessar(perfil, tab)) setActiveTab(tab)
+  }}
         onLogout={handleLogout}
         user={user}
         userRole={userRole}
@@ -545,7 +603,10 @@ export default function Home() {
         <div className="p-4 pt-16 md:p-10 md:pt-10">
           {/* Header */}
           <div className="mb-8 flex flex-col gap-2 border-b border-border/70 pb-7">
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">Dom Costelo · Gestão</p>
+            <div className="flex items-center justify-between gap-3">
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">Dom Costelo · Gestão</p>
+              <SyncIndicator />
+            </div>
             <h1 className="text-3xl font-bold tracking-tight text-foreground capitalize">
               {activeTab === "estoque" && "Controle de Estoque"}
               {activeTab === "entrada" && "Entrada de Mercadoria"}
@@ -553,8 +614,8 @@ export default function Home() {
               {activeTab === "inventario" && "Inventário"}
               {activeTab === "financeiro" && "Financeiro"}
               {activeTab === "dashboard" && "Dashboard"}
- {activeTab === "lista-compras" && "Lista de Compras"}
- {activeTab === "cmv" && "Ficha Técnica e CMV"}
+ {activeTab === "listaCompras" && "Lista de Compras"}
+ {activeTab === "fichaTecnica" && "Ficha Técnica e CMV"}
  {activeTab === "admin" && "Administração"}
             </h1>
             <p className="text-muted-foreground">
@@ -567,10 +628,10 @@ export default function Home() {
               {activeTab === "financeiro" &&
                 "Acompanhe seus gastos e histórico"}
               {activeTab === "dashboard" &&
-                "Visualize as métricas do seu negócio"}
- {activeTab === "lista-compras" &&
+                "Visualize as métricas do seu neg��cio"}
+ {activeTab === "listaCompras" &&
   "Itens com estoque baixo, quantidades e valor total da compra"}
- {activeTab === "cmv" && "Custos centralizados, fichas técnicas e margens"}
+ {activeTab === "fichaTecnica" && "Custos centralizados, fichas técnicas e margens"}
  {activeTab === "admin" &&
                 "Gerenciamento de usuários, permissões e configurações"}
             </p>
@@ -579,11 +640,12 @@ export default function Home() {
           {/* Content */}
           {activeTab === "estoque" && <div className="flex flex-col gap-6"><EstoqueView
               itens={itens}
-              onUpdateItem={handleUpdateItem}
-              onAddItem={handleAddItem}
-              onEditItem={handleEditItem}
-              onDeleteItem={handleDeleteItem}
-              userRole={userRole as "admin" | "operador" | "owner"}
+  onEditItem={handleEditItem}
+  onDeleteItem={handleDeleteItem}
+  onOpenEntrada={() => setActiveTab("entrada")}
+  onOpenSaida={() => setActiveTab("saida")}
+  onQuickMovement={movimentarRapido}
+  userRole={userRole as "admin" | "operador" | "owner"}
               movimentacoes={movimentacoes}
               onEstornarMovimentacao={estornarMovimentacao}
             /><BaixasPendentesView vendas={vendasFinanceiras} onProcessar={async (venda) => { try { await processarBaixaVenda(venda) } catch (error) { toast.error(error instanceof Error ? error.message : "Não foi possível processar a baixa.") } }} /></div>}
@@ -611,7 +673,7 @@ export default function Home() {
           {activeTab === "dashboard" && (
             <DashboardView itens={itens} historico={historico} vendasFinanceiras={vendasFinanceiras} despesasFinanceiras={despesasFinanceiras} financeConfig={financeConfig} />
           )}
-          {activeTab === "lista-compras" && (
+          {activeTab === "listaCompras" && (
             <ListaComprasView
               itens={itens}
               user={user}
@@ -620,16 +682,28 @@ export default function Home() {
               insumos={insumos}
               historico={comprasHistorico}
               onSaveInsumos={persistirInsumos}
-  onSaveHistorico={persistirCompras}
-  onRegistrarEntrada={async ({ item, quantidade, unidade, precoUnitario, fornecedor, data }) => {
-  await registrarEntradaRastreavel(item.nome, quantidade, quantidade * precoUnitario, fornecedor, "Compra efetivada", data, item.id, unidade)
+              onSaveHistorico={persistirCompras}
+  onConfirmarCompra={async (compraId, linhas) => {
+  const currentUser = auth.currentUser
+  if (!currentUser) throw new Error("Usuário autenticado não encontrado.")
+  const movimentos = linhas.map((linha) => {
+    const item = itens.find((row) => row.nome === linha.nome || row.insumoId === linha.insumoId)
+    const insumo = insumos.find((row) => row.id === item?.insumoId || row.nome === linha.nome)
+    if (!item || !insumo) throw new Error(`Insumo não encontrado: ${linha.nome}`)
+    const unidade = (item.unidadeEstoque === "Unidade" ? "un" : item.unidadeEstoque) as Insumo["unidade"]
+    return { itemNome: linha.nome, movimento: { ...criarEntrada({ insumo: { ...insumo, id: item.insumoId ?? insumo.id }, quantidade: linha.quantidade, unidade, precoUnitario: linha.unitario, fornecedor: linha.fornecedor, observacao: `Compra confirmada · ${linha.data}`, dataMovimentacao: linha.data, usuario: { id: currentUser.uid, email: currentUser.email ?? undefined, nome: currentUser.displayName ?? undefined } }), status: "ativa" as const } }
+  })
+  const result = await registrarEntradasAtomica({ compraId, movimentos, userId: currentUser.uid })
+  setItens(result.itens)
+  setMovimentacoes(await getMovimentacoesEstoque())
+  toast.success(result.idempotente ? "Compra já registrada anteriormente." : "Compra registrada com sucesso.")
   }}
             />
           )}
-  {activeTab === "cmv" && (
+  {activeTab === "fichaTecnica" && (
   <CmvView insumos={insumos} fichas={fichasTecnicas} combos={combos} userRole={userRole} onSaveInsumos={persistirInsumos} onSaveFichas={persistirFichas} onSaveCombos={(data) => { setCombos(data); saveCombos(data).catch((error) => console.error("[v0] Erro ao salvar combos:", error)) }} />
   )}
-  {activeTab === "admin" && userRole === "admin" && (
+  {activeTab === "admin" && (userRole === "admin" || userRole === "owner") && (
   <AdminView currentUser={user} onPasswordChange={handlePasswordChange} />
   )}
         </div>

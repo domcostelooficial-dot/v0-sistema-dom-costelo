@@ -49,7 +49,9 @@ import {
   PlusCircle,
   Plus,
   Minus,
+  Pencil,
   Trash2,
+  Check,
 } from "lucide-react"
 import dynamic from "next/dynamic"
 import { toast } from "sonner"
@@ -61,21 +63,23 @@ const ExportPDFButton = dynamic(
 
 interface EstoqueViewProps {
   itens: Item[]
-  onUpdateItem: (nome: string, novoAtual: number) => void
-  onAddItem: (item: Item) => void
   onEditItem: (oldNome: string, item: Item) => void
   onDeleteItem: (nome: string) => void
+  onOpenEntrada?: (item: Item) => void
+  onOpenSaida?: (item: Item) => void
+  onQuickMovement?: (item: Item, delta: number, motivo: string) => void | Promise<void>
   userRole: "admin" | "operador" | "owner"
   movimentacoes?: MovimentacaoEstoque[]
   onEstornarMovimentacao?: (movimentacao: MovimentacaoEstoque) => void
 }
 
-export function EstoqueView({ itens, onUpdateItem, onAddItem, onEditItem, onDeleteItem, userRole, movimentacoes = [], onEstornarMovimentacao }: EstoqueViewProps) {
+export function EstoqueView({ itens, onEditItem, onDeleteItem, onOpenEntrada, onOpenSaida, onQuickMovement, userRole, movimentacoes = [], onEstornarMovimentacao }: EstoqueViewProps) {
   const isAdmin = userRole === "admin" || userRole === "owner"
   const [search, setSearch] = useState("")
   const [categoriaFilter, setCategoriaFilter] = useState<string>("todas")
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
+  const [confirmEdit, setConfirmEdit] = useState(false)
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
   const [selectedItem, setSelectedItem] = useState<Item | null>(null)
   const [movimentacaoParaEstorno, setMovimentacaoParaEstorno] = useState<MovimentacaoEstoque | null>(null)
@@ -84,16 +88,26 @@ export function EstoqueView({ itens, onUpdateItem, onAddItem, onEditItem, onDele
   const [historicoStatus, setHistoricoStatus] = useState("todos")
   const [historicoTipo, setHistoricoTipo] = useState("todos")
   const [detalheMovimentacao, setDetalheMovimentacao] = useState<MovimentacaoEstoque | null>(null)
+  const [movimentoRapido, setMovimentoRapido] = useState<{ item: Item; novoAtual: number } | null>(null)
+  const [motivoAberto, setMotivoAberto] = useState(false)
+  const [movimentoProcessando, setMovimentoProcessando] = useState(false)
+
+  const deltaRapido = movimentoRapido ? movimentoRapido.novoAtual - movimentoRapido.item.atual : 0
+  const motivosRapidos = deltaRapido > 0
+    ? ["Reposição", "Aumento de capacidade"]
+    : ["Venda não registrada", "Desperdício", "Consumo interno"]
   const [historicoDe, setHistoricoDe] = useState("")
   const [historicoAte, setHistoricoAte] = useState("")
   const [formData, setFormData] = useState({
     nome: "",
     categoria: "Carnes",
     min: 1,
+    estoqueIdeal: 0,
     atual: 0,
     unidadeEstoque: "Unidade",
     quantidadePorEmbalagem: 1,
     unidadeConteudo: "un",
+    precoCompra: 0,
   })
 
   const filteredItens = useMemo(() => {
@@ -143,39 +157,19 @@ export function EstoqueView({ itens, onUpdateItem, onAddItem, onEditItem, onDele
     )
   }
 
-  const handleAddItem = () => {
-    if (!formData.nome.trim()) {
-      toast.error("Digite um nome para o item")
-      return
-    }
-    
-    if (itens.some((item) => item.nome.toLowerCase() === formData.nome.trim().toLowerCase())) {
-      toast.error("Já existe um item com este nome")
-      return
-    }
-
-    const newItem: Item = {
-      nome: formData.nome.trim(),
-      categoria: formData.categoria,
-      min: formData.min,
-      atual: formData.atual,
-      unidadeEstoque: formData.unidadeEstoque,
-      quantidadePorEmbalagem: formData.quantidadePorEmbalagem,
-      unidadeConteudo: formData.unidadeConteudo,
-      ultimaAlteracao: undefined,
-    }
-
-    onAddItem(newItem)
-    setIsAddDialogOpen(false)
-    setFormData({ nome: "", categoria: "Carnes", min: 1, atual: 0, unidadeEstoque: "Unidade", quantidadePorEmbalagem: 1, unidadeConteudo: "un" })
-    toast.success(`Item "${newItem.nome}" adicionado com sucesso!`)
-  }
-
   const handleEditItem = () => {
     if (!selectedItem) return
     
     if (!formData.nome.trim()) {
       toast.error("Digite um nome para o item")
+      return
+    }
+    if (formData.min < 0 || formData.atual < 0 || formData.quantidadePorEmbalagem < 0 || formData.precoCompra < 0) {
+      toast.error("Os valores numéricos não podem ser negativos")
+      return
+    }
+    if (itens.some((item) => item.nome.toLowerCase() === formData.nome.trim().toLowerCase() && item.nome !== selectedItem.nome)) {
+      toast.error("Já existe um item com este nome")
       return
     }
 
@@ -184,10 +178,12 @@ export function EstoqueView({ itens, onUpdateItem, onAddItem, onEditItem, onDele
       nome: formData.nome.trim(),
       categoria: formData.categoria,
       min: formData.min,
-      atual: formData.atual,
+      estoqueIdeal: formData.estoqueIdeal > 0 ? formData.estoqueIdeal : undefined,
+      atual: selectedItem.atual,
       unidadeEstoque: formData.unidadeEstoque,
       quantidadePorEmbalagem: formData.quantidadePorEmbalagem,
       unidadeConteudo: formData.unidadeConteudo,
+      precoCompra: formData.precoCompra,
     }
 
     onEditItem(selectedItem.nome, updatedItem)
@@ -211,10 +207,12 @@ export function EstoqueView({ itens, onUpdateItem, onAddItem, onEditItem, onDele
       nome: item.nome,
       categoria: item.categoria,
       min: item.min,
+      estoqueIdeal: item.estoqueIdeal ?? 0,
       atual: item.atual,
       unidadeEstoque: item.unidadeEstoque ?? "Unidade",
       quantidadePorEmbalagem: item.quantidadePorEmbalagem ?? 1,
       unidadeConteudo: item.unidadeConteudo ?? "un",
+      precoCompra: item.precoCompra ?? 0,
     })
     setIsEditDialogOpen(true)
   }
@@ -287,107 +285,6 @@ export function EstoqueView({ itens, onUpdateItem, onAddItem, onEditItem, onDele
         <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle className="text-lg text-foreground">Controle de Estoque</CardTitle>
           <div className="flex items-center gap-2">
-            <Dialog open={false} onOpenChange={setIsAddDialogOpen}>
-              <DialogTrigger asChild>
-                <Button className="hidden gap-2">
-                  <PlusCircle className="h-4 w-4" />
-                  Adicionar Item
-                </Button>
-              </DialogTrigger>
-              <DialogContent>
-                <DialogHeader>
-                  <DialogTitle>Adicionar Novo Item</DialogTitle>
-                  <DialogDescription>
-                    Preencha as informações do novo item do estoque.
-                  </DialogDescription>
-                </DialogHeader>
-                <div className="space-y-4 py-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="add-nome">Nome do Item</Label>
-                    <Input
-                      id="add-nome"
-                      value={formData.nome}
-                      onChange={(e) =>
-                        setFormData({ ...formData, nome: e.target.value })
-                      }
-                      placeholder="Ex: Contra filé"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="add-categoria">Categoria</Label>
-                    <Select
-                      value={formData.categoria}
-                      onValueChange={(value) =>
-                        setFormData({ ...formData, categoria: value })
-                      }
-                    >
-                      <SelectTrigger id="add-categoria">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {categorias.map((cat) => (
-                          <SelectItem key={cat} value={cat}>
-                            {cat}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="grid grid-cols-3 gap-3">
-                    <div className="space-y-2">
-                      <Label htmlFor="add-unidade">Unidade de estoque</Label>
-                      <Input id="add-unidade" value={formData.unidadeEstoque} onChange={(e) => setFormData({ ...formData, unidadeEstoque: e.target.value })} placeholder="Pacote" />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="add-conteudo">Qtd. embalagem</Label>
-                      <Input id="add-conteudo" type="number" min="0" value={formData.quantidadePorEmbalagem} onChange={(e) => setFormData({ ...formData, quantidadePorEmbalagem: Number(e.target.value) })} />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="add-unidade-conteudo">Unidade conteúdo</Label>
-                      <Input id="add-unidade-conteudo" value={formData.unidadeConteudo} onChange={(e) => setFormData({ ...formData, unidadeConteudo: e.target.value })} placeholder="kg" />
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="add-min">Estoque Mínimo</Label>
-                      <Input
-                        id="add-min"
-                        type="number"
-                        min="0"
-                        value={formData.min}
-                        onChange={(e) =>
-                          setFormData({ ...formData, min: Number(e.target.value) })
-                        }
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="add-atual">Estoque Atual</Label>
-                      <Input
-                        id="add-atual"
-                        type="number"
-                        min="0"
-                        value={formData.atual}
-                        onChange={(e) =>
-                          setFormData({ ...formData, atual: Number(e.target.value) })
-                        }
-                      />
-                    </div>
-                  </div>
-                </div>
-                <DialogFooter>
-                  <Button
-                    variant="outline"
-                    onClick={() => {
-                      setIsAddDialogOpen(false)
-                      setFormData({ nome: "", categoria: "Carnes", min: 1, atual: 0, unidadeEstoque: "Unidade", quantidadePorEmbalagem: 1, unidadeConteudo: "un" })
-                    }}
-                  >
-                    Cancelar
-                  </Button>
-                  <Button onClick={handleAddItem}>Adicionar Item</Button>
-                </DialogFooter>
-              </DialogContent>
-            </Dialog>
             <ExportPDFButton itensEmFalta={itensEmFalta} />
           </div>
         </CardHeader>
@@ -427,6 +324,7 @@ export function EstoqueView({ itens, onUpdateItem, onAddItem, onEditItem, onDele
                   <TableHead className="text-muted-foreground">Embalagem</TableHead>
                   <TableHead className="text-muted-foreground text-center">Mínimo</TableHead>
                   <TableHead className="text-muted-foreground text-center">Atual</TableHead>
+                  <TableHead className="text-muted-foreground text-center">Preço un.</TableHead>
                   <TableHead className="text-muted-foreground text-center">Status</TableHead>
                   <TableHead className="text-muted-foreground hidden md:table-cell">Alterado por</TableHead>
                   <TableHead className="text-muted-foreground text-center">Ações</TableHead>
@@ -448,7 +346,18 @@ export function EstoqueView({ itens, onUpdateItem, onAddItem, onEditItem, onDele
                       {item.min}
                     </TableCell>
                     <TableCell className="text-center font-medium text-foreground">
-                      {item.atual}
+                      <div className="flex items-center justify-center gap-1">
+                        <Button variant="outline" size="icon" className="size-10" aria-label={`Diminuir estoque de ${item.nome}`} onClick={() => item.atual > 0 && setMovimentoRapido((atual) => ({ item, novoAtual: Math.max(0, (atual?.item.nome === item.nome ? atual.novoAtual : item.atual) - 1) }))} disabled={item.atual <= 0}>
+                          <Minus data-icon="inline-start" />
+                        </Button>
+                        <div className="flex items-center justify-center gap-1"><Input type="number" min="0" step="1" className="h-10 w-20 text-center text-lg font-bold tabular-nums" aria-label={`Alterar quantidade de ${item.nome}`} value={movimentoRapido?.item.nome === item.nome ? movimentoRapido.novoAtual : item.atual} onChange={(event) => { const novoAtual = Math.max(0, Number(event.target.value)); setMovimentoRapido({ item, novoAtual }) }} onBlur={() => { if (movimentoRapido?.item.nome === item.nome && movimentoRapido.novoAtual !== item.atual) setMotivoAberto(true) }} />{movimentoRapido?.item.nome === item.nome && movimentoRapido.novoAtual !== item.atual && <Button type="button" variant="default" size="icon" className="size-10" aria-label={`Confirmar quantidade de ${item.nome}`} title="Confirmar quantidade" onMouseDown={(event) => event.preventDefault()} onClick={() => setMotivoAberto(true)}><Check data-icon="inline-start" /></Button>}</div>
+                        <Button variant="outline" size="icon" className="size-10" aria-label={`Aumentar estoque de ${item.nome}`} onClick={() => setMovimentoRapido((atual) => ({ item, novoAtual: (atual?.item.nome === item.nome ? atual.novoAtual : item.atual) + 1 }))}>
+                          <Plus data-icon="inline-start" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-center text-muted-foreground">
+                      R$ {(item.precoCompra ?? 0).toFixed(2).replace(".", ",")}
                     </TableCell>
                     <TableCell className="text-center">
                       {getStatusBadge(item)}
@@ -467,9 +376,10 @@ export function EstoqueView({ itens, onUpdateItem, onAddItem, onEditItem, onDele
                       )}
                     </TableCell>
                     <TableCell className="text-center">
-                      <div className="flex items-center justify-center gap-1">
-                        <Button variant="outline" size="icon" className="size-8" aria-label={`Diminuir ${item.nome}`} onClick={() => onUpdateItem(item.nome, Math.max(0, item.atual - 1))}><Minus /></Button>
-                        <Button variant="outline" size="icon" className="size-8" aria-label={`Adicionar ${item.nome}`} onClick={() => onUpdateItem(item.nome, item.atual + 1)}><Plus /></Button>
+                      <div className="flex flex-wrap items-center justify-center gap-1">
+                        <Button variant="outline" size="sm" className="h-8 px-2" onClick={() => onOpenEntrada?.(item)}>Entrada</Button>
+                        <Button variant="outline" size="sm" className="h-8 px-2" onClick={() => onOpenSaida?.(item)}>Saída</Button>
+                        <Button variant="outline" size="icon" className="size-8" aria-label={`Editar ${item.nome}`} onClick={() => openEditDialog(item)}><Pencil className="h-3 w-3" /></Button>
                         {isAdmin && (
                           <Button
                             variant="outline"
@@ -496,8 +406,18 @@ export function EstoqueView({ itens, onUpdateItem, onAddItem, onEditItem, onDele
       <Dialog open={Boolean(detalheMovimentacao)} onOpenChange={(open) => !open && setDetalheMovimentacao(null)}><DialogContent><DialogHeader><DialogTitle>Detalhes da movimentação</DialogTitle><DialogDescription>{detalheMovimentacao && <span className="space-y-1"><span className="block">ID: {detalheMovimentacao.id}</span><span className="block">Tipo: {detalheMovimentacao.tipo === "saida_venda" ? "Saída por venda" : detalheMovimentacao.tipo === "ajuste_inventario" ? "Ajuste de inventário" : detalheMovimentacao.tipo === "estorno_entrada" ? "Estorno de entrada" : detalheMovimentacao.tipo === "entrada" ? "Entrada" : detalheMovimentacao.tipo === "saida" ? "Saída" : detalheMovimentacao.tipo} · Status: {detalheMovimentacao.status}</span><span className="block">Insumo: {detalheMovimentacao.insumoNomeSnapshot} ({detalheMovimentacao.insumoId})</span><span className="block">Quantidade: {detalheMovimentacao.quantidade} {detalheMovimentacao.unidadeSnapshot}</span>{detalheMovimentacao.tipo === "ajuste_inventario" || detalheMovimentacao.tipo === "ajuste" ? <><span className="block">Estoque anterior: {detalheMovimentacao.estoqueAnterior ?? "—"} {detalheMovimentacao.unidadeSnapshot}</span><span className="block">Estoque contado: {detalheMovimentacao.estoqueContado ?? "—"} {detalheMovimentacao.unidadeSnapshot}</span><span className="block">Diferença: {detalheMovimentacao.diferenca != null ? (detalheMovimentacao.diferenca > 0 ? "+" : "") + detalheMovimentacao.diferenca : "—"} {detalheMovimentacao.unidadeSnapshot}</span><span className="block">Motivo: {detalheMovimentacao.motivo ?? "—"}</span><span className="block">Observação: {detalheMovimentacao.observacao ?? "—"}</span></> : detalheMovimentacao.tipo === "saida" ? <><span className="block">Motivo: {detalheMovimentacao.motivo ?? "—"}</span><span className="block">Observação: {detalheMovimentacao.observacao ?? "—"}</span></> : detalheMovimentacao.tipo === "saida_venda" ? <><span className="block">Venda/Pedido: {detalheMovimentacao.vendaId ?? "—"}</span><span className="block">Produto: {detalheMovimentacao.produtoNomeSnapshot ?? "—"} ({detalheMovimentacao.produtoId ?? "—"})</span><span className="block">Quantidade vendida: {detalheMovimentacao.quantidadeVendida ?? "—"}</span><span className="block">Quantidade prevista: {detalheMovimentacao.quantidadeFicha ?? "—"} {detalheMovimentacao.unidadeFicha ?? "—"}</span><span className="block">Quantidade baixada: {Math.abs(detalheMovimentacao.quantidadeBaixadaEstoque ?? detalheMovimentacao.quantidadeBase)} {detalheMovimentacao.unidadeEstoque ?? detalheMovimentacao.unidadeBase ?? "—"}</span><span className="block">Estoque: {detalheMovimentacao.estoqueAnterior ?? "—"} → {detalheMovimentacao.estoquePosterior ?? detalheMovimentacao.saldoPosterior ?? "—"}</span><span className="block">Canal: {detalheMovimentacao.canalVenda ?? "—"}</span><span className="block">Origem: Venda automática</span><span className="block">Baixa: {detalheMovimentacao.baixaId ?? "—"}</span></> : <span className="block">Preço total: R$ {(detalheMovimentacao.precoTotal ?? detalheMovimentacao.valorTotal).toFixed(2)}</span>}<span className="block">Fornecedor: {detalheMovimentacao.fornecedor ?? "—"}</span><span className="block">Data: {new Date(detalheMovimentacao.dataMovimentacao ?? detalheMovimentacao.criadoEm).toLocaleDateString("pt-BR")}</span><span className="block">Criado em: {new Date(detalheMovimentacao.criadoEm).toLocaleString("pt-BR")}</span><span className="block">Responsável: {detalheMovimentacao.criadoPorEmail ?? detalheMovimentacao.usuarioEmail}</span>{detalheMovimentacao.movimentacaoOrigemId && <span className="block">Movimentação original: {detalheMovimentacao.movimentacaoOrigemId}</span>}</span>}</DialogDescription></DialogHeader></DialogContent></Dialog>
       <AlertDialog open={Boolean(movimentacaoParaEstorno)} onOpenChange={(open) => !estornoProcessando && !open && setMovimentacaoParaEstorno(null)}><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Estornar entrada?</AlertDialogTitle><AlertDialogDescription>{movimentacaoParaEstorno && <span className="space-y-1"><span className="block">{movimentacaoParaEstorno.insumoNomeSnapshot} · {movimentacaoParaEstorno.quantidade} {movimentacaoParaEstorno.unidadeSnapshot}</span><span className="block">Estoque atual: {itens.find((item) => item.insumoId === movimentacaoParaEstorno.insumoId || item.nome === movimentacaoParaEstorno.insumoNomeSnapshot)?.atual ?? 0}</span><span className="block">Data: {new Date(movimentacaoParaEstorno.dataMovimentacao ?? movimentacaoParaEstorno.criadoEm).toLocaleDateString("pt-BR")}</span><span className="block">Responsável: {movimentacaoParaEstorno.criadoPorEmail ?? movimentacaoParaEstorno.usuarioEmail}</span></span>}</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel disabled={estornoProcessando}>Cancelar</AlertDialogCancel><AlertDialogAction disabled={estornoProcessando} onClick={async (event) => { event.preventDefault(); if (!movimentacaoParaEstorno || estornoProcessando) return; setEstornoProcessando(true); try { await onEstornarMovimentacao?.(movimentacaoParaEstorno); setMovimentacaoParaEstorno(null) } finally { setEstornoProcessando(false) } }}>{estornoProcessando ? "Estornando..." : "Confirmar estorno"}</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
 
-      {/* Edit Dialog */}
-      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+  <Dialog open={Boolean(movimentoRapido && motivoAberto)} onOpenChange={(open) => !movimentoProcessando && !open && (setMovimentoRapido(null), setMotivoAberto(false))}>
+    <DialogContent className="w-[calc(100%-2rem)] max-w-sm">
+      <DialogHeader>
+        <DialogTitle>{deltaRapido > 0 ? "Qual o motivo do aumento?" : "Qual o motivo da saída?"}</DialogTitle>
+        <DialogDescription>{movimentoRapido?.item.nome} · Anterior: {movimentoRapido?.item.atual} · Novo: {movimentoRapido?.novoAtual} · Alteração: {deltaRapido > 0 ? "+" : ""}{deltaRapido}</DialogDescription>
+      </DialogHeader>
+      <div className="grid gap-3 py-2">{motivosRapidos.map((motivo) => <Button key={motivo} size="lg" disabled={movimentoProcessando} onClick={async () => { if (!movimentoRapido || !onQuickMovement) return; setMovimentoProcessando(true); try { await onQuickMovement(movimentoRapido.item, deltaRapido, motivo); setMovimentoRapido(null); setMotivoAberto(false); toast.success("Alteração de estoque confirmada.") } catch (error) { setMovimentoRapido(null); setMotivoAberto(false); toast.error(error instanceof Error ? error.message : "Não foi possível confirmar a alteração.") } finally { setMovimentoProcessando(false) } }}>{motivo}</Button>)}</div>
+    </DialogContent>
+  </Dialog>
+
+  {/* Edit Dialog */}
+  <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Editar Item</DialogTitle>
@@ -551,6 +471,10 @@ export function EstoqueView({ itens, onUpdateItem, onAddItem, onEditItem, onDele
                 <Input id="edit-unidade-conteudo" value={formData.unidadeConteudo} onChange={(e) => setFormData({ ...formData, unidadeConteudo: e.target.value })} />
               </div>
             </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-preco">Preço unitário</Label>
+              <Input id="edit-preco" type="number" min="0" step="0.01" value={formData.precoCompra} onChange={(e) => setFormData({ ...formData, precoCompra: Number(e.target.value) })} placeholder="0,00" />
+            </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="edit-min">Estoque Mínimo</Label>
@@ -563,19 +487,25 @@ export function EstoqueView({ itens, onUpdateItem, onAddItem, onEditItem, onDele
                     setFormData({ ...formData, min: Number(e.target.value) })
                   }
                 />
+                <p className="text-xs text-muted-foreground">Dispara o alerta de compra.</p>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="edit-atual">Estoque Atual</Label>
+                <Label htmlFor="edit-ideal">Estoque Ideal</Label>
                 <Input
-                  id="edit-atual"
+                  id="edit-ideal"
                   type="number"
                   min="0"
-                  value={formData.atual}
+                  value={formData.estoqueIdeal}
                   onChange={(e) =>
-                    setFormData({ ...formData, atual: Number(e.target.value) })
+                    setFormData({ ...formData, estoqueIdeal: Number(e.target.value) })
                   }
+                  placeholder="Quantidade após reposição"
                 />
+                <p className="text-xs text-muted-foreground">Quantidade desejada após comprar. Se vazio, usa o mínimo.</p>
               </div>
+            </div>
+            <div className="rounded-md border border-dashed p-3 text-sm text-muted-foreground">
+              Estoque atual não é cadastral. Corrija o saldo pelo módulo Inventário.
             </div>
           </div>
           <DialogFooter>
@@ -588,10 +518,12 @@ export function EstoqueView({ itens, onUpdateItem, onAddItem, onEditItem, onDele
             >
               Cancelar
             </Button>
-            <Button onClick={handleEditItem}>Salvar Alterações</Button>
+            <Button onClick={() => setConfirmEdit(true)}>Confirmar alterações</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <AlertDialog open={confirmEdit} onOpenChange={setConfirmEdit}><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Confirmar alterações?</AlertDialogTitle><AlertDialogDescription>As alterações de {selectedItem?.nome || "este item"} serão salvas na nuvem.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>Cancelar</AlertDialogCancel><AlertDialogAction onClick={() => { setConfirmEdit(false); handleEditItem() }}>Confirmar e salvar</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
 
       {/* Delete Confirmation Dialog */}
       <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>

@@ -56,10 +56,16 @@ export function FirebaseLoginForm({ onLogin }: FirebaseLoginFormProps) {
     try {
       let user: FirebaseUser | null = null
       let authError: string | null = null
+      const emailNormalizado = email.trim().toLowerCase()
+      const comTempoLimite = <T,>(promise: Promise<T>, mensagem: string) =>
+        Promise.race([
+          promise,
+          new Promise<T>((_, reject) => setTimeout(() => reject(new Error(mensagem)), 15000)),
+        ])
 
       if (isSignUp) {
         // Criar nova conta no Firebase
-        const result = await signUpWithEmail(email, password)
+        const result = await comTempoLimite(signUpWithEmail(emailNormalizado, password), "O Firebase demorou para responder ao criar a conta.")
         user = result.user
         authError = result.error
 
@@ -93,7 +99,13 @@ export function FirebaseLoginForm({ onLogin }: FirebaseLoginFormProps) {
           ativo: false,
           dataCriacao: new Date().toLocaleString("pt-BR"),
         }
-        await createUsuarioProfile(user!.uid, novoUsuario)
+        const profileResult = await comTempoLimite(createUsuarioProfile(user!.uid, novoUsuario), "O Firebase demorou para salvar o perfil.")
+        if (profileResult.error) {
+          await signOut(auth)
+          setError("A conta foi criada, mas não foi possível salvar o perfil na nuvem. Tente novamente.")
+          setLoading(false)
+          return
+        }
 
         // Mostrar mensagem de sucesso e aguardar aprovacao
         setSuccess("Conta criada com sucesso! Aguarde a aprovacao do administrador para acessar o sistema.")
@@ -106,7 +118,7 @@ export function FirebaseLoginForm({ onLogin }: FirebaseLoginFormProps) {
 
       } else {
         // Fazer login
-        const result = await signInWithEmail(email, password)
+        const result = await comTempoLimite(signInWithEmail(emailNormalizado, password), "O Firebase demorou para responder ao login.")
         user = result.user
         authError = result.error
       }
@@ -118,16 +130,17 @@ export function FirebaseLoginForm({ onLogin }: FirebaseLoginFormProps) {
       }
 
       const displayName = user!.email?.split("@")[0] || user!.uid
-      const { data: usuarioSistema, error: profileError } = await getUsuarioProfile(user!.uid)
       const isPrincipalOwner = user!.email?.toLowerCase() === "admin@domcostelo.com"
 
-      // O owner existente no Firebase Authentication continua sendo o fallback
-      // mesmo quando o perfil Firestore ainda não foi provisionado.
-      if ((profileError || !usuarioSistema) && isPrincipalOwner) {
+      // O administrador principal não deve esperar uma leitura do Firestore
+      // para entrar. Isso evita lentidão quando o Firestore está indisponível.
+      if (isPrincipalOwner) {
         setLoading(false)
         onLogin(displayName, "owner", ["estoque", "entrada", "financeiro", "dashboard", "lista-compras", "cmv", "admin"])
         return
       }
+
+      const { data: usuarioSistema, error: profileError } = await comTempoLimite(getUsuarioProfile(user!.uid), "O Firebase demorou para carregar o perfil.")
 
       if (profileError || !usuarioSistema) {
         await signOut(auth)
@@ -144,7 +157,8 @@ export function FirebaseLoginForm({ onLogin }: FirebaseLoginFormProps) {
       setLoading(false)
       onLogin(displayName, usuarioSistema.role, usuarioSistema.permissoes)
     } catch (err) {
-      setError(isSignUp ? "Erro ao criar conta. Tente novamente." : "Erro ao fazer login. Tente novamente.")
+      const mensagem = err instanceof Error ? err.message : ""
+      setError(mensagem || (isSignUp ? "Erro ao criar conta. Tente novamente." : "Erro ao fazer login. Tente novamente."))
       setLoading(false)
     }
   }
