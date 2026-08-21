@@ -412,7 +412,7 @@ export function EstoqueView({ itens, onEditItem, onDeleteItem, onOpenEntrada, on
         <DialogTitle>{deltaRapido > 0 ? "Qual o motivo do aumento?" : "Qual o motivo da saída?"}</DialogTitle>
         <DialogDescription>{movimentoRapido?.item.nome} · Anterior: {movimentoRapido?.item.atual} · Novo: {movimentoRapido?.novoAtual} · Alteração: {deltaRapido > 0 ? "+" : ""}{deltaRapido}</DialogDescription>
       </DialogHeader>
-      <div className="grid gap-3 py-2">{motivosRapidos.map((motivo) => <Button key={motivo} size="lg" disabled={movimentoProcessando} onClick={async () => { if (!movimentoRapido || !onQuickMovement) return; setMovimentoProcessando(true); try { await onQuickMovement(movimentoRapido.item, deltaRapido, motivo); setMovimentoRapido(null); setMotivoAberto(false); toast.success("Alteração de estoque confirmada.") } catch (error) { toast.error(error instanceof Error ? error.message : "Não foi possível confirmar a alteração.") } finally { setMovimentoProcessando(false) } }}>{motivo}</Button>)}</div>
+      <div className="grid gap-3 py-2">{motivosRapidos.map((motivo) => <Button key={motivo} size="lg" disabled={movimentoProcessando} onClick={async () => { if (!movimentoRapido || !onQuickMovement) return; setMovimentoProcessando(true); try { await onQuickMovement(movimentoRapido.item, deltaRapido, motivo); setMovimentoRapido(null); setMotivoAberto(false); toast.success("Alteração de estoque confirmada.") } catch (error) { setMovimentoRapido(null); setMotivoAberto(false); toast.error(error instanceof Error ? error.message : "Não foi possível confirmar a alteração.") } finally { setMovimentoProcessando(false) } }}>{motivo}</Button>)}</div>
     </DialogContent>
   </Dialog>
 

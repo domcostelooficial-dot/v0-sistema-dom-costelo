@@ -150,7 +150,8 @@ export async function getEstoque(userId: string) {
     const docRef = doc(db, "estoque", "global")
     const docSnap = await getDoc(docRef)
     if (docSnap.exists()) {
-      return { data: docSnap.data().itens as Item[], error: null }
+      const itens = (docSnap.data().itens ?? []) as Item[]
+      return { data: itens.map((item) => ({ ...item, id: item.id ?? item.insumoId ?? item.nome })), error: null }
     }
     return { data: null, error: null }
   } catch (error: any) {
@@ -164,7 +165,8 @@ export function subscribeToEstoque(callback: (itens: Item[]) => void) {
 doc(db, "estoque", "global"),
     (docSnap) => {
       if (docSnap.exists()) {
-        callback(docSnap.data().itens as Item[])
+        const itens = (docSnap.data().itens ?? []) as Item[]
+        callback(itens.map((item) => ({ ...item, id: item.id ?? item.insumoId ?? item.nome })))
       }
     },
     (error) => {
@@ -493,20 +495,21 @@ export async function registrarEntradasAtomica(params: { compraId: string; movim
   })
 }
 
-export async function registrarMovimentacaoRapidaAtomica(params: { movimento: MovimentacaoEstoque; itemNome: string; userId: string; delta: number }) {
+export async function registrarMovimentacaoRapidaAtomica(params: { movimento: MovimentacaoEstoque; itemId: string; itemNome: string; userId: string; delta: number }) {
   const movimentoRef = doc(db, MOVIMENTACOES_COLLECTION, params.movimento.id)
   const estoqueRef = doc(db, "estoque", "global")
   return runTransaction(db, async (transaction) => {
     const estoqueSnap = await transaction.get(estoqueRef)
     const itens = (estoqueSnap.exists() ? estoqueSnap.data().itens : []) as Item[]
-    const index = itens.findIndex((item) => item.nome === params.itemNome || item.insumoId === params.movimento.insumoId)
+    const indexPorId = itens.findIndex((item) => item.id === params.itemId)
+    const index = indexPorId >= 0 ? indexPorId : itens.findIndex((item) => item.insumoId === params.itemId || item.nome === params.itemNome || item.insumoId === params.movimento.insumoId)
     if (index < 0) throw new Error("Insumo não encontrado no estoque")
     if (!Number.isFinite(params.delta) || params.delta === 0) throw new Error("Quantidade inválida")
     const item = itens[index]
     const novoAtual = item.atual + params.delta
     if (!Number.isFinite(novoAtual) || novoAtual < 0) throw new Error("Estoque insuficiente para esta saída")
     const atualizados = itens.map((row, rowIndex) => rowIndex === index ? { ...row, atual: novoAtual } : row)
-    const movimento = removerUndefinedFirestore({ ...params.movimento, estoqueAnterior: item.atual, estoquePosterior: novoAtual, saldoAnterior: item.atual, saldoPosterior: novoAtual, quantidade: params.delta, quantidadeBase: params.delta })
+    const movimento = removerUndefinedFirestore({ ...params.movimento, itemId: params.itemId, itemNome: item.nome, quantidadeAnterior: item.atual, quantidadeNova: novoAtual, diferenca: params.delta, usuarioUid: params.userId, createdAt: Timestamp.now(), estoqueAnterior: item.atual, estoquePosterior: novoAtual, saldoAnterior: item.atual, saldoPosterior: novoAtual, quantidade: params.delta, quantidadeBase: params.delta })
     transaction.set(estoqueRef, { itens: atualizados, updatedAt: Timestamp.now(), lastModifiedBy: params.userId })
     transaction.set(movimentoRef, movimento)
     return { itens: atualizados, movimento }

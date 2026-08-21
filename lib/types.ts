@@ -158,6 +158,12 @@ export interface MovimentacaoEstoque {
   movimentacaoOrigemId?: string
   movimentacaoOriginalId?: string
   referenciaId?: string
+  itemId?: string
+  itemNome?: string
+  quantidadeAnterior?: number
+  quantidadeNova?: number
+  usuarioUid?: string
+  createdAt?: unknown
   status: "efetivada" | "estornada" | "ativa"
   usuarioId: string
   usuarioEmail: string

@@ -541,9 +541,8 @@ export default function Home() {
   const movimentarRapido = async (item: Item, delta: number, motivo: string) => {
     const currentUser = auth.currentUser
     if (!currentUser) throw new Error("Sessão expirada. Entre novamente para continuar.")
-    const insumo = insumos.find((row) => row.id === item.insumoId || row.nome === item.nome)
-    if (!insumo) throw new Error("Não foi possível localizar este item no estoque.")
-    const unidade = (item.unidadeEstoque ?? item.unidade ?? insumo.unidade) as Insumo["unidade"]
+    const itemId = item.id ?? item.insumoId ?? item.nome
+    const unidade = (item.unidadeEstoque ?? item.unidade ?? "un") as Insumo["unidade"]
     const motivosEstruturados: Record<string, NonNullable<MovimentacaoEstoque["motivo"]>> = {
       "Reposição": "reposicao",
       "Aumento de capacidade": "aumento_capacidade",
@@ -554,14 +553,14 @@ export default function Home() {
     }
     const motivoEstruturado = motivosEstruturados[motivo] ?? (delta > 0 ? "reposicao" : "consumo_interno")
     const movimento: MovimentacaoEstoque = {
-      id: crypto.randomUUID(), tipo: "ajuste", origemDetalhada: "ajuste_rapido", insumoId: item.insumoId ?? insumo.id ?? item.nome,
-      insumoNomeSnapshot: item.nome, quantidade: delta, unidadeSnapshot: unidade, quantidadeBase: delta, unidadeBase: unidade,
+      id: crypto.randomUUID(), tipo: delta > 0 ? "entrada" : "saida", origemDetalhada: "ajuste_rapido", itemId, itemNome: item.nome, insumoId: item.insumoId ?? itemId,
+      insumoNomeSnapshot: item.nome, quantidade: delta, quantidadeAnterior: item.atual, quantidadeNova: item.atual + delta, diferenca: delta, unidadeSnapshot: unidade, quantidadeBase: delta, unidadeBase: unidade,
       precoUnitarioSnapshot: 0, valorTotal: 0, precoTotal: 0, origem: "estoque", motivo: motivoEstruturado,
       observacao: motivo, status: "ativa", usuarioId: currentUser.uid, usuarioEmail: currentUser.email ?? "", criadoPorUid: currentUser.uid,
       criadoPorEmail: currentUser.email ?? undefined, criadoPorNome: currentUser.displayName ?? undefined, criadoEm: new Date().toISOString(), dataMovimentacao: new Date().toISOString(), unidade,
     }
     try {
-      const result = await registrarMovimentacaoRapidaAtomica({ movimento, itemNome: item.nome, userId: currentUser.uid, delta })
+      const result = await registrarMovimentacaoRapidaAtomica({ movimento, itemId, itemNome: item.nome, userId: currentUser.uid, delta })
       setItens(result.itens)
       setMovimentacoes(await getMovimentacoesEstoque())
     } catch (error) {
@@ -623,7 +622,7 @@ export default function Home() {
               {activeTab === "financeiro" &&
                 "Acompanhe seus gastos e histórico"}
               {activeTab === "dashboard" &&
-                "Visualize as métricas do seu negócio"}
+                "Visualize as métricas do seu neg��cio"}
  {activeTab === "lista-compras" &&
   "Itens com estoque baixo, quantidades e valor total da compra"}
  {activeTab === "cmv" && "Custos centralizados, fichas técnicas e margens"}
