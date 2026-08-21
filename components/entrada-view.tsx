@@ -19,12 +19,12 @@ import { Truck, Package, Plus } from "lucide-react"
 interface EntradaViewProps {
   itens: Item[]
   insumos?: Insumo[]
-  onEntrada: (nome: string, qtd: number, custo: number, fornecedor?: string, observacao?: string, dataMovimentacao?: string) => Promise<void> | void
+  onEntrada: (itemId: string, qtd: number, custo: number, fornecedor?: string, observacao?: string, dataMovimentacao?: string) => Promise<void> | void
   canRegister?: boolean
 }
 
 export function EntradaView({ itens, insumos = [], onEntrada, canRegister = true }: EntradaViewProps) {
-  const [selectedItem, setSelectedItem] = useState("")
+  const [selectedItemId, setSelectedItemId] = useState("")
   const [quantidade, setQuantidade] = useState("")
   const [precoUnitario, setPrecoUnitario] = useState("")
   const [fornecedor, setFornecedor] = useState("")
@@ -35,7 +35,7 @@ export function EntradaView({ itens, insumos = [], onEntrada, canRegister = true
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    if (!selectedItem || !quantidade) return
+    if (!selectedItemId || !quantidade) return
 
     const qtd = Number(quantidade)
     const preco = Number(precoUnitario) || 0
@@ -44,7 +44,7 @@ export function EntradaView({ itens, insumos = [], onEntrada, canRegister = true
     setConfirmOpen(true)
   }
 
-  const selectedItemData = itens.find((i) => i.nome === selectedItem)
+  const selectedItemData = itens.find((i) => (i.id ?? i.insumoId ?? i.nome) === selectedItemId)
   const selectedInsumo = selectedItemData ? insumos.find((i) => i.id === selectedItemData.insumoId || i.nome === selectedItemData.nome) : undefined
   const precoEstimado = selectedInsumo?.precoReferencia ?? selectedInsumo?.precoCompra ?? 0
   const quantidadeNumerica = Number(quantidade) || 0
@@ -73,7 +73,7 @@ export function EntradaView({ itens, insumos = [], onEntrada, canRegister = true
             <FieldGroup>
               <Field>
                 <FieldLabel>Item</FieldLabel>
-                <Select value={selectedItem} onValueChange={(value) => { setSelectedItem(value); const item = itens.find((entry) => entry.nome === value); const insumo = item ? insumos.find((entry) => entry.id === item.insumoId || entry.nome === item.nome) : undefined; const estimado = insumo?.precoReferencia ?? insumo?.precoCompra ?? 0; setPrecoUnitario(estimado > 0 ? estimado.toFixed(2) : "") }}>
+                <Select value={selectedItemId} onValueChange={(value) => { setSelectedItemId(value); const item = itens.find((entry) => (entry.id ?? entry.insumoId ?? entry.nome) === value); const insumo = item ? insumos.find((entry) => entry.id === item.insumoId) : undefined; const estimado = insumo?.precoReferencia ?? insumo?.precoCompra ?? item?.precoReferencia ?? item?.precoCompra ?? item?.preco ?? 0; setPrecoUnitario(estimado > 0 ? estimado.toFixed(2) : "") }}>
                   <SelectTrigger>
                     <SelectValue placeholder="Selecione um item" />
                   </SelectTrigger>
@@ -145,7 +145,7 @@ export function EntradaView({ itens, insumos = [], onEntrada, canRegister = true
               <Button
                 type="submit"
                 className="w-full"
-                disabled={!canRegister || !selectedItem || !quantidade || isSubmitting}
+                disabled={!canRegister || !selectedItemId || !quantidade || isSubmitting}
               >
                 <Plus className="mr-2 h-4 w-4" />
                 Adicionar ao Estoque
@@ -154,7 +154,7 @@ export function EntradaView({ itens, insumos = [], onEntrada, canRegister = true
           </form>
         </CardContent>
       </Card>
-      <AlertDialog open={confirmOpen} onOpenChange={(open) => !isSubmitting && setConfirmOpen(open)}><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Confirmar entrada?</AlertDialogTitle><AlertDialogDescription>{selectedItemData?.nome} · {quantidade} {selectedItemData?.unidadeEstoque ?? "unidade"} · R$ {(Number(quantidade) * (Number(precoUnitario) || precoEstimado)).toFixed(2)}. Estoque após entrada: {(selectedItemData?.atual ?? 0) + Number(quantidade || 0)}.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel disabled={isSubmitting}>Cancelar</AlertDialogCancel><AlertDialogAction disabled={isSubmitting} onClick={async (event) => { event.preventDefault(); if (isSubmitting) return; setIsSubmitting(true); try { await onEntrada(selectedItem, Number(quantidade), Number(quantidade) * (Number(precoUnitario) || precoEstimado), fornecedor.trim() || undefined, observacao.trim() || undefined, dataMovimentacao); setConfirmOpen(false); setSelectedItem(""); setQuantidade(""); setPrecoUnitario(""); setFornecedor(""); setObservacao("") } finally { setIsSubmitting(false) } }}>{isSubmitting ? "Registrando..." : "Confirmar entrada"}</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
+      <AlertDialog open={confirmOpen} onOpenChange={(open) => !isSubmitting && setConfirmOpen(open)}><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Confirmar entrada?</AlertDialogTitle><AlertDialogDescription>{selectedItemData?.nome} · {quantidade} {selectedItemData?.unidadeEstoque ?? "unidade"} · R$ {(Number(quantidade) * (Number(precoUnitario) || precoEstimado)).toFixed(2)}. Estoque após entrada: {(selectedItemData?.atual ?? 0) + Number(quantidade || 0)}.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel disabled={isSubmitting}>Cancelar</AlertDialogCancel><AlertDialogAction disabled={isSubmitting} onClick={async (event) => { event.preventDefault(); if (isSubmitting) return; setIsSubmitting(true); try { await onEntrada(selectedItemId, Number(quantidade), Number(quantidade) * (Number(precoUnitario) || precoEstimado), fornecedor.trim() || undefined, observacao.trim() || undefined, dataMovimentacao); setConfirmOpen(false); setSelectedItemId(""); setQuantidade(""); setPrecoUnitario(""); setFornecedor(""); setObservacao("") } finally { setIsSubmitting(false) } }}>{isSubmitting ? "Registrando..." : "Confirmar entrada"}</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
     </div>
   )
 }

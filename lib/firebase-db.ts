@@ -451,20 +451,22 @@ export async function registrarBaixaVendaAtomica(params: { venda: VendaFinanceir
   })
 }
 
-export async function registrarEntradaAtomica(params: { movimento: MovimentacaoEstoque; itemNome: string; userId: string }) {
+export async function registrarEntradaAtomica(params: { movimento: MovimentacaoEstoque; itemId: string; userId: string }) {
   const movimentoRef = doc(db, MOVIMENTACOES_COLLECTION, params.movimento.id)
   const estoqueRef = doc(db, "estoque", "global")
   return runTransaction(db, async (transaction) => {
     const estoqueSnap = await transaction.get(estoqueRef)
     const itens = (estoqueSnap.exists() ? estoqueSnap.data().itens : []) as Item[]
-    const index = itens.findIndex((item) => item.nome === params.itemNome || item.insumoId === params.movimento.insumoId)
-    if (index < 0) throw new Error("Insumo não encontrado no estoque")
+    const index = itens.findIndex((item) => item.id === params.itemId || item.insumoId === params.itemId)
+    if (index < 0) throw new Error(`Insumo não encontrado no estoque: ${params.itemId}`)
     const item = itens[index]
     const quantidade = params.movimento.quantidade
     if (!Number.isFinite(quantidade) || quantidade <= 0) throw new Error("A quantidade deve ser maior que zero")
-    const atualizados = itens.map((row, rowIndex) => rowIndex === index ? { ...row, atual: row.atual + quantidade } : row)
+    const novoAtual = item.atual + quantidade
+    const movimento = removerUndefinedFirestore({ ...params.movimento, itemId: params.itemId, itemNome: item.nome, quantidadeAnterior: item.atual, quantidadeNova: novoAtual, diferenca: quantidade, usuarioUid: params.userId, createdAt: Timestamp.now(), estoqueAnterior: item.atual, estoquePosterior: novoAtual, saldoAnterior: item.atual, saldoPosterior: novoAtual, tipo: "entrada" as const })
+    const atualizados = itens.map((row, rowIndex) => rowIndex === index ? { ...row, atual: novoAtual, precoReferencia: params.movimento.precoUnitarioSnapshot != null ? params.movimento.precoUnitarioSnapshot / 100 : row.precoReferencia, precoCompra: params.movimento.precoUnitarioSnapshot != null ? params.movimento.precoUnitarioSnapshot / 100 : row.precoCompra, ultimaAtualizacaoPreco: new Date().toISOString() } : row)
     transaction.set(estoqueRef, { itens: atualizados, updatedAt: Timestamp.now(), lastModifiedBy: params.userId })
-    transaction.set(movimentoRef, params.movimento)
+    transaction.set(movimentoRef, movimento)
     return atualizados
   })
 }

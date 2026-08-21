@@ -247,16 +247,16 @@ export default function Home() {
     } catch (error) { toast.error(error instanceof Error ? error.message : "Não foi possível estornar a entrada.") }
   }
 
-  const registrarEntradaRastreavel = async (nome: string, qtd: number, custo: number, fornecedor?: string, observacao?: string, dataMovimentacao?: string) => {
-    const item = itens.find((row) => row.nome === nome)
-    const insumo = insumos.find((row) => row.id === item?.insumoId || row.nome === nome)
+  const registrarEntradaRastreavel = async (itemId: string, qtd: number, custo: number, fornecedor?: string, observacao?: string, dataMovimentacao?: string) => {
+    const item = itens.find((row) => (row.id ?? row.insumoId ?? row.nome) === itemId)
+    const insumo = item ? insumos.find((row) => row.id === item.insumoId) : undefined
     if (!userPermissoes.includes("entrada") && userRole !== "owner" && userRole !== "admin") throw new Error("Você não tem permissão para registrar entrada.")
     if (!item || !insumo || item.ativo === false || item.naoVinculado === true) throw new Error("Este item não está disponível para entrada.")
     const currentUser = auth.currentUser
     if (!currentUser) throw new Error("Usuário autenticado não encontrado.")
     const unidade = (item.unidadeEstoque === "Unidade" ? "un" : item.unidadeEstoque) as Insumo["unidade"]
     const movimento = { ...criarEntrada({ insumo: { ...insumo, id: item.insumoId ?? insumo.id }, quantidade: qtd, unidade, precoUnitario: qtd > 0 ? custo / qtd : 0, fornecedor, observacao, dataMovimentacao, usuario: { id: currentUser.uid, email: currentUser.email ?? undefined, nome: currentUser.displayName ?? undefined } }), status: "ativa" as const }
-    const atualizados = await registrarEntradaAtomica({ movimento, itemNome: nome, userId: currentUser.uid })
+    const atualizados = await registrarEntradaAtomica({ movimento, itemId, userId: currentUser.uid })
     setItens(atualizados); setMovimentacoes(await getMovimentacoesEstoque()); toast.success("Entrada registrada com sucesso.")
   }
 
@@ -455,9 +455,9 @@ export default function Home() {
     }
   }
 
-  const handleEntrada = async (nome: string, qtd: number, custo: number, fornecedor?: string, observacao?: string, dataMovimentacao?: string) => {
+  const handleEntrada = async (itemId: string, qtd: number, custo: number, fornecedor?: string, observacao?: string, dataMovimentacao?: string) => {
     try {
-      await registrarEntradaRastreavel(nome, qtd, custo, fornecedor, observacao, dataMovimentacao)
+      await registrarEntradaRastreavel(itemId, qtd, custo, fornecedor, observacao, dataMovimentacao)
     } catch (error) {
       console.error("[v0] Falha ao sincronizar entrada:", error)
       toast.error(traduzirErroFirebase(error))
