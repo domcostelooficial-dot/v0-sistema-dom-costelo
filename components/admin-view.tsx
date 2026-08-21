@@ -54,6 +54,7 @@ import type { UsuarioSistema, UserRole, TabPermissao, UserStatus } from "@/lib/t
 import { toast } from "sonner"
 import { auth } from "@/lib/firebase"
 import { changePassword } from "@/lib/firebase-auth"
+import { MODULOS_PERMISSAO, normalizarPermissoes } from "@/lib/permissions"
 
 interface AdminViewProps {
   currentUser: string
@@ -61,21 +62,12 @@ interface AdminViewProps {
 }
 
 const permissoesPorPerfil: Record<Exclude<UserRole, "owner">, TabPermissao[]> = {
-  admin: ["estoque", "entrada", "saida", "inventario", "financeiro", "dashboard", "lista-compras", "cmv", "admin"],
-  operador: ["estoque", "entrada", "saida", "inventario", "lista-compras"],
-  analista: ["estoque", "dashboard", "financeiro", "lista-compras", "cmv"],
+  admin: ["estoque", "entrada", "saida", "inventario", "financeiro", "dashboard", "listaCompras", "fichaTecnica", "admin"],
+  operador: ["estoque", "entrada", "saida", "inventario", "listaCompras"],
+  analista: ["estoque", "dashboard", "financeiro", "listaCompras", "fichaTecnica"],
 }
 
-const allPermissoes: { id: TabPermissao; label: string }[] = [
-  { id: "estoque", label: "Estoque" },
-  { id: "entrada", label: "Entrada" },
-  { id: "saida", label: "Saída" },
-  { id: "inventario", label: "Inventário" },
-  { id: "financeiro", label: "Financeiro" },
-  { id: "dashboard", label: "Dashboard" },
-  { id: "lista-compras", label: "Lista de Compras" },
-  { id: "cmv", label: "Ficha Técnica e CMV" },
-]
+const allPermissoes = MODULOS_PERMISSAO.map(({ key, label }) => ({ id: key as TabPermissao, label }))
 
 export function AdminView({ currentUser, onPasswordChange }: AdminViewProps) {
   const [usuarios, setUsuarios] = useState<UsuarioSistema[]>([])
@@ -138,7 +130,7 @@ export function AdminView({ currentUser, onPasswordChange }: AdminViewProps) {
       nome: formData.nome.trim(),
       email: formData.email.trim().toLowerCase(),
       role: formData.role,
-      permissoes: formData.permissoes,
+      permissoes: normalizarPermissoes(formData.permissoes) as TabPermissao[],
       status: "aprovado",
       dataCriacao: new Date().toLocaleString("pt-BR"),
     }
@@ -172,7 +164,7 @@ export function AdminView({ currentUser, onPasswordChange }: AdminViewProps) {
       nome: formData.nome.trim(),
       email: formData.email.trim().toLowerCase(),
       role: formData.role,
-      permissoes: formData.permissoes,
+      permissoes: normalizarPermissoes(formData.permissoes) as TabPermissao[],
     }
 
     const updated = usuarios.map((u) =>
@@ -220,7 +212,7 @@ export function AdminView({ currentUser, onPasswordChange }: AdminViewProps) {
       nome: user.nome || "",
       email: user.email || "",
       role: user.role,
-      permissoes: user.permissoes ? [...user.permissoes] : [],
+      permissoes: normalizarPermissoes(user.permissoes) as TabPermissao[],
     })
     setIsEditDialogOpen(true)
   }
@@ -243,9 +235,10 @@ export function AdminView({ currentUser, onPasswordChange }: AdminViewProps) {
   }
 
   const handleBulkPermissionChange = async (userId: string, permissao: TabPermissao, checked: boolean) => {
+    const atuais = normalizarPermissoes(usuarios.find(u => u.login === userId)?.permissoes)
     const newPermissoes = checked
-      ? [...(usuarios.find(u => u.login === userId)?.permissoes || []), permissao]
-      : (usuarios.find(u => u.login === userId)?.permissoes || []).filter((p) => p !== permissao)
+      ? Array.from(new Set([...atuais, permissao]))
+      : atuais.filter((p) => p !== permissao)
     
     const updated = usuarios.map((u) => {
       if (u.login === userId) {

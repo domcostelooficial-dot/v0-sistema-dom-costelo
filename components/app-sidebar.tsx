@@ -2,6 +2,7 @@
 
 import Image from "next/image"
 import { cn } from "@/lib/utils"
+import { MODULOS_PERMISSAO, normalizarPermissoes, roleTemAcessoTotal } from "@/lib/permissions"
 import { Button } from "@/components/ui/button"
 import {
   Package,
@@ -17,7 +18,7 @@ import {
   ClipboardCheck,
 } from "lucide-react"
 
-type Tab = "estoque" | "entrada" | "saida" | "inventario" | "financeiro" | "dashboard" | "lista-compras" | "cmv" | "admin"
+type Tab = "estoque" | "entrada" | "saida" | "inventario" | "financeiro" | "dashboard" | "listaCompras" | "fichaTecnica" | "admin"
 
 interface AppSidebarProps {
   activeTab: Tab
@@ -37,8 +38,8 @@ const menuItems = [
   { id: "inventario" as Tab, label: "Inventário", icon: ClipboardCheck },
   { id: "financeiro" as Tab, label: "Financeiro", icon: DollarSign },
   { id: "dashboard" as Tab, label: "Dashboard", icon: BarChart3 },
-  { id: "lista-compras" as Tab, label: "Lista de Compras", icon: ShoppingCart },
-  { id: "cmv" as Tab, label: "Ficha Técnica e CMV", icon: Calculator },
+  { id: "listaCompras" as Tab, label: "Lista de Compras", icon: ShoppingCart },
+  { id: "fichaTecnica" as Tab, label: "Ficha Técnica e CMV", icon: Calculator },
   { id: "admin" as Tab, label: "Administração", icon: Settings },
 ]
 
@@ -53,15 +54,8 @@ export function AppSidebar({
   onToggle,
 }: AppSidebarProps) {
   // Filter menu items based on permissions
-  const filteredMenuItems = menuItems.filter((item) => {
-    if (item.id === "admin") {
-      return userRole === "admin" || userRole === "owner"
-    }
-    if (item.id === "cmv") {
-      return true
-    }
-    return userPermissoes && userPermissoes.includes(item.id)
-  })
+  const permissoesNormalizadas = normalizarPermissoes(userPermissoes)
+  const filteredMenuItems = menuItems.filter((item) => roleTemAcessoTotal(userRole as "owner" | "admin" | "operador" | "analista") || permissoesNormalizadas.includes(item.id))
   return (
     <>
       {/* Mobile Menu Button */}

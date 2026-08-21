@@ -78,8 +78,9 @@ import { Button } from "@/components/ui/button"
 import { signOut } from "firebase/auth"
 import { auth } from "@/lib/firebase"
 import { traduzirErroFirebase } from "@/lib/firebase-errors"
+import { normalizarPermissoes, primeiroModuloPermitido, usuarioPodeAcessar } from "@/lib/permissions"
 
-type Tab = "estoque" | "entrada" | "saida" | "inventario" | "financeiro" | "dashboard" | "lista-compras" | "cmv" | "admin"
+type Tab = "estoque" | "entrada" | "saida" | "inventario" | "financeiro" | "dashboard" | "listaCompras" | "fichaTecnica" | "admin"
 
 const ITENS_REMOVIDOS = new Set(["Costela Crua", "Contra filé", "Manteiga de Garrafa", "Limoneto"])
 
@@ -340,8 +341,9 @@ export default function Home() {
 
   const handleLogin = (username: string, role: string, permissoes: string[]) => {
     setUser(username)
+    const permissoesNormalizadas = normalizarPermissoes(permissoes)
     setUserRole(role)
-    setUserPermissoes(permissoes)
+    setUserPermissoes(permissoesNormalizadas)
     
     // Recarregar dados do Firebase do novo usuario
     const loadUserData = async () => {
@@ -370,7 +372,8 @@ export default function Home() {
     loadUserData()
     
     // Set first allowed tab as active
-    const firstAllowedTab = permissoes[0] as Tab
+    const perfil = { role: role as "owner" | "admin" | "operador" | "analista", status: "aprovado" as const, ativo: true, permissoes: permissoesNormalizadas as never[] }
+    const firstAllowedTab = primeiroModuloPermitido(perfil) as Tab | null
     setActiveTab(firstAllowedTab || "estoque")
   }
 
@@ -582,9 +585,12 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-background">
-      <AppSidebar
-        activeTab={activeTab}
-        onTabChange={setActiveTab}
+  <AppSidebar
+  activeTab={activeTab}
+  onTabChange={(tab) => {
+    const perfil = { role: userRole as "owner" | "admin" | "operador" | "analista", status: "aprovado" as const, ativo: true, permissoes: userPermissoes as never[] }
+    if (usuarioPodeAcessar(perfil, tab)) setActiveTab(tab)
+  }}
         onLogout={handleLogout}
         user={user}
         userRole={userRole}
@@ -608,8 +614,8 @@ export default function Home() {
               {activeTab === "inventario" && "Inventário"}
               {activeTab === "financeiro" && "Financeiro"}
               {activeTab === "dashboard" && "Dashboard"}
- {activeTab === "lista-compras" && "Lista de Compras"}
- {activeTab === "cmv" && "Ficha Técnica e CMV"}
+ {activeTab === "listaCompras" && "Lista de Compras"}
+ {activeTab === "fichaTecnica" && "Ficha Técnica e CMV"}
  {activeTab === "admin" && "Administração"}
             </h1>
             <p className="text-muted-foreground">
@@ -623,9 +629,9 @@ export default function Home() {
                 "Acompanhe seus gastos e histórico"}
               {activeTab === "dashboard" &&
                 "Visualize as métricas do seu neg��cio"}
- {activeTab === "lista-compras" &&
+ {activeTab === "listaCompras" &&
   "Itens com estoque baixo, quantidades e valor total da compra"}
- {activeTab === "cmv" && "Custos centralizados, fichas técnicas e margens"}
+ {activeTab === "fichaTecnica" && "Custos centralizados, fichas técnicas e margens"}
  {activeTab === "admin" &&
                 "Gerenciamento de usuários, permissões e configurações"}
             </p>
@@ -667,7 +673,7 @@ export default function Home() {
           {activeTab === "dashboard" && (
             <DashboardView itens={itens} historico={historico} vendasFinanceiras={vendasFinanceiras} despesasFinanceiras={despesasFinanceiras} financeConfig={financeConfig} />
           )}
-          {activeTab === "lista-compras" && (
+          {activeTab === "listaCompras" && (
             <ListaComprasView
               itens={itens}
               user={user}
@@ -694,7 +700,7 @@ export default function Home() {
   }}
             />
           )}
-  {activeTab === "cmv" && (
+  {activeTab === "fichaTecnica" && (
   <CmvView insumos={insumos} fichas={fichasTecnicas} combos={combos} userRole={userRole} onSaveInsumos={persistirInsumos} onSaveFichas={persistirFichas} onSaveCombos={(data) => { setCombos(data); saveCombos(data).catch((error) => console.error("[v0] Erro ao salvar combos:", error)) }} />
   )}
   {activeTab === "admin" && (userRole === "admin" || userRole === "owner") && (
